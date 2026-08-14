@@ -1,26 +1,66 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --border: #e2e8f0;
+  --lime: #84cc16;
+  --emerald: #10b981;
+  --amber: #f59e0b;
+  --gold: #eab308;
+  --tap-lavender: #9ca3af;
+  --tap-dust: #a8a3b5;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-lime: var(--lime);
+  --color-emerald: var(--emerald);
+  --color-amber: var(--amber);
+  --color-gold: var(--gold);
+  --color-tap-lavender: var(--tap-lavender);
+  --color-tap-dust: var(--tap-dust);
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-space-grotesk);
+  --font-mono: var(--font-jetbrains-mono);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  cursor: default;
+  user-select: none;
+}
+
+/* Text caret / I-beam only where the user can type */
+input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]),
+textarea,
+[contenteditable="true"] {
+  cursor: text;
+  user-select: text;
+}
+
+button,
+a,
+[role="button"] {
+  cursor: pointer;
+}
+
+.font-display {
+  font-family: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Soft ambient card shadow — light theme only */
+.shadow-soft {
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 0.04),
+    0 4px 16px rgb(15 23 42 / 0.04);
 }
