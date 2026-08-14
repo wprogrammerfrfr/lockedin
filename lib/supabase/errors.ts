@@ -22,6 +22,7 @@ const ALLOWED_KEYS: Record<string, string> = {
   empty_room_name: "Give this session a name first.",
   no_active_vote: "That break vote already ended.",
   vote_expired: "That break vote already ended.",
+  not_vote_requester: "Only the person who started this vote can cancel it.",
 };
 
 function errorMessage(err: unknown): string {

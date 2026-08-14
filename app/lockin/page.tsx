@@ -294,7 +294,7 @@ export default function LockInPage() {
         await tapOutSession(createClient(), {
           id: state.remoteSessionId,
           activeMs: state.elapsedMs,
-          breakMs: 0,
+          breakMs: state.breakMs,
           breakTypes: state.breakTypesUsed,
           outcome: "tapout",
           prBroken: state.didBreakPR,
@@ -311,6 +311,7 @@ export default function LockInPage() {
     isAuthenticated,
     persistGuestDraft,
     state.breakTypesUsed,
+    state.breakMs,
     state.didBreakPR,
     state.elapsedMs,
     state.remoteSessionId,
@@ -322,7 +323,7 @@ export default function LockInPage() {
         await endSession(createClient(), {
           id: state.remoteSessionId,
           activeMs: state.elapsedMs,
-          breakMs: 0,
+          breakMs: state.breakMs,
           breakTypes: state.breakTypesUsed,
           outcome: state.didBreakPR ? "pr" : "solid",
           prBroken: state.didBreakPR,
@@ -340,6 +341,7 @@ export default function LockInPage() {
     isAuthenticated,
     persistGuestDraft,
     state.breakTypesUsed,
+    state.breakMs,
     state.didBreakPR,
     state.elapsedMs,
     state.remoteSessionId,

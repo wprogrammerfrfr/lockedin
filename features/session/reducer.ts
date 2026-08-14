@@ -28,6 +28,7 @@ export const initialState: AppState = {
   breakEmoji: "",
   sessionName: null,
   breakTypesUsed: [],
+  breakMs: 0,
   remoteSessionId: null,
   clientId: null,
 };
@@ -54,6 +55,7 @@ export function reducer(state: AppState, action: Action): AppState {
         breakEmoji: "",
         sessionName: action.sessionName?.trim() || null,
         breakTypesUsed: [],
+        breakMs: 0,
         remoteSessionId:
           action.remoteSessionId !== undefined
             ? action.remoteSessionId
@@ -136,15 +138,21 @@ export function reducer(state: AppState, action: Action): AppState {
     }
     case "BREAK_TICK": {
       if (state.session !== "ON_BREAK") return state;
+      const spent = Math.min(action.delta, state.breakRemainingMs);
       const next = Math.max(0, state.breakRemainingMs - action.delta);
       if (next <= 0) {
         return {
           ...state,
           breakRemainingMs: 0,
+          breakMs: state.breakMs + spent,
           session: "BREAK_DONE",
         };
       }
-      return { ...state, breakRemainingMs: next };
+      return {
+        ...state,
+        breakRemainingMs: next,
+        breakMs: state.breakMs + spent,
+      };
     }
     case "LOCK_BACK_IN":
       if (

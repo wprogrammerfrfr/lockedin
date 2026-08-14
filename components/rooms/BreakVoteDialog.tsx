@@ -17,15 +17,17 @@ export function BreakVoteDialog({
   endsAt,
   tallies,
   myVote,
+  canCancel,
   onVote,
-  onClose,
+  onCancel,
 }: {
   open: boolean;
   endsAt: string | null;
   tallies: { break: number; stay: number };
   myVote: BreakVoteChoice | null;
+  canCancel?: boolean;
   onVote: (choice: BreakVoteChoice) => void;
-  onClose: () => void;
+  onCancel?: () => void;
 }) {
   const [left, setLeft] = useState(30);
 
@@ -40,8 +42,12 @@ export function BreakVoteDialog({
   }, [endsAt, open]);
 
   return (
-    <Dialog open={open} onOpenChange={(n) => !n && onClose()}>
-      <DialogContent className="max-w-sm border-slate-200 bg-white">
+    <Dialog open={open} onOpenChange={() => undefined}>
+      <DialogContent
+        className="max-w-sm border-slate-200 bg-white"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>Shared break vote</DialogTitle>
           <DialogDescription>
@@ -49,7 +55,7 @@ export function BreakVoteDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <p className="text-center font-mono text-2xl tabular-nums text-slate-800">
+        <p className="font-mono text-center text-2xl tabular-nums text-slate-800">
           {left}s
         </p>
         <p className="text-center text-xs text-slate-500">
@@ -80,6 +86,15 @@ export function BreakVoteDialog({
             </span>
           </Button>
         </DialogFooter>
+        {canCancel ? (
+          <Button
+            variant="ghost"
+            className="w-full rounded-xl text-slate-500"
+            onClick={() => onCancel?.()}
+          >
+            Cancel vote
+          </Button>
+        ) : null}
       </DialogContent>
     </Dialog>
   );

@@ -44,6 +44,7 @@ export type AppState = {
   breakEmoji: string;
   sessionName: string | null;
   breakTypesUsed: BreakTypeUsed[];
+  breakMs: number;
   remoteSessionId: string | null;
   clientId: string | null;
 };

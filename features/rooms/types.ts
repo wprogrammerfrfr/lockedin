@@ -32,6 +32,9 @@ export type RoomSummary = {
   roomSessionId?: string | null;
   activeBreakRoundId?: string | null;
   breakVoteEndsAt?: string | null;
+  breakVoteRequestedBy?: string | null;
+  lastVoteRoundId?: string | null;
+  lastVoteResult?: "break" | "stay" | "cancelled" | string | null;
   memberCount?: number;
 };
 

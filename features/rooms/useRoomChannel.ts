@@ -22,8 +22,8 @@ function mergeMembers(
     const next: RoomPresenceMember = live
       ? {
           ...m,
-          status: live.status,
-          elapsedMs: live.elapsedMs,
+          status: m.status !== "WAITING" ? m.status : live.status,
+          elapsedMs: live.elapsedMs || m.elapsedMs,
           username: live.username || m.username,
           displayName: live.displayName || m.displayName,
           avatarPath: live.avatarPath || m.avatarPath,
@@ -140,7 +140,8 @@ export function useRoomChannel(
           const metas = state[key] ?? [];
           for (const meta of metas) {
             const m = meta as RoomPresenceMember;
-            if (m.userId) next.set(m.userId, m);
+            const userId = m.userId || key;
+            next.set(userId, { ...m, userId });
           }
         }
         setPresenceById(next);
@@ -158,7 +159,13 @@ export function useRoomChannel(
       });
 
     const touchId = window.setInterval(() => {
-      void touchRoomPresence(supabase, roomId).catch(() => undefined);
+      const s = selfRef.current;
+      void touchRoomPresence(
+        supabase,
+        roomId,
+        s.status,
+        s.elapsedMs,
+      ).catch(() => undefined);
       trackSelf();
     }, TOUCH_MS);
 
@@ -174,6 +181,16 @@ export function useRoomChannel(
   useEffect(() => {
     trackSelf();
   }, [self.status, elapsedSec, self.seat, trackSelf]);
+
+  useEffect(() => {
+    if (!roomId || !self.userId) return;
+    void touchRoomPresence(
+      createClient(),
+      roomId,
+      self.status,
+      self.elapsedMs,
+    ).catch(() => undefined);
+  }, [self.status, roomId, self.userId]);
 
   return { members, channelStatus };
 }

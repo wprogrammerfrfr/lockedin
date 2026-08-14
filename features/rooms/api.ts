@@ -23,6 +23,9 @@ function mapRoom(row: RoomRow): RoomSummary {
     roomSessionId: row.room_session_id ?? null,
     activeBreakRoundId: row.active_break_round_id ?? null,
     breakVoteEndsAt: row.break_vote_ends_at ?? null,
+    breakVoteRequestedBy: row.break_vote_requested_by ?? null,
+    lastVoteRoundId: row.last_vote_round_id ?? null,
+    lastVoteResult: row.last_vote_result ?? null,
   };
 }
 
@@ -142,9 +145,14 @@ export async function joinRoom(supabase: SupabaseClient, code: string) {
 export async function touchRoomPresence(
   supabase: SupabaseClient,
   roomId: string,
+  status?: string | null,
+  elapsedMs?: number | null,
 ) {
   const { error } = await supabase.rpc("touch_room_presence", {
     p_room_id: roomId,
+    p_status: status ?? null,
+    p_elapsed_ms:
+      typeof elapsedMs === "number" ? Math.round(elapsedMs) : null,
   });
   if (error) throw new Error(error.message);
 }
@@ -172,17 +180,30 @@ export async function castBreakVote(
   if (error) throw new Error(error.message);
 }
 
+export async function cancelBreakVote(
+  supabase: SupabaseClient,
+  roomId: string,
+) {
+  const { data, error } = await supabase.rpc("cancel_break_vote", {
+    p_room_id: roomId,
+  });
+  if (error) throw new Error(error.message);
+  return asRoom(data);
+}
+
 export async function resolveBreakVote(
   supabase: SupabaseClient,
   roomId: string,
-): Promise<{ result: "break" | "stay" | null }> {
+): Promise<{ result: "break" | "stay" | "cancelled" | null }> {
   const { data, error } = await supabase.rpc("resolve_break_vote", {
     p_room_id: roomId,
   });
   if (error) throw new Error(error.message);
   const row = data as { result?: string | null } | null;
   const result = row?.result;
-  if (result === "break" || result === "stay") return { result };
+  if (result === "break" || result === "stay" || result === "cancelled") {
+    return { result };
+  }
   return { result: null };
 }
 
@@ -214,7 +235,7 @@ export async function fetchRoomMembers(
 ): Promise<RoomPresenceMember[]> {
   const { data, error } = await supabase
     .from("room_members")
-    .select("user_id, seat, profiles(username, avatar_path)")
+    .select("user_id, seat, focus_status, elapsed_ms, profiles(username, avatar_path)")
     .eq("room_id", roomId)
     .order("seat", { ascending: true });
   if (error) throw new Error(error.message);
@@ -228,13 +249,21 @@ export async function fetchRoomMembers(
       : (row as { profiles?: { username?: string; avatar_path?: string | null } })
           .profiles;
     const username = profile?.username?.trim() || "member";
+    const rawStatus = (row as { focus_status?: string | null }).focus_status;
+    const status: RoomPresenceMember["status"] =
+      rawStatus === "LOCKED_IN" ||
+      rawStatus === "BREAK" ||
+      rawStatus === "LACKING" ||
+      rawStatus === "IDLE"
+        ? rawStatus
+        : "WAITING";
     return {
       userId: (row as { user_id: string }).user_id,
       username,
       displayName: username,
       avatarPath: publicAvatarUrl(profile?.avatar_path ?? null),
-      status: "WAITING" as const,
-      elapsedMs: 0,
+      status,
+      elapsedMs: Number((row as { elapsed_ms?: number | null }).elapsed_ms) || 0,
       seat: (row as { seat?: number | null }).seat ?? null,
     };
   });

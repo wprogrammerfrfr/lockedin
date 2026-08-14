@@ -78,7 +78,7 @@ export function useSessionClock(
       void heartbeatSession(supabase, {
         id: s.remoteSessionId,
         activeMs: s.elapsedMs,
-        breakMs: 0,
+        breakMs: s.breakMs,
         breakTypes: s.breakTypesUsed,
         status,
       }).catch(() => {

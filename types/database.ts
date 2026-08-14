@@ -49,6 +49,9 @@ export type RoomRow = {
   room_session_id?: string | null;
   active_break_round_id?: string | null;
   break_vote_ends_at?: string | null;
+  break_vote_requested_by?: string | null;
+  last_vote_round_id?: string | null;
+  last_vote_result?: "break" | "stay" | "cancelled" | string | null;
 };
 
 export type RoomMemberRow = {
@@ -56,6 +59,8 @@ export type RoomMemberRow = {
   user_id: string;
   seat: number | null;
   last_seen_at: string | null;
+  focus_status?: string | null;
+  elapsed_ms?: number | null;
 };
 
 export type FollowStatus = "pending" | "accepted" | "rejected";

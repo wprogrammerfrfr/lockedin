@@ -18,9 +18,11 @@ import { RoomPresencePane } from "@/components/rooms/RoomPresencePane";
 import { RoomPresenceStrip } from "@/components/rooms/RoomPresenceStrip";
 import { BreakVoteDialog } from "@/components/rooms/BreakVoteDialog";
 import { ActiveSessionDialog } from "@/components/session/ActiveSessionDialog";
+import { PitStopDialog } from "@/components/session/PitStopDialog";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
+  cancelBreakVote,
   castBreakVote,
   fetchBreakVotes,
   fetchRoomByCode,
@@ -31,7 +33,6 @@ import {
 import { useRoomCloseWatch } from "@/features/rooms/closeWatch";
 import { usePomodoroCadence } from "@/features/rooms/usePomodoroCadence";
 import { useRoomChannel } from "@/features/rooms/useRoomChannel";
-import { majorityBreakResult } from "@/features/rooms/vote";
 import type { BreakVoteChoice, RoomSummary } from "@/features/rooms/types";
 import { initialState, reducer } from "@/features/session/reducer";
 import { useSessionClock } from "@/features/session/useSessionClock";
@@ -76,16 +77,15 @@ export default function RoomFocusPage({
   const [sessionNameDraft, setSessionNameDraft] = useState("");
   const [tallies, setTallies] = useState({ break: 0, stay: 0 });
   const [myVote, setMyVote] = useState<BreakVoteChoice | null>(null);
-  const [resolvedRound, setResolvedRound] = useState<string | null>(null);
   const [conflictOpen, setConflictOpen] = useState(false);
   const [conflictSession, setConflictSession] = useState<SessionRow | null>(
     null,
   );
   const stateRef = useRef(state);
   stateRef.current = state;
-  const talliesRef = useRef(tallies);
-  talliesRef.current = tallies;
   const seenRoomRef = useRef(false);
+  const appliedVoteRoundRef = useRef<string | null>(null);
+  const loadErrorToastRef = useRef(false);
 
   const userId = user?.id ?? null;
   const username = profile?.username?.trim() || "you";
@@ -105,6 +105,7 @@ export default function RoomFocusPage({
         return;
       }
       seenRoomRef.current = true;
+      loadErrorToastRef.current = false;
       setMissing(false);
       setRoom(next);
       if (next.activeBreakRoundId) {
@@ -120,9 +121,9 @@ export default function RoomFocusPage({
         setMyVote(null);
       }
     } catch {
-      if (!seenRoomRef.current) {
-        setMissing(true);
-        setRoom(null);
+      if (!loadErrorToastRef.current) {
+        loadErrorToastRef.current = true;
+        toast.error("Could not load room");
       }
     }
   }, [code, router]);
@@ -192,7 +193,7 @@ export default function RoomFocusPage({
 
   const roundId = room?.activeBreakRoundId ?? null;
   const voteEndsAt = room?.breakVoteEndsAt ?? null;
-  const voteActive = Boolean(roundId && voteEndsAt && resolvedRound !== roundId);
+  const voteActive = Boolean(roundId && voteEndsAt);
 
   const { secondsLeft } = useRoomCloseWatch(room?.closesAt);
   const { isPomodoro, phase, remainingMs } = usePomodoroCadence(room);
@@ -268,47 +269,32 @@ export default function RoomFocusPage({
     };
   }, [status, userId]);
 
-  const membersLenRef = useRef(0);
-  membersLenRef.current = members.length;
-
-  const applyVoteResult = useCallback((result: "break" | "stay") => {
-    if (result === "break" && stateRef.current.session === "LOCKED_IN") {
+  useEffect(() => {
+    const voteRound = room?.lastVoteRoundId;
+    const result = room?.lastVoteResult;
+    if (!voteRound || !result) return;
+    if (appliedVoteRoundRef.current === voteRound) return;
+    appliedVoteRoundRef.current = voteRound;
+    if (result === "break") {
       dispatch({ type: "START_SHARED_BREAK" });
+    } else if (result === "cancelled") {
+      toast.message("Break vote cancelled.");
     }
-  }, []);
+  }, [room?.lastVoteRoundId, room?.lastVoteResult]);
 
   useEffect(() => {
     if (!room?.id || !roundId || !voteEndsAt) return;
-    if (resolvedRound === roundId) return;
     const ends = new Date(voteEndsAt).getTime();
-    const wait = Math.max(0, ends - Date.now());
+    const wait = Math.max(0, ends - Date.now() + 250);
     const id = window.setTimeout(() => {
-      setResolvedRound(roundId);
-      const t = talliesRef.current;
-      const result = majorityBreakResult(
-        t.break,
-        t.stay,
-        Math.max(membersLenRef.current, 1),
-      );
-      applyVoteResult(result);
       void resolveBreakVote(createClient(), room.id)
-        .then((resolved) => {
-          if (resolved.result) applyVoteResult(resolved.result);
-          void loadRoom();
-        })
+        .then(() => loadRoom())
         .catch(() => {
           void loadRoom();
         });
     }, wait);
     return () => window.clearTimeout(id);
-  }, [
-    room?.id,
-    roundId,
-    voteEndsAt,
-    resolvedRound,
-    applyVoteResult,
-    loadRoom,
-  ]);
+  }, [room?.id, roundId, voteEndsAt, loadRoom]);
 
   useEffect(() => {
     if (state.session === "ENDED" || state.session === "TAPPED_OUT") {
@@ -322,7 +308,7 @@ export default function RoomFocusPage({
     const payload = {
       id: s.remoteSessionId,
       activeMs: s.elapsedMs,
-      breakMs: 0,
+      breakMs: s.breakMs,
       breakTypes: s.breakTypesUsed,
       outcome: kind === "tapout" ? "tapout" : s.didBreakPR ? "pr" : "solid",
       prBroken: s.didBreakPR,
@@ -400,6 +386,16 @@ export default function RoomFocusPage({
     }
   }
 
+  async function onCancelVote() {
+    if (!room) return;
+    try {
+      await cancelBreakVote(createClient(), room.id);
+      await loadRoom();
+    } catch (err) {
+      toast.error(userFacingError(err, "Could not cancel vote"));
+    }
+  }
+
   async function onLeave() {
     try {
       if (isFocusSession(stateRef.current.session) && stateRef.current.remoteSessionId) {
@@ -425,6 +421,8 @@ export default function RoomFocusPage({
 
   const displayCode = room?.code ?? code.replace(/\D/g, "").slice(0, 6);
   const isVoteRoom = room?.kind !== "pomodoro";
+  const canCancelVote =
+    Boolean(userId) && room?.breakVoteRequestedBy === userId;
 
   return (
     <AppShell
@@ -486,13 +484,10 @@ export default function RoomFocusPage({
           sessionName={sessionNameDraft}
           onSessionNameChange={setSessionNameDraft}
           lockInDisabled={status === "loading"}
-          hidePersonalBreak
           onLockIn={() => {
             void onLockIn();
           }}
-          onPitStop={() => {
-            void onRequestBreak();
-          }}
+          onPitStop={() => dispatch({ type: "OPEN_PIT_STOP" })}
           onLockBackIn={() => dispatch({ type: "LOCK_BACK_IN" })}
           onEndSession={() => {
             void onEndSession();
@@ -505,11 +500,18 @@ export default function RoomFocusPage({
         />
       </div>
 
+      <PitStopDialog
+        open={state.session === "CHOOSING_BREAK"}
+        onClose={() => dispatch({ type: "CLOSE_PIT_STOP" })}
+        onSelect={(choice) => dispatch({ type: "START_BREAK", choice })}
+      />
+
       <BreakVoteDialog
         open={voteActive}
         endsAt={voteEndsAt}
         tallies={tallies}
         myVote={myVote}
+        canCancel={canCancelVote}
         onVote={async (choice) => {
           const previous = myVote;
           setMyVote(choice);
@@ -523,7 +525,7 @@ export default function RoomFocusPage({
             }
           }
         }}
-        onClose={() => undefined}
+        onCancel={() => void onCancelVote()}
       />
 
       <ActiveSessionDialog
