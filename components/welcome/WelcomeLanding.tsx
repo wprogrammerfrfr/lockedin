@@ -3,10 +3,12 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Cloud, Target, Users } from "lucide-react";
+import { Cloud, Code2, Target, Users } from "lucide-react";
 import { WelcomeCtas } from "@/components/welcome/WelcomeCtas";
+import { WelcomeDevShowcase } from "@/components/welcome/WelcomeDevShowcase";
 import { WelcomeFeatures } from "@/components/welcome/WelcomeFeatures";
 import { WelcomeHowTo } from "@/components/welcome/WelcomeHowTo";
+import { WelcomeRoomsShowcase } from "@/components/welcome/WelcomeRoomsShowcase";
 import { WelcomeTimerPreview } from "@/components/welcome/WelcomeTimerPreview";
 import { springSoft } from "@/components/session/state-accent";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -103,14 +105,46 @@ export function WelcomeLanding() {
         </WelcomeSection>
 
         <WelcomeSection>
-          <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-slate-400">
-            What you get
+          <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-emerald-600">
+            Rooms
           </p>
-          <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-slate-900">
-            Lock in with friends. Price the build.
+          <h2 className="mt-2 flex items-center gap-2 font-display text-3xl font-bold tracking-tight text-slate-900">
+            <Users className="h-7 w-7 text-emerald-600" />
+            Lock in with friends.
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-500">
-            Rooms for shared sessions. Developer Mode for GitHub cost and time.
+            Shared rooms, presence, and Bet / Nah break votes.
+          </p>
+          <div className="mt-6">
+            <WelcomeRoomsShowcase />
+          </div>
+        </WelcomeSection>
+
+        <WelcomeSection>
+          <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-slate-500">
+            Developer Mode
+          </p>
+          <h2 className="mt-2 flex items-center gap-2 font-display text-3xl font-bold tracking-tight text-slate-900">
+            <Code2 className="h-7 w-7 text-slate-700" />
+            Price the build.
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm text-slate-500">
+            Connect GitHub. Track hours, cost, commits, and lines of code.
+          </p>
+          <div className="mt-6">
+            <WelcomeDevShowcase />
+          </div>
+        </WelcomeSection>
+
+        <WelcomeSection>
+          <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-slate-400">
+            Also in the app
+          </p>
+          <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-slate-900">
+            Streaks, share cards, proof.
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm text-slate-500">
+            Dashboard stats, screenshot cards, and verification badges.
           </p>
           <div className="mt-6">
             <WelcomeFeatures />

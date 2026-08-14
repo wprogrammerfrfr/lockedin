@@ -53,25 +53,31 @@ export function BreakVoteDialog({
           {left}s
         </p>
         <p className="text-center text-xs text-slate-500">
-          Break {tallies.break} · Stay {tallies.stay}
-          {myVote ? ` · You: ${myVote}` : ""}
+          Bet {tallies.break} · Nah {tallies.stay}
+          {myVote ? ` · You: ${myVote === "break" ? "Bet" : "Nah"}` : ""}
         </p>
 
         <DialogFooter className="gap-2 sm:justify-center">
           <Button
-            className="rounded-xl bg-amber-100 text-amber-900 hover:bg-amber-200"
+            className="h-auto flex-col gap-1 rounded-xl bg-amber-100 py-3 text-amber-900 hover:bg-amber-200"
             disabled={Boolean(myVote)}
             onClick={() => onVote("break")}
           >
-            Break
+            <span className="font-display text-base font-bold">Bet</span>
+            <span className="text-[11px] font-medium normal-case tracking-normal text-amber-800/80">
+              Take the break
+            </span>
           </Button>
           <Button
-            className="rounded-xl"
+            className="h-auto flex-col gap-1 rounded-xl py-3"
             variant="outline"
             disabled={Boolean(myVote)}
             onClick={() => onVote("stay")}
           >
-            Stay Locked In
+            <span className="font-display text-base font-bold">Nah</span>
+            <span className="text-[11px] font-medium normal-case tracking-normal text-slate-500">
+              Stay Locked In
+            </span>
           </Button>
         </DialogFooter>
       </DialogContent>

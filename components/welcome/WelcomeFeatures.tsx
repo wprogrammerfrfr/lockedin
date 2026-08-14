@@ -3,8 +3,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { BadgeCheck, BarChart3, Flame, Share2, Trophy } from "lucide-react";
-import { WelcomeDevShowcase } from "@/components/welcome/WelcomeDevShowcase";
-import { WelcomeRoomsShowcase } from "@/components/welcome/WelcomeRoomsShowcase";
 import { springSoft } from "@/components/session/state-accent";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,11 +32,7 @@ export function WelcomeFeatures() {
   const chrome = shareCardChrome(durationMs, shareWin ? "pr" : "tapout");
 
   return (
-    <div className="flex flex-col gap-6">
-      <WelcomeRoomsShowcase />
-      <WelcomeDevShowcase />
-
-      <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -177,7 +171,6 @@ export function WelcomeFeatures() {
             </div>
           </CardContent>
         </Card>
-      </div>
     </div>
   );
 }

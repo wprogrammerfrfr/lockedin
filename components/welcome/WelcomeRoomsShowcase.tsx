@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Users } from "lucide-react";
+import { Check, Pause, ThumbsDown, ThumbsUp, Users, X } from "lucide-react";
 import { springSoft } from "@/components/session/state-accent";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -105,7 +105,7 @@ export function WelcomeRoomsShowcase() {
   const slots = Array.from({ length: SEATS }, (_, i) => DEMO_MEMBERS[i] ?? null);
 
   return (
-    <Card>
+    <Card className="border-emerald-200">
       <CardHeader className="space-y-3">
         <CardTitle className="flex items-center gap-2 text-xl">
           <Users className="h-5 w-5 text-emerald-600" />
@@ -116,10 +116,20 @@ export function WelcomeRoomsShowcase() {
             Lock in with friends. 2–6 people, one room, a code to join.
           </p>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600">
-            Everyone runs their own timer. When someone needs a break, the room
-            votes — Break vs Stay Locked In. Majority wins; a tie keeps you
-            locked in.
+            Everyone runs their own timer. When a friend hits Request shared
+            break, a 30-second vote opens for the whole room.
           </p>
+          <ol className="mt-3 max-w-3xl list-decimal space-y-1 pl-5 text-sm leading-relaxed text-slate-600">
+            <li>
+              <span className="font-semibold text-slate-800">Bet</span> takes
+              the break with them.
+            </li>
+            <li>
+              <span className="font-semibold text-slate-800">Nah</span> stays
+              locked in.
+            </li>
+            <li>Majority wins. Tie or timeout → stay locked in.</li>
+          </ol>
         </div>
         <div className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
           <Users className="h-4 w-4 shrink-0 text-slate-400" />
@@ -233,38 +243,62 @@ export function WelcomeRoomsShowcase() {
           </div>
 
           {kind === "vote" ? (
-            <div className="flex flex-col justify-center rounded-2xl border border-slate-200 bg-white p-5 shadow-soft sm:p-6">
-              <p className="font-display text-lg font-semibold text-slate-900">
-                Shared break vote
-              </p>
+            <div className="flex flex-col rounded-2xl border-2 border-amber-200 bg-white p-5 shadow-soft sm:p-6">
+              <div className="flex items-center gap-2">
+                <Pause className="h-4 w-4 text-amber-600" />
+                <p className="font-display text-lg font-semibold text-slate-900">
+                  Shared break vote
+                </p>
+              </div>
               <p className="mt-1 text-sm text-slate-500">
-                Majority of eligible voters wins. Tie or timeout → stay locked
-                in.
+                Maya requested a break. Vote Bet or Nah before the timer hits
+                zero.
               </p>
-              <p className="mt-6 text-center font-mono text-3xl tabular-nums text-slate-800">
+              <p className="mt-5 text-center font-mono text-3xl tabular-nums text-slate-800">
                 {left}s
               </p>
               <p className="mt-2 text-center text-xs text-slate-500">
-                Break {tallies.break} · Stay {tallies.stay}
-                {myVote ? ` · You: ${myVote}` : ""}
+                Bet {tallies.break} · Nah {tallies.stay}
+                {myVote
+                  ? ` · You: ${myVote === "break" ? "Bet" : "Nah"}`
+                  : ""}
               </p>
-              <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 <Button
-                  className="rounded-xl bg-amber-100 text-amber-900 hover:bg-amber-200"
+                  className="h-auto flex-col gap-1 rounded-xl bg-amber-100 py-4 text-amber-900 hover:bg-amber-200"
                   disabled={Boolean(myVote)}
                   onClick={() => vote("break")}
                 >
-                  Break
+                  <span className="flex items-center gap-1.5 font-display text-base font-bold">
+                    <ThumbsUp className="h-4 w-4" />
+                    Bet
+                  </span>
+                  <span className="flex items-center gap-1 text-[11px] font-medium normal-case tracking-normal text-amber-800/80">
+                    <Check className="h-3 w-3" />
+                    Take the break
+                  </span>
                 </Button>
                 <Button
-                  className="rounded-xl"
+                  className="h-auto flex-col gap-1 rounded-xl border-slate-200 py-4"
                   variant="outline"
                   disabled={Boolean(myVote)}
                   onClick={() => vote("stay")}
                 >
-                  Stay Locked In
+                  <span className="flex items-center gap-1.5 font-display text-base font-bold">
+                    <ThumbsDown className="h-4 w-4" />
+                    Nah
+                  </span>
+                  <span className="flex items-center gap-1 text-[11px] font-medium normal-case tracking-normal text-slate-500">
+                    <X className="h-3 w-3" />
+                    Stay Locked In
+                  </span>
                 </Button>
               </div>
+              {myVote && (
+                <p className="mt-4 text-center text-xs font-medium text-slate-500">
+                  Vote locked. Majority wins this round.
+                </p>
+              )}
             </div>
           ) : (
             <div className="flex flex-col justify-center rounded-2xl border border-lime-300 bg-lime-50/60 p-5 sm:p-6">
@@ -273,7 +307,7 @@ export function WelcomeRoomsShowcase() {
               </p>
               <p className="mt-1 text-sm text-slate-600">
                 Host sets work / break. The room auto-flips LOCKED IN ↔ BREAK
-                together — no voting.
+                together — no Bet / Nah vote.
               </p>
               <div className="mt-5 flex flex-wrap gap-2">
                 {["50 / 10", "25 / 5", "45 / 15"].map((label, i) => (

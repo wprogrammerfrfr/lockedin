@@ -19,7 +19,7 @@ function money(n: number) {
 
 export function WelcomeDevShowcase() {
   return (
-    <Card>
+    <Card className="border-slate-300">
       <CardHeader className="space-y-3">
         <CardTitle className="flex items-center gap-2 text-xl">
           <Code2 className="h-5 w-5 text-emerald-600" />
