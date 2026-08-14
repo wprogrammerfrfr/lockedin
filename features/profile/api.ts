@@ -95,13 +95,26 @@ export async function uploadAvatar(
 }
 
 export function publicAvatarUrl(
-  supabase: SupabaseClient,
   avatarPath: string | null | undefined,
 ): string | null {
   if (!avatarPath) return null;
   if (avatarPath.startsWith("http")) return avatarPath;
-  const { data } = supabase.storage.from("avatars").getPublicUrl(avatarPath);
-  return data.publicUrl;
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim().replace(/\/$/, "");
+  if (!base) return null;
+  try {
+    const parsed = new URL(base);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+  const encoded = avatarPath
+    .split("/")
+    .filter(Boolean)
+    .map((seg) => encodeURIComponent(seg))
+    .join("/");
+  return `${base}/storage/v1/object/public/avatars/${encoded}`;
 }
 
 export async function deleteOwnAccount(

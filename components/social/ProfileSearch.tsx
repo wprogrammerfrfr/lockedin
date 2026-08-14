@@ -41,8 +41,6 @@ export function ProfileSearch() {
     };
   }, [q, isAuthenticated]);
 
-  const supabase = createClient();
-
   return (
     <div className="space-y-3">
       <div className="relative">
@@ -62,7 +60,7 @@ export function ProfileSearch() {
       {loading && <p className="text-xs text-slate-400">Searching…</p>}
       <ul className="space-y-2">
         {hits.map((h) => {
-          const url = publicAvatarUrl(supabase, h.avatar_path);
+          const url = publicAvatarUrl(h.avatar_path);
           return (
             <li key={h.id}>
               <Link

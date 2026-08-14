@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Loader2, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -88,7 +88,6 @@ function LoginPageContent() {
       : null,
   );
 
-  const supabase = useMemo(() => createClient(), []);
   const busy = loading !== null;
 
   function clearFormNoise() {
@@ -116,7 +115,7 @@ function LoginPageContent() {
     setLoading(provider);
     try {
       const redirectTo = `${window.location.origin}/auth/callback`;
-      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      const { error: oauthError } = await createClient().auth.signInWithOAuth({
         provider,
         options: { redirectTo },
       });
@@ -142,7 +141,7 @@ function LoginPageContent() {
 
     try {
       if (mode === "login") {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
+        const { error: signInError } = await createClient().auth.signInWithPassword({
           email,
           password,
         });
@@ -156,7 +155,7 @@ function LoginPageContent() {
         return;
       }
 
-      const { data, error: signUpError } = await supabase.auth.signUp({
+      const { data, error: signUpError } = await createClient().auth.signUp({
         email,
         password,
         options: {

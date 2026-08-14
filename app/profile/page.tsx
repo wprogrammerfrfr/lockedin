@@ -65,7 +65,7 @@ export default function ProfilePage() {
 
   const name = profile?.username?.trim() || profileLabel;
   const profileAvatar =
-    publicAvatarUrl(createClient(), profile?.avatar_path) ?? avatarUrl;
+    publicAvatarUrl(profile?.avatar_path) ?? avatarUrl;
 
   return (
     <ChromePage>

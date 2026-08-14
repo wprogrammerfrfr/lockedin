@@ -55,8 +55,6 @@ export function WeeklyLeaderboard({
     };
   }, [timezone, status, isAuthenticated]);
 
-  const supabase = createClient();
-
   return (
     <div
       className={
@@ -91,7 +89,7 @@ export function WeeklyLeaderboard({
       {!needsAuth && (
         <ol className="mt-3 space-y-2">
           {rows.slice(0, compact ? 5 : 10).map((r) => {
-            const url = publicAvatarUrl(supabase, r.avatar_path);
+            const url = publicAvatarUrl(r.avatar_path);
             return (
               <li key={r.user_id}>
                 <Link

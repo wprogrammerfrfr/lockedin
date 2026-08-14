@@ -43,7 +43,7 @@ export default async function PublicProfilePage({
   );
 
   const days = (heatmapError ? [] : (heatmap ?? [])) as HeatmapDay[];
-  const avatarUrl = publicAvatarUrl(supabase, profile.avatar_path);
+  const avatarUrl = publicAvatarUrl(profile.avatar_path);
 
   const isSelf = user?.id === profile.id;
   const badgeLabel = "Self-Reported ✍️";

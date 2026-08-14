@@ -12,7 +12,7 @@ import {
 import { useRouter } from "next/navigation";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { publicAvatarUrl } from "@/features/profile/api";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
 export type AuthStatus = "loading" | "guest" | "authenticated";
 export type ConnectedVia = "GitHub" | "Google" | "Email" | null;
@@ -90,7 +90,7 @@ function resolveAvatarUrl(
   profile: AuthProfile | null,
   user: User | null,
 ): string | null {
-  const fromPath = publicAvatarUrl(createClient(), profile?.avatar_path);
+  const fromPath = publicAvatarUrl(profile?.avatar_path);
   if (fromPath) return fromPath;
   return avatarUrlFromUser(user);
 }
@@ -127,6 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const loadProfile = useCallback(async (userId: string) => {
+    if (!isSupabaseConfigured()) return;
     profileUserIdRef.current = userId;
     try {
       const supabase = createClient();
@@ -157,6 +158,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user?.id, loadProfile]);
 
   useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      setStatus("guest");
+      return;
+    }
+
     const supabase = createClient();
     let cancelled = false;
 

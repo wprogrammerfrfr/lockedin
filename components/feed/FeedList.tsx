@@ -43,8 +43,6 @@ export function FeedList() {
     };
   }, []);
 
-  const supabase = createClient();
-
   if (loading) {
     return <p className="text-sm text-slate-400">Loading feed…</p>;
   }
@@ -69,7 +67,7 @@ export function FeedList() {
   return (
     <div className="space-y-4">
       {posts.map((post) => {
-        const url = publicAvatarUrl(supabase, post.author?.avatar_path ?? null);
+        const url = publicAvatarUrl(post.author?.avatar_path ?? null);
         const outcome = asOutcome(post.session?.outcome);
         return (
           <Card key={post.id} className="border-slate-200 bg-white">
