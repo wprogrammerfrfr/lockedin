@@ -10,6 +10,12 @@ const ALLOWED_KEYS: Record<string, string> = {
   rate_limited: "Slow down — try again in a moment.",
   room_full: "Room is full (max 6).",
   active_session_exists: "You already have an active session.",
+  already_in_other_room: "You're already in a room — leave it first.",
+  profile_not_found: "Your profile isn't ready yet. Refresh and try again.",
+  room_code_generation_failed: "Could not generate a room code. Try again.",
+  room_not_found: "That room code doesn't exist.",
+  room_closed: "That room has closed.",
+  not_in_room: "You're not in that room.",
 };
 
 function errorMessage(err: unknown): string {

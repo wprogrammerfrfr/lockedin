@@ -2,8 +2,8 @@ import type { Action, AppState, BreakTypeUsed } from "./types";
 
 /** Short PR so the sandbox particle burst is easy to demo (~15s). */
 export const DEFAULT_PR_MS = 15 * 1000;
-export const DEFAULT_TODAY_MS = 1 * 60 * 60 * 1000 + 12 * 60 * 1000;
-export const DEFAULT_STREAK = 7;
+export const DEFAULT_TODAY_MS = 0;
+export const DEFAULT_STREAK = 0;
 
 function breakTypeFromChoiceGroup(
   group: "hydration" | "dynamic" | "smart",
@@ -81,6 +81,16 @@ export function reducer(state: AppState, action: Action): AppState {
         breakLabel: "",
         breakEmoji: "",
       };
+    case "HYDRATE_STATS":
+      return {
+        ...state,
+        streak: action.streak,
+        todayTotalMs: action.todayTotalMs,
+        personalRecordMs:
+          action.personalRecordMs !== undefined && action.personalRecordMs > 0
+            ? action.personalRecordMs
+            : state.personalRecordMs,
+      };
     case "OPEN_PIT_STOP":
       if (state.session !== "LOCKED_IN") return state;
       return { ...state, session: "CHOOSING_BREAK", lastOutcome: "break" };
@@ -120,7 +130,13 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, breakRemainingMs: next };
     }
     case "LOCK_BACK_IN":
-      if (state.session !== "BREAK_DONE") return state;
+      if (
+        state.session !== "BREAK_DONE" &&
+        state.session !== "ON_BREAK" &&
+        state.session !== "CHOOSING_BREAK"
+      ) {
+        return state;
+      }
       return {
         ...state,
         session: "LOCKED_IN",
@@ -151,7 +167,9 @@ export function reducer(state: AppState, action: Action): AppState {
     case "TICK": {
       if (state.session !== "LOCKED_IN") return state;
       const elapsedMs = state.elapsedMs + action.delta;
+      const canBreakPr = state.personalRecordMs > 0;
       const justBroke =
+        canBreakPr &&
         state.elapsedMs <= state.personalRecordMs &&
         elapsedMs > state.personalRecordMs;
       return {
@@ -165,17 +183,14 @@ export function reducer(state: AppState, action: Action): AppState {
             : state.personalRecordMs,
         didBreakPR: justBroke ? true : state.didBreakPR,
         lastOutcome:
-          justBroke || elapsedMs > state.personalRecordMs ? "pr" : "solid",
+          justBroke || (canBreakPr && elapsedMs > state.personalRecordMs)
+            ? "pr"
+            : "solid",
         lastSessionMs: elapsedMs,
       };
     }
     case "TAP_OUT":
-      if (
-        state.session !== "LOCKED_IN" &&
-        state.session !== "CHOOSING_BREAK" &&
-        state.session !== "ON_BREAK" &&
-        state.session !== "BREAK_DONE"
-      ) {
+      if (state.session !== "LOCKED_IN") {
         return state;
       }
       return {

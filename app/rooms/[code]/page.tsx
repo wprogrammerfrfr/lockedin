@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useEffect, useMemo, useReducer, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { AppShell } from "@/components/layout/AppShell";
 import { FocusTimer } from "@/components/session/FocusTimer";
@@ -13,6 +14,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import {
   castBreakVote,
   fetchRoomByCode,
+  leaveRoom,
   requestSharedBreak,
 } from "@/features/rooms/api";
 import { useRoomCloseWatch } from "@/features/rooms/closeWatch";
@@ -31,6 +33,7 @@ export default function RoomFocusPage({
   params: Promise<{ code: string }>;
 }) {
   const { code } = use(params);
+  const router = useRouter();
   const { status, user, profile, avatarUrl } = useAuth();
   const [room, setRoom] = useState<RoomSummary | null>(null);
   const [state, dispatch] = useReducer(reducer, initialState);
@@ -129,15 +132,37 @@ export default function RoomFocusPage({
               {room?.status ?? "…"}
             </p>
           </div>
-          {!isPomodoro && state.session === "LOCKED_IN" && (
+          <div className="flex items-center gap-2">
+            {!isPomodoro && state.session === "LOCKED_IN" && (
+              <Button
+                variant="outline"
+                className="rounded-xl"
+                onClick={onRequestBreak}
+              >
+                Request shared break
+              </Button>
+            )}
             <Button
               variant="outline"
               className="rounded-xl"
-              onClick={onRequestBreak}
+              onClick={async () => {
+                if (room) {
+                  try {
+                    await leaveRoom(createClient(), room.id);
+                  } catch (err) {
+                    const msg = err instanceof Error ? err.message : "";
+                    if (!msg.includes("not_in_room")) {
+                      toast.error(userFacingError(err, "Could not leave room"));
+                      return;
+                    }
+                  }
+                }
+                router.push("/rooms");
+              }}
             >
-              Request shared break
+              Leave
             </Button>
-          )}
+          </div>
         </div>
 
         {room?.status === "closing" && secondsLeft != null && (

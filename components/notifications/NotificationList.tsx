@@ -34,7 +34,7 @@ export function NotificationList({
   onMarkAll: () => void;
 }) {
   return (
-    <div className="max-h-80 overflow-y-auto">
+    <div className="max-h-[inherit] overflow-y-auto">
       <div className="mb-2 flex items-center justify-between px-1">
         <p className="font-display text-xs font-semibold text-slate-700">
           Notifications

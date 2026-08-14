@@ -16,9 +16,15 @@ import { userFacingError } from "@/lib/supabase/errors";
 import {
   mergeLocalSessionsIntoUser,
   saveLocalSessionDraft,
+  loadLocalSessionDrafts,
 } from "@/lib/auth/merge";
 import { cn } from "@/lib/utils";
 import { initialState, reducer } from "@/features/session/reducer";
+import {
+  computePersonalRecordMs,
+  computeStreak,
+  computeTodayMs,
+} from "@/features/session/aggregates";
 import { resolveOutcome } from "@/features/session/format";
 import { useDocumentSessionChrome } from "@/features/session/useDocumentSessionChrome";
 import { useSessionHotkeys } from "@/features/session/useSessionHotkeys";
@@ -72,13 +78,18 @@ export default function LockInPage() {
   );
   const [timezone, setTimezone] = useState("UTC");
   const [lastRemoteId, setLastRemoteId] = useState<string | null>(null);
+  const [statsNonce, setStatsNonce] = useState(0);
 
   const layoutMode: LayoutMode = isFocusSession(state.session)
     ? "solo-focus"
     : "chrome";
 
   useEffect(() => {
-    if (!isAuthenticated || !userId) return;
+    if (!isAuthenticated || !userId) {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (tz) setTimezone(tz);
+      return;
+    }
     const supabase = createClient();
     let cancelled = false;
     void (async () => {
@@ -99,6 +110,59 @@ export default function LockInPage() {
   }, [isAuthenticated, userId]);
 
   useEffect(() => {
+    if (!authReady) return;
+    if (isFocusSession(state.session)) return;
+
+    let cancelled = false;
+    const tz =
+      timezone ||
+      Intl.DateTimeFormat().resolvedOptions().timeZone ||
+      "UTC";
+
+    void (async () => {
+      if (!isAuthenticated || !userId) {
+        const sessions = loadLocalSessionDrafts().map((d) => ({
+          started_at: d.endedAt,
+          active_ms: d.elapsedMs,
+          status: d.outcome === "tapout" ? "tapped_out" : "ended",
+        }));
+        if (cancelled) return;
+        dispatch({
+          type: "HYDRATE_STATS",
+          streak: computeStreak(sessions, tz),
+          todayTotalMs: computeTodayMs(sessions, tz),
+          personalRecordMs: computePersonalRecordMs(sessions),
+        });
+        return;
+      }
+
+      try {
+        const { data, error } = await createClient().rpc("dashboard_stats", {
+          p_tz: tz,
+        });
+        if (cancelled || error) return;
+        const stats = (data ?? {}) as {
+          streak_days?: number;
+          today_ms?: number;
+          pr_ms?: number;
+        };
+        dispatch({
+          type: "HYDRATE_STATS",
+          streak: Number(stats.streak_days) || 0,
+          todayTotalMs: Number(stats.today_ms) || 0,
+          personalRecordMs: Number(stats.pr_ms) || 0,
+        });
+      } catch {
+        /* keep current stats */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authReady, isAuthenticated, userId, timezone, state.session, statsNonce]);
+
+  useEffect(() => {
     if (!authReady || !isAuthenticated) return;
     let cancelled = false;
     void (async () => {
@@ -113,6 +177,7 @@ export default function LockInPage() {
               ? "Synced 1 guest session"
               : `Synced ${result.merged} guest sessions`,
           );
+          setStatsNonce((n) => n + 1);
         }
       } catch (err) {
         if (!cancelled) {
@@ -289,6 +354,7 @@ export default function LockInPage() {
       onTapOut: () => {
         void onTapOut();
       },
+      onLockBackIn: () => dispatch({ type: "LOCK_BACK_IN" }),
     }),
     [onLockIn, onBreak, onTapOut],
   );

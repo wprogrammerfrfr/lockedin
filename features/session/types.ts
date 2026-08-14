@@ -70,4 +70,10 @@ export type Action =
       sessionName?: string | null;
       breakTypesUsed?: BreakTypeUsed[];
       session?: SessionState;
+    }
+  | {
+      type: "HYDRATE_STATS";
+      streak: number;
+      todayTotalMs: number;
+      personalRecordMs?: number;
     };

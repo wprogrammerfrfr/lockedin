@@ -14,13 +14,22 @@ type Handlers = {
   onLockIn: () => void;
   onBreak: () => void;
   onTapOut: () => void;
+  onLockBackIn: () => void;
 };
+
+function isOnBreak(session: SessionState) {
+  return (
+    session === "ON_BREAK" ||
+    session === "CHOOSING_BREAK" ||
+    session === "BREAK_DONE"
+  );
+}
 
 export function useSessionHotkeys(session: SessionState, handlers: Handlers) {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (isTypingTarget(event)) return;
-      if (isDialogOpen() && !matchTapOut(event)) return;
+      if (isDialogOpen() && !matchTapOut(event) && !matchLockIn(event)) return;
 
       if (matchLockIn(event)) {
         if (
@@ -30,6 +39,9 @@ export function useSessionHotkeys(session: SessionState, handlers: Handlers) {
         ) {
           event.preventDefault();
           handlers.onLockIn();
+        } else if (isOnBreak(session)) {
+          event.preventDefault();
+          handlers.onLockBackIn();
         }
         return;
       }
@@ -43,15 +55,13 @@ export function useSessionHotkeys(session: SessionState, handlers: Handlers) {
       }
 
       if (matchTapOut(event)) {
-        if (isDialogOpen()) return;
-        if (
-          session === "LOCKED_IN" ||
-          session === "ON_BREAK" ||
-          session === "CHOOSING_BREAK" ||
-          session === "BREAK_DONE"
-        ) {
+        if (isDialogOpen() && session === "LOCKED_IN") return;
+        if (session === "LOCKED_IN") {
           event.preventDefault();
           handlers.onTapOut();
+        } else if (isOnBreak(session)) {
+          event.preventDefault();
+          handlers.onLockBackIn();
         }
       }
     }

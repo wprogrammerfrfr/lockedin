@@ -406,20 +406,25 @@ export function FocusTimer({
                     <Pause className="h-4 w-4" />
                     BREAK
                   </Button>
+                ) : null}
+                {state === "ON_BREAK" || state === "CHOOSING_BREAK" ? (
+                  <Button
+                    size="lg"
+                    className="col-span-2 border border-lime-500/40 bg-lime-400 text-slate-950 hover:bg-lime-300"
+                    onClick={onLockBackIn}
+                  >
+                    <Play className="h-4 w-4" />
+                    LOCK BACK IN
+                  </Button>
                 ) : (
-                  <div />
+                  <Button
+                    size="lg"
+                    className="border border-red-600 bg-red-500 text-white hover:bg-red-600"
+                    onClick={onTapOut}
+                  >
+                    TAP OUT
+                  </Button>
                 )}
-                <Button
-                  size="lg"
-                  className={cn(
-                    "border border-red-600 bg-red-500 text-white hover:bg-red-600",
-                    (state === "ON_BREAK" || state === "CHOOSING_BREAK") &&
-                      "col-span-2"
-                  )}
-                  onClick={onTapOut}
-                >
-                  TAP OUT
-                </Button>
               </motion.div>
             )}
           </AnimatePresence>
