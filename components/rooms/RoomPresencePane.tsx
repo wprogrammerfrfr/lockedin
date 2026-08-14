@@ -41,7 +41,7 @@ export function RoomPresencePane({
   seats?: number;
 }) {
   const slots = Array.from({ length: Math.min(6, Math.max(2, seats)) }, (_, i) => {
-    return members[i] ?? null;
+    return members.find((m) => m.seat === i + 1) ?? null;
   });
 
   return (

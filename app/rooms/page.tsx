@@ -48,7 +48,7 @@ export default function RoomsPage() {
             Rooms
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Multiplayer 2–6 focus rooms. Create or join with a code.
+            Multiplayer 2–6 focus rooms. Join with a 6-digit code or create one.
           </p>
         </div>
 

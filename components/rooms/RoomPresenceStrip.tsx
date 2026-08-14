@@ -14,7 +14,7 @@ export function RoomPresenceStrip({
 }) {
   const slots = Array.from(
     { length: Math.min(6, Math.max(2, seats)) },
-    (_, i) => members[i] ?? null,
+    (_, i) => members.find((m) => m.seat === i + 1) ?? null,
   );
   const filled = slots.filter(Boolean).length;
 

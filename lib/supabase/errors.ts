@@ -16,6 +16,12 @@ const ALLOWED_KEYS: Record<string, string> = {
   room_not_found: "That room code doesn't exist.",
   room_closed: "That room has closed.",
   not_in_room: "You're not in that room.",
+  room_not_live: "Need at least two people in the room to vote on a break.",
+  vote_in_progress: "A break vote is already running.",
+  not_vote_room: "Pomodoro rooms use an automatic break cadence.",
+  empty_room_name: "Give this session a name first.",
+  no_active_vote: "That break vote already ended.",
+  vote_expired: "That break vote already ended.",
 };
 
 function errorMessage(err: unknown): string {

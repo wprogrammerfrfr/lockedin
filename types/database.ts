@@ -26,6 +26,7 @@ export type SessionRow = {
   outcome: string | null;
   pr_broken: boolean;
   client_id: string | null;
+  room_session_id?: string | null;
 };
 
 export type RoomStatus = "waiting" | "live" | "closing" | "closed";
@@ -44,6 +45,10 @@ export type RoomRow = {
   break_ms: number | null;
   phase: RoomPhase | string | null;
   phase_started_at: string | null;
+  name?: string | null;
+  room_session_id?: string | null;
+  active_break_round_id?: string | null;
+  break_vote_ends_at?: string | null;
 };
 
 export type RoomMemberRow = {

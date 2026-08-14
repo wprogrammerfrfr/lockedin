@@ -53,6 +53,7 @@ export type Action =
   | { type: "OPEN_PIT_STOP" }
   | { type: "CLOSE_PIT_STOP" }
   | { type: "START_BREAK"; choice: BreakChoice }
+  | { type: "START_SHARED_BREAK"; durationMs?: number }
   | { type: "BREAK_TICK"; delta: number }
   | { type: "LOCK_BACK_IN" }
   | { type: "END_SESSION" }

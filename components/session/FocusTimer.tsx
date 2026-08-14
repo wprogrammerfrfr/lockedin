@@ -34,6 +34,7 @@ export function FocusTimer({
   onShare,
   onClearPrBurst,
   lockInDisabled = false,
+  hidePersonalBreak = false,
 }: {
   state: SessionState;
   elapsedMs: number;
@@ -53,6 +54,7 @@ export function FocusTimer({
   onShare: () => void;
   onClearPrBurst: () => void;
   lockInDisabled?: boolean;
+  hidePersonalBreak?: boolean;
 }) {
   const accent = stateAccent(state);
   const muted = state === "TAPPED_OUT";
@@ -396,7 +398,7 @@ export function FocusTimer({
                 exit={{ opacity: 0, y: -8 }}
                 transition={springSoft}
               >
-                {state === "LOCKED_IN" ? (
+                {state === "LOCKED_IN" && !hidePersonalBreak ? (
                   <Button
                     size="lg"
                     variant="outline"
@@ -419,7 +421,10 @@ export function FocusTimer({
                 ) : (
                   <Button
                     size="lg"
-                    className="border border-red-600 bg-red-500 text-white hover:bg-red-600"
+                    className={cn(
+                      "border border-red-600 bg-red-500 text-white hover:bg-red-600",
+                      hidePersonalBreak && "col-span-2",
+                    )}
                     onClick={onTapOut}
                   >
                     TAP OUT

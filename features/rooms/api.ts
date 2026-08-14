@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RoomRow } from "@/types/database";
-import type { BreakVoteChoice, RoomSummary } from "@/features/rooms/types";
+import type {
+  BreakVoteChoice,
+  RoomPresenceMember,
+  RoomSummary,
+} from "@/features/rooms/types";
+import { publicAvatarUrl } from "@/features/profile/api";
 
 function mapRoom(row: RoomRow): RoomSummary {
   return {
@@ -14,6 +19,10 @@ function mapRoom(row: RoomRow): RoomSummary {
     breakMs: row.break_ms,
     phase: row.phase,
     phaseStartedAt: row.phase_started_at,
+    name: row.name ?? null,
+    roomSessionId: row.room_session_id ?? null,
+    activeBreakRoundId: row.active_break_round_id ?? null,
+    breakVoteEndsAt: row.break_vote_ends_at ?? null,
   };
 }
 
@@ -85,9 +94,11 @@ async function withStaleMembershipRetry<T>(
   }
 }
 
-export async function createRoom(supabase: SupabaseClient) {
+export async function createRoom(supabase: SupabaseClient, name: string) {
   return withStaleMembershipRetry(supabase, async () => {
-    const { data, error } = await supabase.rpc("create_room");
+    const { data, error } = await supabase.rpc("create_room", {
+      p_name: name.trim(),
+    });
     if (error) throw new Error(error.message);
     return asRoom(data);
   });
@@ -97,11 +108,13 @@ export async function createPomodoroRoom(
   supabase: SupabaseClient,
   workMinutes: number,
   breakMinutes: number,
+  name: string,
 ) {
   return withStaleMembershipRetry(supabase, async () => {
     const { data, error } = await supabase.rpc("create_pomodoro_room", {
       work_minutes: workMinutes,
       break_minutes: breakMinutes,
+      p_name: name.trim(),
     });
     if (error) throw new Error(error.message);
     return asRoom(data);
@@ -109,7 +122,7 @@ export async function createPomodoroRoom(
 }
 
 export async function joinRoom(supabase: SupabaseClient, code: string) {
-  const normalized = code.trim().toUpperCase();
+  const normalized = code.trim();
   const existing = await fetchRoomByCode(supabase, normalized).catch(
     () => null,
   );
@@ -144,21 +157,33 @@ export async function requestSharedBreak(
     p_room_id: roomId,
   });
   if (error) throw new Error(error.message);
-  return data;
+  return asRoom(data);
 }
 
 export async function castBreakVote(
   supabase: SupabaseClient,
   roomId: string,
-  roundId: string,
   choice: BreakVoteChoice,
 ) {
   const { error } = await supabase.rpc("cast_break_vote", {
     p_room_id: roomId,
-    p_round_id: roundId,
     p_choice: choice,
   });
   if (error) throw new Error(error.message);
+}
+
+export async function resolveBreakVote(
+  supabase: SupabaseClient,
+  roomId: string,
+): Promise<{ result: "break" | "stay" | null }> {
+  const { data, error } = await supabase.rpc("resolve_break_vote", {
+    p_room_id: roomId,
+  });
+  if (error) throw new Error(error.message);
+  const row = data as { result?: string | null } | null;
+  const result = row?.result;
+  if (result === "break" || result === "stay") return { result };
+  return { result: null };
 }
 
 export async function pomodoroTick(supabase: SupabaseClient, roomId: string) {
@@ -176,9 +201,68 @@ export async function fetchRoomByCode(
   const { data, error } = await supabase
     .from("rooms")
     .select("*")
-    .eq("code", code.trim().toUpperCase())
+    .eq("code", code.trim())
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) return null;
   return mapRoom(data as RoomRow);
+}
+
+export async function fetchRoomMembers(
+  supabase: SupabaseClient,
+  roomId: string,
+): Promise<RoomPresenceMember[]> {
+  const { data, error } = await supabase
+    .from("room_members")
+    .select("user_id, seat, profiles(username, avatar_path)")
+    .eq("room_id", roomId)
+    .order("seat", { ascending: true });
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map((row) => {
+    const profile = Array.isArray(
+      (row as { profiles?: unknown }).profiles,
+    )
+      ? (row as { profiles: { username?: string; avatar_path?: string | null }[] })
+          .profiles[0]
+      : (row as { profiles?: { username?: string; avatar_path?: string | null } })
+          .profiles;
+    const username = profile?.username?.trim() || "member";
+    return {
+      userId: (row as { user_id: string }).user_id,
+      username,
+      displayName: username,
+      avatarPath: publicAvatarUrl(profile?.avatar_path ?? null),
+      status: "WAITING" as const,
+      elapsedMs: 0,
+      seat: (row as { seat?: number | null }).seat ?? null,
+    };
+  });
+}
+
+export async function fetchBreakVotes(
+  supabase: SupabaseClient,
+  roomId: string,
+  roundId: string,
+): Promise<{ break: number; stay: number; myVote: BreakVoteChoice | null }> {
+  const { data: auth } = await supabase.auth.getUser();
+  const uid = auth.user?.id;
+  const { data, error } = await supabase
+    .from("room_break_votes")
+    .select("user_id, choice")
+    .eq("room_id", roomId)
+    .eq("round_id", roundId);
+  if (error) throw new Error(error.message);
+  let breakN = 0;
+  let stayN = 0;
+  let myVote: BreakVoteChoice | null = null;
+  for (const row of data ?? []) {
+    const choice = (row as { choice: string }).choice;
+    if (choice === "break") breakN += 1;
+    if (choice === "stay") stayN += 1;
+    if (uid && (row as { user_id: string }).user_id === uid) {
+      myVote = choice === "stay" ? "stay" : "break";
+    }
+  }
+  return { break: breakN, stay: stayN, myVote };
 }

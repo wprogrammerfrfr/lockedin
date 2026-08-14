@@ -26,12 +26,24 @@ function isActiveExistsError(error: { message?: string; code?: string } | null) 
 
 export async function startSession(
   supabase: SupabaseClient,
-  opts: { sessionName?: string | null; clientId: string },
+  opts: {
+    sessionName?: string | null;
+    clientId: string;
+    roomSessionId?: string | null;
+  },
 ): Promise<SessionRow> {
-  const { data, error } = await supabase.rpc("start_session", {
+  const params: {
+    p_session_name: string | null;
+    p_client_id: string;
+    p_room_session_id?: string;
+  } = {
     p_session_name: opts.sessionName?.trim() || null,
     p_client_id: opts.clientId,
-  });
+  };
+  if (opts.roomSessionId) {
+    params.p_room_session_id = opts.roomSessionId;
+  }
+  const { data, error } = await supabase.rpc("start_session", params);
 
   if (error) {
     if (isActiveExistsError(error)) {

@@ -117,6 +117,23 @@ export function reducer(state: AppState, action: Action): AppState {
         breakTypesUsed,
       };
     }
+    case "START_SHARED_BREAK": {
+      if (state.session !== "LOCKED_IN" && state.session !== "CHOOSING_BREAK") {
+        return state;
+      }
+      const breakTypesUsed = state.breakTypesUsed.includes("dynamic")
+        ? state.breakTypesUsed
+        : [...state.breakTypesUsed, "dynamic" as const];
+      return {
+        ...state,
+        session: "ON_BREAK",
+        breakRemainingMs: action.durationMs ?? 5 * 60 * 1000,
+        breakLabel: "Shared break",
+        breakEmoji: "☕",
+        lastOutcome: "break",
+        breakTypesUsed,
+      };
+    }
     case "BREAK_TICK": {
       if (state.session !== "ON_BREAK") return state;
       const next = Math.max(0, state.breakRemainingMs - action.delta);

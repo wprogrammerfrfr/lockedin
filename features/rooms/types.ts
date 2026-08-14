@@ -28,6 +28,10 @@ export type RoomSummary = {
   breakMs: number | null;
   phase: RoomPhase | string | null;
   phaseStartedAt: string | null;
+  name?: string | null;
+  roomSessionId?: string | null;
+  activeBreakRoundId?: string | null;
+  breakVoteEndsAt?: string | null;
   memberCount?: number;
 };
 

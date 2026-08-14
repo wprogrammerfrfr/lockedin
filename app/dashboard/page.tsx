@@ -8,20 +8,61 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMs, lockedInForLabel } from "@/features/session/format";
 import { createClient } from "@/lib/supabase/client";
 
+type RecentParticipant = {
+  user_id?: string;
+  username?: string | null;
+  active_ms?: number;
+  break_ms?: number;
+  break_types_used?: unknown;
+  status_at_end?: string | null;
+  outcome?: string | null;
+};
+
+type RecentItem = {
+  id?: string;
+  kind?: "solo" | "room" | string;
+  session_name?: string | null;
+  active_ms?: number;
+  break_ms?: number;
+  break_types_used?: unknown;
+  status?: string;
+  started_at?: string;
+  participants?: RecentParticipant[];
+};
+
 type DashboardStats = {
   today_ms?: number;
   streak_days?: number;
   pr_ms?: number;
-  recent?: Array<{
-    id?: string;
-    session_name?: string | null;
-    active_ms?: number;
-    break_ms?: number;
-    break_types_used?: string[];
-    status?: string;
-    started_at?: string;
-  }>;
+  recent?: RecentItem[];
 };
+
+function asStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((v): v is string => typeof v === "string" && v.trim().length > 0);
+}
+
+function breakTypesLabel(value: unknown): string {
+  const labels: Record<string, string> = {
+    hydration: "Hydration",
+    dynamic: "Dynamic",
+    smart_alignment: "Smart alignment",
+  };
+  return asStringList(value)
+    .map((t) => labels[t] ?? t.replaceAll("_", " "))
+    .join(" · ");
+}
+
+function sessionMeta(item: RecentItem): string {
+  const parts: string[] = [];
+  if (item.status) parts.push(item.status.replaceAll("_", " "));
+  if ((item.break_ms ?? 0) > 0) {
+    parts.push(`break ${formatMs(item.break_ms ?? 0)}`);
+  }
+  const types = breakTypesLabel(item.break_types_used);
+  if (types) parts.push(types);
+  return parts.join(" · ");
+}
 
 export default function DashboardPage() {
   const { status, isAuthenticated, user } = useAuth();
@@ -132,22 +173,60 @@ export default function DashboardPage() {
             {!unavailable && (!stats?.recent || stats.recent.length === 0) && (
               <p className="text-slate-400">No sessions yet.</p>
             )}
-            {(stats?.recent ?? []).map((s, i) => (
-              <div
-                key={s.id ?? i}
-                className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3 py-2"
-              >
-                <div>
-                  <p className="font-medium text-slate-800">
-                    {s.session_name || "Untitled"}
-                  </p>
-                  <p className="text-xs text-slate-400">{s.status}</p>
+            {(stats?.recent ?? []).map((s, i) => {
+              const isRoom = s.kind === "room";
+              const people = s.participants ?? [];
+              return (
+                <div
+                  key={s.id ?? i}
+                  className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-slate-800">
+                        {isRoom ? "Room · " : ""}
+                        {s.session_name || (isRoom ? "Untitled room" : "Untitled")}
+                      </p>
+                      <p className="text-xs capitalize text-slate-400">
+                        {sessionMeta(s)}
+                      </p>
+                    </div>
+                    <span className="shrink-0 font-mono text-xs tabular-nums text-slate-600">
+                      {lockedInForLabel(s.active_ms ?? 0)}
+                    </span>
+                  </div>
+                  {isRoom && people.length > 0 && (
+                    <ul className="mt-2 space-y-1 border-t border-slate-100 pt-2">
+                      {people.map((p, pi) => {
+                        const types = breakTypesLabel(p.break_types_used);
+                        return (
+                          <li
+                            key={p.user_id ?? `${s.id}-p-${pi}`}
+                            className="flex items-center justify-between gap-3 text-xs text-slate-600"
+                          >
+                            <span className="truncate font-medium text-slate-700">
+                              {p.username || "member"}
+                              {p.status_at_end ? (
+                                <span className="ml-1 font-normal capitalize text-slate-400">
+                                  · {p.status_at_end.replaceAll("_", " ")}
+                                </span>
+                              ) : null}
+                            </span>
+                            <span className="shrink-0 font-mono tabular-nums text-slate-500">
+                              {formatMs(p.active_ms ?? 0)}
+                              {(p.break_ms ?? 0) > 0
+                                ? ` · break ${formatMs(p.break_ms ?? 0)}`
+                                : ""}
+                              {types ? ` · ${types}` : ""}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
                 </div>
-                <span className="font-mono text-xs tabular-nums text-slate-600">
-                  {lockedInForLabel(s.active_ms ?? 0)}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
       </div>
