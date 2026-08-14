@@ -61,6 +61,7 @@ export type RoomMemberRow = {
   last_seen_at: string | null;
   focus_status?: string | null;
   elapsed_ms?: number | null;
+  break_label?: string | null;
 };
 
 export type FollowStatus = "pending" | "accepted" | "rejected";

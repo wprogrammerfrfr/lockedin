@@ -10,7 +10,10 @@ import {
 import { createPortal } from "react-dom";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { NotificationList } from "@/components/notifications/NotificationList";
+import {
+  NotificationList,
+  usePendingFollowRequests,
+} from "@/components/notifications/NotificationList";
 import { useNotifications } from "@/features/notifications/useNotifications";
 import { cn } from "@/lib/utils";
 
@@ -61,6 +64,8 @@ export function NotificationBell({
   menuAlign?: "sidebar" | "header";
 }) {
   const { items, unread, markRead, markAll } = useNotifications(enabled);
+  const { requests, refresh: refreshRequests, pendingCount } =
+    usePendingFollowRequests(enabled);
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({});
@@ -70,6 +75,10 @@ export function NotificationBell({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (open) void refreshRequests();
+  }, [open, refreshRequests]);
 
   const updatePosition = useCallback(() => {
     const el = rootRef.current;
@@ -109,6 +118,9 @@ export function NotificationBell({
     };
   }, [open, updatePosition]);
 
+  const badgeCount = unread + pendingCount;
+  const showBadge = badgeCount > 0;
+
   return (
     <div className="relative" ref={rootRef}>
       <Button
@@ -119,15 +131,30 @@ export function NotificationBell({
         aria-expanded={open}
         aria-haspopup="dialog"
         onClick={() => setOpen((v) => !v)}
-        aria-label="Notifications"
+        aria-label={
+          pendingCount > 0
+            ? `Notifications, ${pendingCount} follow request${pendingCount === 1 ? "" : "s"}`
+            : "Notifications"
+        }
       >
         <Bell className="h-5 w-5 text-slate-500" />
-        {unread > 0 && (
+        {showBadge && (
           <span
             className={cn(
-              "absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-lime-500",
+              "absolute right-1 top-1 flex min-w-[14px] items-center justify-center rounded-full bg-lime-500 px-0.5 text-[9px] font-bold leading-none text-slate-950",
+              pendingCount > 0 || unread > 9 ? "h-3.5 px-1" : "h-2 w-2 p-0",
             )}
-          />
+          >
+            {pendingCount > 0
+              ? pendingCount > 9
+                ? "9+"
+                : pendingCount
+              : unread > 9
+                ? "9+"
+                : unread > 0
+                  ? unread
+                  : ""}
+          </span>
         )}
       </Button>
       {mounted &&
@@ -142,8 +169,10 @@ export function NotificationBell({
           >
             <NotificationList
               items={items}
+              pendingRequests={requests}
               onMarkRead={markRead}
               onMarkAll={markAll}
+              onRequestsChange={() => void refreshRequests()}
             />
           </div>,
           document.body,

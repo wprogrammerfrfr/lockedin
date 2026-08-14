@@ -191,7 +191,7 @@ export function WelcomeRoomsShowcase() {
               Presence
             </p>
             <p className="mb-3 text-xs text-slate-500">
-              Room A7KX2M · 4 friends locked in with you
+              Room 482931 · 4 friends locked in with you
             </p>
             <div className="flex flex-col gap-2">
               {slots.map((m, i) => {

@@ -19,6 +19,11 @@ export type BreakChoiceId =
 
 export type BreakTypeUsed = "hydration" | "dynamic" | "smart_alignment";
 
+/** Groups plus optional choice ids (doomscroll / touch_grass) for finer history labels. */
+export type BreakTypeStored = BreakTypeUsed | BreakChoiceId;
+
+export type BreakSource = "personal" | "shared" | null;
+
 export type BreakChoice = {
   id: BreakChoiceId;
   title: string;
@@ -40,10 +45,14 @@ export type AppState = {
   lastSessionMs: number;
   shareOpen: boolean;
   breakRemainingMs: number;
+  breakElapsedMs: number;
+  breakOpenEnded: boolean;
   breakLabel: string;
   breakEmoji: string;
+  breakChoiceId: BreakChoiceId | null;
+  breakSource: BreakSource;
   sessionName: string | null;
-  breakTypesUsed: BreakTypeUsed[];
+  breakTypesUsed: BreakTypeStored[];
   breakMs: number;
   remoteSessionId: string | null;
   clientId: string | null;
@@ -52,8 +61,9 @@ export type AppState = {
 export type Action =
   | { type: "LOCK_IN"; sessionName?: string; remoteSessionId?: string | null; clientId?: string | null }
   | { type: "OPEN_PIT_STOP" }
+  | { type: "OPEN_SHARED_BREAK_PICKER" }
   | { type: "CLOSE_PIT_STOP" }
-  | { type: "START_BREAK"; choice: BreakChoice }
+  | { type: "START_BREAK"; choice: BreakChoice; openEnded?: boolean }
   | { type: "START_SHARED_BREAK"; durationMs?: number }
   | { type: "BREAK_TICK"; delta: number }
   | { type: "LOCK_BACK_IN" }
@@ -70,7 +80,7 @@ export type Action =
       clientId?: string | null;
       elapsedMs: number;
       sessionName?: string | null;
-      breakTypesUsed?: BreakTypeUsed[];
+      breakTypesUsed?: BreakTypeStored[];
       session?: SessionState;
     }
   | {

@@ -1,15 +1,44 @@
+import type { Metadata } from "next";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { notFound } from "next/navigation";
 import { ChromePage } from "@/components/layout/ChromePage";
-import { ContributionHeatmap } from "@/components/profile/ContributionHeatmap";
-import { FollowButton } from "@/components/social/FollowButton";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { publicAvatarUrl } from "@/features/profile/api";
+import { PublicProfileView } from "@/components/profile/PublicProfileView";
 import { resolveUsername } from "@/lib/profile/resolveUsername";
 import { createClient } from "@/lib/supabase/server";
 import type { HeatmapDay } from "@/types/database";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ username: string }>;
+}): Promise<Metadata> {
+  const { username } = await params;
+  try {
+    const supabase = await createClient();
+    const profile = await resolveUsername(supabase, username);
+    const title = `@${profile.username} · LockedIn`;
+    const description =
+      profile.bio?.trim() ||
+      `Focus calendar and sessions for @${profile.username} on LockedIn.`;
+    return {
+      title,
+      description,
+      openGraph: {
+        title,
+        description,
+        type: "profile",
+        url: `/u/${profile.username}`,
+      },
+      twitter: {
+        card: "summary",
+        title,
+        description,
+      },
+    };
+  } catch {
+    return { title: "Profile · LockedIn" };
+  }
+}
 
 export default async function PublicProfilePage({
   params,
@@ -34,65 +63,35 @@ export default async function PublicProfilePage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: heatmap, error: heatmapError } = await supabase.rpc(
-    "profile_activity_heatmap",
-    {
-      p_username: profile.username,
-      p_tz: profile.timezone || "UTC",
-    },
-  );
+  const [{ data: heatmap, error: heatmapError }, { data: verified }] =
+    await Promise.all([
+      supabase.rpc("profile_activity_heatmap", {
+        p_username: profile.username,
+        p_tz: profile.timezone || "UTC",
+      }),
+      supabase.rpc("profile_is_github_verified", {
+        p_user_id: profile.id,
+      }),
+    ]);
 
   const days = (heatmapError ? [] : (heatmap ?? [])) as HeatmapDay[];
-  const avatarUrl = publicAvatarUrl(profile.avatar_path);
-
   const isSelf = user?.id === profile.id;
-  const badgeLabel = "Self-Reported ✍️";
+  const githubVerified = verified === true;
 
   return (
     <ChromePage>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-        <Card className="border-slate-200 bg-white">
-          <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center">
-            <Avatar className="h-16 w-16 rounded-2xl">
-              {avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}
-              <AvatarFallback className="rounded-2xl bg-slate-100 text-lg font-semibold">
-                {profile.username.slice(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0 flex-1">
-              <h1 className="font-display text-2xl font-bold text-slate-900">
-                {profile.username}
-              </h1>
-              <p className="text-sm text-slate-500">@{profile.username}</p>
-              {profile.bio && (
-                <p className="mt-2 text-sm text-slate-600">{profile.bio}</p>
-              )}
-              <div className="mt-2">
-                <Badge
-                  variant="outline"
-                  className="rounded-lg border-slate-200 text-xs"
-                >
-                  {badgeLabel}
-                </Badge>
-              </div>
-            </div>
-            {!isSelf && (
-              <FollowButton
-                targetUserId={profile.id}
-                initialStatus="none"
-              />
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-slate-200 bg-white">
-          <CardHeader>
-            <CardTitle className="text-base">Contribution heatmap</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ContributionHeatmap days={days} />
-          </CardContent>
-        </Card>
+        <PublicProfileView
+          profileId={profile.id}
+          username={profile.username}
+          bio={profile.bio}
+          timezone={profile.timezone || "UTC"}
+          avatarPath={profile.avatar_path}
+          days={days}
+          isSelf={isSelf}
+          viewerId={user?.id ?? null}
+          githubVerified={githubVerified}
+        />
       </div>
     </ChromePage>
   );

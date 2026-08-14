@@ -1,36 +1,79 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LockedIn
 
-## Getting Started
+Focus tracking for students — solo sessions, multiplayer Rooms, follows, and an opt-in Explore feed.
 
-First, run the development server:
+## Stack
+
+- Next.js 16 (App Router) + React 19 + TypeScript
+- Supabase (Auth, Postgres, Storage, Realtime)
+- Tailwind CSS 4 + shadcn/ui + framer-motion
+
+## Local setup
+
+1. Copy env:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Fill in:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_SITE_URL` (production canonical origin, e.g. `https://your-domain.com`)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+2. Apply all SQL migrations in `supabase/migrations/` to your Supabase project (SQL editor or CLI), in order (`00001` … `00036`).
 
-## Learn More
+3. Enable Auth providers in the Supabase dashboard:
 
-To learn more about Next.js, take a look at the following resources:
+- Email (with confirmations **on** for production)
+- Google OAuth
+- GitHub OAuth
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Redirect URL allowlist must include:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+https://YOUR_DOMAIN/auth/callback
+http://localhost:3000/auth/callback
+```
 
-## Deploy on Vercel
+4. Paste email templates from `emails/Signup.html` and `emails/ResetPassword.html` into Supabase Auth → Email Templates. Configure SMTP (Resend/SendGrid/etc.) for production.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+5. Create public storage buckets if migrations did not (normally they do):
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `avatars`
+- `post-cards`
+
+6. Install and run:
+
+```bash
+npm install
+npm run dev
+```
+
+## Deploy (Vercel)
+
+1. Set the same `NEXT_PUBLIC_*` env vars in the Vercel project.
+2. Confirm migrations are applied on the production Supabase project.
+3. Set `NEXT_PUBLIC_SITE_URL` to the live domain (used for auth redirects, OG, sitemap).
+
+## Product routes
+
+| Route | Purpose |
+|-------|---------|
+| `/lockin` | Solo focus timer |
+| `/rooms` | Create/join focus rooms |
+| `/rooms/[code]` | Live room (invite URL auto-joins when signed in) |
+| `/dashboard` | Stats + heatmap |
+| `/explore` | Search + following feed |
+| `/profile` | Edit profile + settings |
+| `/u/[username]` | Public profile |
+| `/privacy` / `/terms` | Legal |
+| `/dev` | Developer Mode (GitHub repo stats) |
+
+## Notes
+
+- Guests can LOCK IN locally; cloud sync requires auth.
+- New accounts get a provisional username and must claim a public handle.
+- Focus calendars on other profiles are follower-gated.
+- Block / report are available on public profiles and posts.

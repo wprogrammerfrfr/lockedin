@@ -1,10 +1,78 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
+  FollowRelationStatus,
   FollowRequest,
   LeaderboardEntry,
   ProfileSearchHit,
+  ProfileSocialCounts,
+  ProfileDaySession,
 } from "@/features/social/types";
 import { isSchemaUnavailable } from "@/lib/supabase/errors";
+
+export async function profileSocialCounts(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<ProfileSocialCounts> {
+  const { data, error } = await supabase.rpc("profile_social_counts", {
+    p_user_id: userId,
+  });
+  if (error) {
+    if (isSchemaUnavailable(error)) {
+      return { friends: 0, followers: 0, following: 0 };
+    }
+    throw new Error(error.message);
+  }
+  const row = (data ?? {}) as Partial<ProfileSocialCounts>;
+  return {
+    friends: Number(row.friends) || 0,
+    followers: Number(row.followers) || 0,
+    following: Number(row.following) || 0,
+  };
+}
+
+export async function profileSessionsForDay(
+  supabase: SupabaseClient,
+  username: string,
+  day: string,
+  tz: string,
+): Promise<ProfileDaySession[]> {
+  const { data, error } = await supabase.rpc("profile_sessions_for_day", {
+    p_username: username,
+    p_day: day,
+    p_tz: tz,
+  });
+  if (error) {
+    if (isSchemaUnavailable(error)) return [];
+    throw new Error(error.message);
+  }
+  return (Array.isArray(data) ? data : []) as ProfileDaySession[];
+}
+
+export async function getFollowRelation(
+  supabase: SupabaseClient,
+  targetUserId: string,
+): Promise<FollowRelationStatus> {
+  const { data, error } = await supabase.rpc("get_follow_relation", {
+    p_target_id: targetUserId,
+  });
+  if (error) {
+    if (isSchemaUnavailable(error)) return "none";
+    throw new Error(error.message);
+  }
+  const status = String(data ?? "none");
+  if (
+    status === "self" ||
+    status === "accepted" ||
+    status === "pending_outgoing" ||
+    status === "pending_incoming" ||
+    status === "rejected" ||
+    status === "blocked" ||
+    status === "none"
+  ) {
+    return status;
+  }
+  return "none";
+}
 
 export async function searchProfiles(
   supabase: SupabaseClient,
@@ -36,6 +104,16 @@ export async function acceptFollow(
 ) {
   const { error } = await supabase.rpc("accept_follow", {
     p_follower_id: followerId,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function followBack(
+  supabase: SupabaseClient,
+  userId: string,
+) {
+  const { error } = await supabase.rpc("follow_back", {
+    p_user_id: userId,
   });
   if (error) throw new Error(error.message);
 }
@@ -93,6 +171,48 @@ export async function listIncomingFollowRequests(
     const profile = Array.isArray(r.profile) ? r.profile[0] : r.profile;
     return { ...r, profile };
   });
+}
+
+export async function listFollowers(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<ProfileSearchHit[]> {
+  const { data, error } = await supabase.rpc("list_followers", {
+    p_user_id: userId,
+  });
+  if (error) {
+    if (isSchemaUnavailable(error)) return [];
+    throw new Error(error.message);
+  }
+  return (Array.isArray(data) ? data : []) as ProfileSearchHit[];
+}
+
+export async function listFollowing(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<ProfileSearchHit[]> {
+  const { data, error } = await supabase.rpc("list_following", {
+    p_user_id: userId,
+  });
+  if (error) {
+    if (isSchemaUnavailable(error)) return [];
+    throw new Error(error.message);
+  }
+  return (Array.isArray(data) ? data : []) as ProfileSearchHit[];
+}
+
+export async function listFriends(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<ProfileSearchHit[]> {
+  const { data, error } = await supabase.rpc("list_friends", {
+    p_user_id: userId,
+  });
+  if (error) {
+    if (isSchemaUnavailable(error)) return [];
+    throw new Error(error.message);
+  }
+  return (Array.isArray(data) ? data : []) as ProfileSearchHit[];
 }
 
 export async function weeklyLeaderboard(

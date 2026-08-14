@@ -6,4 +6,5 @@ export type Profile = {
   timezone: string;
   email?: string | null;
   username_changed_at?: string | null;
+  username_claimed_at?: string | null;
 };

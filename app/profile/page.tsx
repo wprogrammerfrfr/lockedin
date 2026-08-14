@@ -2,17 +2,34 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Settings } from "lucide-react";
 import { ChromePage } from "@/components/layout/ChromePage";
 import { AuthGateModal } from "@/components/auth/AuthGateModal";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ProfileForm } from "@/components/profile/ProfileForm";
+import {
+  ProfileHeroAvatar,
+  ProfileSocialStats,
+} from "@/components/profile/ProfileHero";
 import { ProfileSettings } from "@/components/profile/ProfileSettings";
-import { FollowRequests } from "@/components/social/FollowRequests";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getProfile, publicAvatarUrl, updateProfile, uploadAvatar } from "@/features/profile/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  getProfile,
+  publicAvatarUrl,
+  updateProfile,
+  uploadAvatar,
+} from "@/features/profile/api";
+import { profileSocialCounts } from "@/features/social/api";
+import type { ProfileSocialCounts as Counts } from "@/features/social/types";
 import { createClient } from "@/lib/supabase/client";
 import { userFacingError } from "@/lib/supabase/errors";
 import type { Profile } from "@/features/profile/types";
@@ -33,6 +50,12 @@ export default function ProfilePage() {
   const [gateOpen, setGateOpen] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileReady, setProfileReady] = useState(false);
+  const [counts, setCounts] = useState<Counts>({
+    friends: 0,
+    followers: 0,
+    following: 0,
+  });
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -48,9 +71,14 @@ export default function ProfilePage() {
     setProfileReady(false);
     async function load() {
       try {
-        const row = await getProfile(createClient(), userId!);
+        const supabase = createClient();
+        const [row, social] = await Promise.all([
+          getProfile(supabase, userId!),
+          profileSocialCounts(supabase, userId!),
+        ]);
         if (cancelled) return;
         setProfile(row ? { ...row, email: userEmail } : null);
+        setCounts(social);
       } catch {
         if (!cancelled) setProfile(null);
       } finally {
@@ -64,19 +92,44 @@ export default function ProfilePage() {
   }, [status, isAuthenticated, userId, user?.email]);
 
   const name = profile?.username?.trim() || profileLabel;
-  const profileAvatar =
-    publicAvatarUrl(profile?.avatar_path) ?? avatarUrl;
+  const profileAvatar = publicAvatarUrl(profile?.avatar_path) ?? avatarUrl;
+
+  async function onAvatarFile(file: File) {
+    if (!user) return;
+    try {
+      await uploadAvatar(createClient(), user.id, file);
+      const updated = await getProfile(createClient(), user.id);
+      if (updated) setProfile({ ...updated, email });
+      await refreshProfile();
+      toast.success("Avatar updated");
+    } catch (err) {
+      toast.error(userFacingError(err, "Upload failed"));
+    }
+  }
 
   return (
     <ChromePage>
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-slate-900">
-            Profile
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Edit your profile, settings, password reset, and log out.
-          </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="font-display text-2xl font-bold text-slate-900">
+              Profile
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Your public card, friends, and account settings.
+            </p>
+          </div>
+          {isAuthenticated && user ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 shrink-0 gap-2 rounded-xl px-4"
+              onClick={() => setSettingsOpen(true)}
+            >
+              <Settings className="h-5 w-5 text-slate-700" />
+              Settings
+            </Button>
+          ) : null}
         </div>
 
         {status === "loading" ? (
@@ -84,34 +137,43 @@ export default function ProfilePage() {
         ) : isAuthenticated && user ? (
           <>
             <Card className="border-slate-200 bg-white">
-              <CardContent className="flex items-center gap-4 p-4">
-                <Avatar className="h-14 w-14 rounded-2xl">
-                  {profileAvatar ? (
-                    <AvatarImage src={profileAvatar} alt="" />
-                  ) : null}
-                  <AvatarFallback className="rounded-2xl bg-slate-100 text-sm">
-                    {name.slice(0, 2).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-display text-base font-semibold text-slate-900">
-                    {name}
-                  </p>
-                  {connectedVia && (
-                    <Badge
-                      variant="outline"
-                      className="mt-1.5 border-slate-200 text-[10px] font-medium text-slate-500"
-                    >
-                      Connected via {connectedVia}
-                    </Badge>
-                  )}
+              <CardContent className="flex flex-col gap-5 p-6 sm:flex-row sm:items-start">
+                <ProfileHeroAvatar
+                  name={name}
+                  avatarUrl={profileAvatar}
+                  editable={profileReady}
+                  onPickFile={(file) => void onAvatarFile(file)}
+                />
+                <div className="min-w-0 flex-1 space-y-3">
+                  <div>
+                    <p className="font-display text-xl font-bold text-slate-900">
+                      {name}
+                    </p>
+                    {profile?.username ? (
+                      <p className="text-sm text-slate-500">
+                        @{profile.username}
+                      </p>
+                    ) : null}
+                    {profile?.bio ? (
+                      <p className="mt-2 text-sm text-slate-600">{profile.bio}</p>
+                    ) : null}
+                    {connectedVia ? (
+                      <Badge
+                        variant="outline"
+                        className="mt-2 border-slate-200 text-[10px] font-medium text-slate-500"
+                      >
+                        Connected via {connectedVia}
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <ProfileSocialStats counts={counts} userId={user.id} />
                 </div>
               </CardContent>
             </Card>
 
             <Card className="border-slate-200 bg-white">
               <CardHeader>
-                <CardTitle className="text-base">Your profile</CardTitle>
+                <CardTitle className="text-base">Edit profile</CardTitle>
               </CardHeader>
               <CardContent>
                 {!profileReady ? (
@@ -133,56 +195,32 @@ export default function ProfilePage() {
                       );
                       setProfile({ ...updated, email });
                       await refreshProfile();
-                    }}
-                  />
-                )}
-                <div className="mt-4">
-                  <label className="text-sm font-medium text-slate-700">
-                    Avatar upload
-                  </label>
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    className="mt-2 block w-full text-sm text-slate-500"
-                    disabled={!profileReady}
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
                       try {
-                        await uploadAvatar(createClient(), user.id, file);
-                        const updated = await getProfile(
-                          createClient(),
-                          user.id,
+                        setCounts(
+                          await profileSocialCounts(createClient(), user.id),
                         );
-                        if (updated) setProfile({ ...updated, email });
-                        await refreshProfile();
-                        toast.success("Avatar updated");
-                      } catch (err) {
-                        toast.error(userFacingError(err, "Upload failed"));
+                      } catch {
+                        /* keep counts */
                       }
                     }}
                   />
+                )}
+              </CardContent>
+            </Card>
+
+            <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+              <DialogContent className="max-h-[min(90vh,40rem)] w-[calc(100%-2rem)] max-w-md overflow-y-auto rounded-2xl border-slate-200 bg-white p-6">
+                <DialogHeader>
+                  <DialogTitle>Settings</DialogTitle>
+                  <DialogDescription>
+                    Reset password, delete account, or log out.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="mt-2">
+                  <ProfileSettings email={email} />
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-slate-200 bg-white">
-              <CardHeader>
-                <CardTitle className="text-base">Follow requests</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <FollowRequests />
-              </CardContent>
-            </Card>
-
-            <Card className="border-slate-200 bg-white">
-              <CardHeader>
-                <CardTitle className="text-base">Settings</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ProfileSettings email={email} />
-              </CardContent>
-            </Card>
+              </DialogContent>
+            </Dialog>
           </>
         ) : (
           <Card className="border-slate-200 bg-white">
@@ -191,8 +229,8 @@ export default function ProfilePage() {
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-sm text-slate-500">
-                Solo focus still works. Sign in to edit your profile, sync
-                stats, and manage follow requests.
+                Solo focus still works. Sign in to edit your profile and sync
+                stats.
               </p>
               <Button asChild className="rounded-xl">
                 <Link href="/login">Log In</Link>

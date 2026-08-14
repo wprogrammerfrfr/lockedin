@@ -5,9 +5,13 @@ const ALLOWED_KEYS: Record<string, string> = {
   invalid_username:
     "Username must be 3–20 characters: letters, numbers, and underscores only.",
   username_taken: "That username is already taken.",
+  username_reserved: "That username is reserved.",
   username_cooldown: "You can change your username again after the cooldown.",
   not_authenticated: "You must be signed in to continue.",
   rate_limited: "Slow down — try again in a moment.",
+  blocked: "You can't interact with this user.",
+  already_blocked: "You've already blocked this user.",
+  not_authorized: "You're not allowed to do that.",
   room_full: "Room is full (max 6).",
   active_session_exists: "You already have an active session.",
   already_in_other_room: "You're already in a room — leave it first.",
@@ -23,6 +27,11 @@ const ALLOWED_KEYS: Record<string, string> = {
   no_active_vote: "That break vote already ended.",
   vote_expired: "That break vote already ended.",
   not_vote_requester: "Only the person who started this vote can cancel it.",
+  report_saved: "Thanks — we received your report.",
+  not_following_you: "They need to follow you first.",
+  follow_not_found: "Follow relationship not found.",
+  invalid_target: "Invalid target.",
+  forbidden: "You're not allowed to do that.",
 };
 
 function errorMessage(err: unknown): string {

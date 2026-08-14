@@ -365,7 +365,7 @@ export default function LockInPage() {
   useDocumentSessionChrome(
     state.session,
     state.elapsedMs,
-    state.breakRemainingMs,
+    state.breakOpenEnded ? state.breakElapsedMs : state.breakRemainingMs,
   );
 
   const shareDuration =
@@ -406,6 +406,8 @@ export default function LockInPage() {
           personalRecordMs={state.personalRecordMs}
           didBreakPR={state.didBreakPR}
           breakRemainingMs={state.breakRemainingMs}
+          breakElapsedMs={state.breakElapsedMs}
+          breakOpenEnded={state.breakOpenEnded}
           breakLabel={state.breakLabel}
           breakEmoji={state.breakEmoji}
           sessionName={

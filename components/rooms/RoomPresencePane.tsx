@@ -8,18 +8,46 @@ import { formatMs } from "@/features/session/format";
 import type { RoomPresenceMember } from "@/features/rooms/types";
 import { cn } from "@/lib/utils";
 
-function statusBadge(status: RoomPresenceMember["status"]) {
-  switch (status) {
+function shortBreakLabel(
+  breakType?: string | null,
+  breakLabel?: string | null,
+): string | null {
+  const typeMap: Record<string, string> = {
+    hydration: "Hydration",
+    doomscroll: "Doomscroll",
+    touch_grass: "Touch Grass",
+    smart_alignment: "Smart alignment",
+    dynamic: "Dynamic",
+    pomodoro: "Pomodoro",
+  };
+  if (breakType && typeMap[breakType]) return typeMap[breakType];
+  if (breakLabel?.trim()) {
+    const raw = breakLabel.trim();
+    if (/hydration/i.test(raw)) return "Hydration";
+    if (/doomscroll/i.test(raw)) return "Doomscroll";
+    if (/touch grass/i.test(raw)) return "Touch Grass";
+    if (/smart alignment/i.test(raw)) return "Smart alignment";
+    if (/pomodoro/i.test(raw)) return "Pomodoro";
+    if (/shared/i.test(raw)) return "Shared";
+    return raw.length > 18 ? `${raw.slice(0, 16)}…` : raw;
+  }
+  return null;
+}
+
+function statusBadge(member: RoomPresenceMember) {
+  switch (member.status) {
     case "LOCKED_IN":
       return {
         label: "LOCKED IN",
         className: "bg-emerald-50 text-emerald-700 border-emerald-200",
       };
-    case "BREAK":
+    case "BREAK": {
+      const kind = shortBreakLabel(member.breakType, member.breakLabel);
       return {
-        label: "BREAK",
+        label: kind ? `BREAK · ${kind}` : "BREAK",
         className: "bg-amber-50 text-amber-700 border-amber-200",
       };
+    }
     case "LACKING":
       return {
         label: "Lacking",
@@ -27,7 +55,7 @@ function statusBadge(status: RoomPresenceMember["status"]) {
       };
     default:
       return {
-        label: status,
+        label: member.status,
         className: "bg-slate-50 text-slate-600 border-slate-200",
       };
   }
@@ -52,7 +80,7 @@ export function RoomPresencePane({
       </div>
       <div className="flex flex-col gap-2">
         {slots.map((m, i) => {
-          const badge = m ? statusBadge(m.status) : null;
+          const badge = m ? statusBadge(m) : null;
           return (
             <motion.div
               key={m?.userId ?? `empty-${i}`}
@@ -84,7 +112,8 @@ export function RoomPresencePane({
                   {badge && (
                     <Badge
                       variant="outline"
-                      className={cn("rounded-lg text-[10px]", badge.className)}
+                      className={cn("max-w-[9.5rem] truncate rounded-lg text-[10px]", badge.className)}
+                      title={badge.label}
                     >
                       {badge.label}
                     </Badge>

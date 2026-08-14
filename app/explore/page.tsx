@@ -5,10 +5,11 @@ import { ChromePage } from "@/components/layout/ChromePage";
 import { AuthGateModal } from "@/components/auth/AuthGateModal";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { FeedList } from "@/components/feed/FeedList";
+import { ExploreSuggestions } from "@/components/social/ExploreSuggestions";
 import { ProfileSearch } from "@/components/social/ProfileSearch";
 
 export default function ExplorePage() {
-  const { status, isAuthenticated } = useAuth();
+  const { status, isAuthenticated, profile } = useAuth();
   const [gateOpen, setGateOpen] = useState(false);
 
   useEffect(() => {
@@ -42,7 +43,11 @@ export default function ExplorePage() {
           {status === "loading" ? (
             <p className="text-sm text-slate-400">Loading…</p>
           ) : isAuthenticated ? (
-            <FeedList />
+            <FeedList
+              emptyExtra={
+                <ExploreSuggestions profileUsername={profile?.username} />
+              }
+            />
           ) : (
             <p className="text-sm text-slate-400">
               Sign in to see explicitly shared sessions from people you follow.

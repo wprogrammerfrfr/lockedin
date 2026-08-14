@@ -19,10 +19,16 @@ export function PitStopDialog({
   open,
   onClose,
   onSelect,
+  required = false,
+  openEnded = false,
 }: {
   open: boolean;
   onClose: () => void;
   onSelect: (choice: BreakChoice) => void;
+  /** Shared vote result — cannot dismiss without picking a type. */
+  required?: boolean;
+  /** Open-ended break — no fixed countdown after select. */
+  openEnded?: boolean;
 }) {
   const choices = useMemo(() => buildBreakChoices(), [open]);
 
@@ -30,19 +36,32 @@ export function PitStopDialog({
   const dynamic = choices.filter((c) => c.group === "dynamic");
   const smart = choices.find((c) => c.group === "smart")!;
 
+  const description = required
+    ? openEnded
+      ? "Shared break passed. Pick how you are spending it — timer runs until you LOCK BACK IN."
+      : "Shared break passed. Pick how you are spending it."
+    : openEnded
+      ? "Main timer paused. Pick a break — timer runs until you LOCK BACK IN."
+      : "Main timer paused. Pick a break — countdown starts on select.";
+
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next) onClose();
+        if (!next) {
+          if (required) return;
+          onClose();
+        }
       }}
     >
-      <DialogContent className="max-w-lg border-slate-200 bg-white">
+      <DialogContent
+        className="max-w-lg border-slate-200 bg-white"
+        onPointerDownOutside={required ? (e) => e.preventDefault() : undefined}
+        onEscapeKeyDown={required ? (e) => e.preventDefault() : undefined}
+      >
         <DialogHeader>
-          <DialogTitle>Break</DialogTitle>
-          <DialogDescription>
-            Main timer paused. Pick a break — countdown starts on select.
-          </DialogDescription>
+          <DialogTitle>{required ? "Shared break" : "Break"}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
@@ -59,7 +78,9 @@ export function PitStopDialog({
                 {hydration.title}
               </span>
               <span className="mt-0.5 block text-xs text-slate-500">
-                {hydration.subtitle}
+                {openEnded
+                  ? "Water up. Reset the eyes."
+                  : hydration.subtitle}
               </span>
             </span>
             <Droplets className="ml-auto h-4 w-4 shrink-0 text-sky-500" />
@@ -85,7 +106,11 @@ export function PitStopDialog({
                       {choice.title}
                     </span>
                     <span className="mt-0.5 block text-[11px] text-slate-500">
-                      {choice.subtitle}
+                      {openEnded
+                        ? choice.id === "doomscroll"
+                          ? "Quick scroll reset"
+                          : "Step outside briefly"
+                        : choice.subtitle}
                     </span>
                   </span>
                   {choice.id === "doomscroll" ? (
@@ -111,18 +136,20 @@ export function PitStopDialog({
                 {smart.title}
               </span>
               <span className="mt-0.5 block text-xs text-slate-500">
-                {smart.subtitle}
+                {openEnded ? "Align to the top of the hour" : smart.subtitle}
               </span>
             </span>
             <Clock className="ml-auto h-4 w-4 shrink-0 text-violet-500" />
           </button>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Keep locked in
-          </Button>
-        </DialogFooter>
+        {!required ? (
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose}>
+              Keep locked in
+            </Button>
+          </DialogFooter>
+        ) : null}
       </DialogContent>
     </Dialog>
   );

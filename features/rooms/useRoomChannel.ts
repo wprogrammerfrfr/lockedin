@@ -27,6 +27,14 @@ function mergeMembers(
           username: live.username || m.username,
           displayName: live.displayName || m.displayName,
           avatarPath: live.avatarPath || m.avatarPath,
+          breakLabel:
+            live.status === "BREAK" || m.status === "BREAK"
+              ? live.breakLabel || m.breakLabel || null
+              : null,
+          breakType:
+            live.status === "BREAK" || m.status === "BREAK"
+              ? live.breakType || m.breakType || null
+              : null,
         }
       : m;
     if (typeof next.seat === "number" && next.seat >= 1) {
@@ -117,6 +125,8 @@ export function useRoomChannel(
         status: s.status,
         elapsedMs: s.elapsedMs,
         seat: s.seat,
+        breakLabel: s.status === "BREAK" ? s.breakLabel ?? null : null,
+        breakType: s.status === "BREAK" ? s.breakType ?? null : null,
       })
       .catch(() => undefined);
   }, []);
@@ -165,6 +175,7 @@ export function useRoomChannel(
         roomId,
         s.status,
         s.elapsedMs,
+        s.status === "BREAK" ? s.breakLabel ?? null : null,
       ).catch(() => undefined);
       trackSelf();
     }, TOUCH_MS);
@@ -180,7 +191,14 @@ export function useRoomChannel(
   const elapsedSec = Math.floor(self.elapsedMs / 1000);
   useEffect(() => {
     trackSelf();
-  }, [self.status, elapsedSec, self.seat, trackSelf]);
+  }, [
+    self.status,
+    elapsedSec,
+    self.seat,
+    self.breakLabel,
+    self.breakType,
+    trackSelf,
+  ]);
 
   useEffect(() => {
     if (!roomId || !self.userId) return;
@@ -189,8 +207,9 @@ export function useRoomChannel(
       roomId,
       self.status,
       self.elapsedMs,
+      self.status === "BREAK" ? self.breakLabel ?? null : null,
     ).catch(() => undefined);
-  }, [self.status, roomId, self.userId]);
+  }, [self.status, self.breakLabel, roomId, self.userId]);
 
   return { members, channelStatus };
 }

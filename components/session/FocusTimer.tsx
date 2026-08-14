@@ -22,6 +22,8 @@ export function FocusTimer({
   personalRecordMs,
   didBreakPR,
   breakRemainingMs,
+  breakElapsedMs = 0,
+  breakOpenEnded = false,
   breakLabel,
   breakEmoji,
   sessionName,
@@ -42,6 +44,8 @@ export function FocusTimer({
   personalRecordMs: number;
   didBreakPR: boolean;
   breakRemainingMs: number;
+  breakElapsedMs?: number;
+  breakOpenEnded?: boolean;
   breakLabel: string;
   breakEmoji: string;
   sessionName: string;
@@ -166,9 +170,13 @@ export function FocusTimer({
                     </span>
                     {breakLabel}
                   </p>
-                  <FlipClock ms={breakRemainingMs} />
+                  <FlipClock
+                    ms={breakOpenEnded ? breakElapsedMs : breakRemainingMs}
+                  />
                   <p className="mt-3 text-xs uppercase tracking-[0.16em] text-slate-400">
-                    break countdown
+                    {breakOpenEnded
+                      ? "until you lock back in"
+                      : "break countdown"}
                   </p>
                 </motion.div>
               ) : (

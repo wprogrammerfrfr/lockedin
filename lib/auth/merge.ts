@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { BreakTypeUsed } from "@/features/session/types";
+import type { BreakTypeStored } from "@/features/session/types";
 
 const LOCAL_DRAFTS_KEY = "lockedin.sessionDrafts";
 
@@ -8,7 +8,7 @@ export type SessionDraft = {
   sessionName: string | null;
   elapsedMs: number;
   outcome: string;
-  breakTypesUsed: BreakTypeUsed[];
+  breakTypesUsed: BreakTypeStored[];
   endedAt: string;
   source: "local" | "anonymous";
 };

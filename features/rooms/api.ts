@@ -147,12 +147,14 @@ export async function touchRoomPresence(
   roomId: string,
   status?: string | null,
   elapsedMs?: number | null,
+  breakLabel?: string | null,
 ) {
   const { error } = await supabase.rpc("touch_room_presence", {
     p_room_id: roomId,
     p_status: status ?? null,
     p_elapsed_ms:
       typeof elapsedMs === "number" ? Math.round(elapsedMs) : null,
+    p_break_label: breakLabel?.trim() || null,
   });
   if (error) throw new Error(error.message);
 }
@@ -235,7 +237,9 @@ export async function fetchRoomMembers(
 ): Promise<RoomPresenceMember[]> {
   const { data, error } = await supabase
     .from("room_members")
-    .select("user_id, seat, focus_status, elapsed_ms, profiles(username, avatar_path)")
+    .select(
+      "user_id, seat, focus_status, elapsed_ms, break_label, profiles(username, avatar_path)",
+    )
     .eq("room_id", roomId)
     .order("seat", { ascending: true });
   if (error) throw new Error(error.message);
@@ -257,6 +261,8 @@ export async function fetchRoomMembers(
       rawStatus === "IDLE"
         ? rawStatus
         : "WAITING";
+    const breakLabel =
+      (row as { break_label?: string | null }).break_label?.trim() || null;
     return {
       userId: (row as { user_id: string }).user_id,
       username,
@@ -265,6 +271,8 @@ export async function fetchRoomMembers(
       status,
       elapsedMs: Number((row as { elapsed_ms?: number | null }).elapsed_ms) || 0,
       seat: (row as { seat?: number | null }).seat ?? null,
+      breakLabel,
+      breakType: null,
     };
   });
 }

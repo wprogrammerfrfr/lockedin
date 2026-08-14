@@ -55,6 +55,8 @@ export function WeeklyLeaderboard({
     };
   }, [timezone, status, isAuthenticated]);
 
+  const alone = !needsAuth && !error && rows.length <= 1;
+
   return (
     <div
       className={
@@ -64,10 +66,10 @@ export function WeeklyLeaderboard({
       }
     >
       <p className="font-display text-sm font-semibold text-slate-800">
-        Weekly Mutual Leaderboard
+        This week&apos;s top lock ins
       </p>
       <p className="mt-1 text-xs text-slate-500">
-        Mutual followers · active hours this week (your timezone).
+        Mutual friends · active hours this week (your timezone).
       </p>
 
       {needsAuth && (
@@ -83,10 +85,26 @@ export function WeeklyLeaderboard({
       )}
 
       {!needsAuth && !error && rows.length === 0 && (
-        <p className="mt-3 text-xs text-slate-400">No mutual activity yet.</p>
+        <p className="mt-3 text-xs text-slate-400">
+          No activity yet.{" "}
+          <Link href="/lockin" className="font-medium text-slate-700 underline">
+            LOCK IN
+          </Link>{" "}
+          to start the week.
+        </p>
       )}
 
-      {!needsAuth && (
+      {alone && rows.length === 1 ? (
+        <p className="mt-3 text-xs text-slate-500">
+          Just you for now. Accept follow-backs to climb with friends —{" "}
+          <Link href="/explore" className="font-medium text-slate-800 underline">
+            find students on Explore
+          </Link>
+          .
+        </p>
+      ) : null}
+
+      {!needsAuth && rows.length > 0 && (
         <ol className="mt-3 space-y-2">
           {rows.slice(0, compact ? 5 : 10).map((r) => {
             const url = publicAvatarUrl(r.avatar_path);

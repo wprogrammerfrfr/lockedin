@@ -15,6 +15,10 @@ export type RoomPresenceMember = {
   status: RoomPresenceStatus;
   elapsedMs: number;
   seat?: number | null;
+  /** Live break label, e.g. "15-minute Hydration Break" or "Quick Doomscroll". */
+  breakLabel?: string | null;
+  /** Choice id / coarse type for badges: hydration, doomscroll, pomodoro, etc. */
+  breakType?: string | null;
 };
 
 export type RoomSummary = {

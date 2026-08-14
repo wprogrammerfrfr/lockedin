@@ -77,6 +77,8 @@ function LoginPageContent() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState<string | null>(null);
   const [signupSent, setSignupSent] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [error, setError] = useState<string | null>(
     callbackError && !confirmed
       ? "Authentication failed. Please try again."
@@ -100,6 +102,8 @@ function LoginPageContent() {
     setEmail("");
     setPassword("");
     setSignupSent(false);
+    setForgotMode(false);
+    setAcceptedTerms(false);
     clearFormNoise();
   }
 
@@ -107,11 +111,82 @@ function LoginPageContent() {
     setMode("login");
     setPassword("");
     setSignupSent(false);
+    setForgotMode(false);
     clearFormNoise();
+  }
+
+  async function handleForgotPassword(e: React.FormEvent) {
+    e.preventDefault();
+    clearFormNoise();
+    if (!email.trim()) {
+      setError("Enter your email to reset your password.");
+      return;
+    }
+    setLoading("forgot");
+    try {
+      const { error: resetError } = await createClient().auth.resetPasswordForEmail(
+        email.trim(),
+        {
+          redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset`,
+        },
+      );
+      if (resetError) {
+        setError(friendlyAuthError(resetError.message, "Could not send reset email."));
+        return;
+      }
+      setMessage("Check your email for a password reset link.");
+    } catch (err) {
+      setError(
+        friendlyAuthError(
+          err instanceof Error ? err.message : "",
+          "Could not send reset email.",
+        ),
+      );
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function handleResendConfirm() {
+    clearFormNoise();
+    if (!email.trim()) {
+      setError("Enter your email to resend confirmation.");
+      return;
+    }
+    setLoading("resend");
+    try {
+      const { error: resendError } = await createClient().auth.resend({
+        type: "signup",
+        email: email.trim(),
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/login?confirmed=1")}`,
+        },
+      });
+      if (resendError) {
+        setError(
+          friendlyAuthError(resendError.message, "Could not resend confirmation."),
+        );
+        return;
+      }
+      setMessage("Confirmation email resent. Check your inbox.");
+    } catch (err) {
+      setError(
+        friendlyAuthError(
+          err instanceof Error ? err.message : "",
+          "Could not resend confirmation.",
+        ),
+      );
+    } finally {
+      setLoading(null);
+    }
   }
 
   async function signInWithOAuth(provider: "google" | "github") {
     clearFormNoise();
+    if (mode === "signup" && !acceptedTerms) {
+      setError("Accept the Terms and Privacy Policy to continue.");
+      return;
+    }
     setLoading(provider);
     try {
       const redirectTo = `${window.location.origin}/auth/callback`;
@@ -137,6 +212,10 @@ function LoginPageContent() {
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
     clearFormNoise();
+    if (mode === "signup" && !acceptedTerms) {
+      setError("Accept the Terms and Privacy Policy to create an account.");
+      return;
+    }
     setLoading("email");
 
     try {
@@ -159,7 +238,7 @@ function LoginPageContent() {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/login?confirmed=1")}`,
         },
       });
       if (signUpError) {
@@ -262,6 +341,48 @@ function LoginPageContent() {
         )}
         {mode === "login" ? "Log In with Email" : "Create Account"}
       </Button>
+      {mode === "signup" ? (
+        <label className="flex items-start gap-2 text-left text-xs text-slate-500">
+          <input
+            type="checkbox"
+            checked={acceptedTerms}
+            onChange={(e) => setAcceptedTerms(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            I agree to the{" "}
+            <a href="/terms" className="underline underline-offset-2">
+              Terms
+            </a>{" "}
+            and{" "}
+            <a href="/privacy" className="underline underline-offset-2">
+              Privacy Policy
+            </a>
+            .
+          </span>
+        </label>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+          <button
+            type="button"
+            className="text-slate-500 underline-offset-2 hover:underline"
+            onClick={() => {
+              setForgotMode(true);
+              clearFormNoise();
+            }}
+          >
+            Forgot password?
+          </button>
+          <button
+            type="button"
+            className="text-slate-500 underline-offset-2 hover:underline"
+            onClick={() => void handleResendConfirm()}
+            disabled={busy}
+          >
+            Resend confirmation
+          </button>
+        </div>
+      )}
     </form>
   );
 
@@ -295,11 +416,88 @@ function LoginPageContent() {
               >
                 Back to Sign In
               </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="mt-2 w-full rounded-xl text-xs"
+                disabled={busy}
+                onClick={() => void handleResendConfirm()}
+              >
+                {loading === "resend" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Resend confirmation email"
+                )}
+              </Button>
               <p className="mt-6 text-center text-xs text-slate-400">
                 <a href="/lockin" className="underline-offset-2 hover:underline">
                   Back to Solo
                 </a>
               </p>
+            </CardContent>
+          </>
+        ) : forgotMode ? (
+          <>
+            <CardHeader className="space-y-2 text-center">
+              <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-slate-500">
+                LockedIn
+              </p>
+              <CardTitle className="font-display text-2xl font-bold text-slate-900">
+                Reset password
+              </CardTitle>
+              <p className="text-sm text-slate-500">
+                We&apos;ll email you a link to choose a new password.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {(error || message) && (
+                <div
+                  className={cn(
+                    "mb-4 rounded-xl border px-3 py-2 text-sm",
+                    error
+                      ? "border-red-200 bg-red-50 text-red-700"
+                      : "border-emerald-200 bg-emerald-50 text-emerald-700",
+                  )}
+                  role={error ? "alert" : "status"}
+                >
+                  {error ?? message}
+                </div>
+              )}
+              <form className="space-y-3" onSubmit={handleForgotPassword}>
+                <label className="block">
+                  <span className="mb-1.5 block text-[10px] uppercase tracking-[0.14em] text-slate-400">
+                    Email
+                  </span>
+                  <input
+                    type="email"
+                    required
+                    autoComplete="email"
+                    value={email}
+                    disabled={busy}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={inputClass}
+                    placeholder="you@school.edu"
+                  />
+                </label>
+                <Button type="submit" className="w-full rounded-xl" disabled={busy}>
+                  {loading === "forgot" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Send reset link"
+                  )}
+                </Button>
+              </form>
+              <Button
+                type="button"
+                variant="ghost"
+                className="mt-3 w-full rounded-xl"
+                onClick={() => {
+                  setForgotMode(false);
+                  clearFormNoise();
+                }}
+              >
+                Back to Sign In
+              </Button>
             </CardContent>
           </>
         ) : (
@@ -380,6 +578,14 @@ function LoginPageContent() {
               <p className="mt-6 text-center text-xs text-slate-400">
                 <a href="/lockin" className="underline-offset-2 hover:underline">
                   Back to Solo
+                </a>
+                {" · "}
+                <a href="/privacy" className="underline-offset-2 hover:underline">
+                  Privacy
+                </a>
+                {" · "}
+                <a href="/terms" className="underline-offset-2 hover:underline">
+                  Terms
                 </a>
               </p>
             </CardContent>

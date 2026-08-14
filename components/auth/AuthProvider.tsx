@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { publicAvatarUrl } from "@/features/profile/api";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import { needsUsernameClaim } from "@/lib/profile/username";
 
 export type AuthStatus = "loading" | "guest" | "authenticated";
 export type ConnectedVia = "GitHub" | "Google" | "Email" | null;
@@ -21,6 +22,7 @@ export type AuthProfile = {
   username: string | null;
   avatar_path: string | null;
   timezone: string | null;
+  username_claimed_at: string | null;
 };
 
 type AuthContextValue = {
@@ -34,6 +36,7 @@ type AuthContextValue = {
   email: string | null;
   avatarUrl: string | null;
   connectedVia: ConnectedVia;
+  needsUsernameClaim: boolean;
   refreshProfile: () => Promise<void>;
 };
 
@@ -131,20 +134,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     profileUserIdRef.current = userId;
     try {
       const supabase = createClient();
-      const { data, error } = await supabase
+      let data: {
+        username: string | null;
+        avatar_path: string | null;
+        timezone: string | null;
+        username_claimed_at?: string | null;
+      } | null = null;
+
+      const first = await supabase
         .from("profiles")
-        .select("username, avatar_path, timezone")
+        .select("username, avatar_path, timezone, username_claimed_at")
         .eq("id", userId)
         .maybeSingle();
-      if (profileUserIdRef.current !== userId) return;
-      if (error || !data) {
-        setProfile(null);
-        return;
+
+      if (first.error && /username_claimed_at/i.test(first.error.message)) {
+        const second = await supabase
+          .from("profiles")
+          .select("username, avatar_path, timezone")
+          .eq("id", userId)
+          .maybeSingle();
+        if (profileUserIdRef.current !== userId) return;
+        if (second.error || !second.data) {
+          setProfile(null);
+          return;
+        }
+        data = second.data;
+      } else {
+        if (profileUserIdRef.current !== userId) return;
+        if (first.error || !first.data) {
+          setProfile(null);
+          return;
+        }
+        data = first.data;
       }
+
+      const claimed =
+        data.username_claimed_at ??
+        // Pre-migration fallback: treat non-provisional usernames as claimed
+        (data.username && !/^u_[a-f0-9]{8,}$/i.test(data.username)
+          ? "legacy"
+          : null);
+
       setProfile({
         username: data.username ?? null,
         avatar_path: data.avatar_path ?? null,
         timezone: data.timezone ?? null,
+        username_claimed_at: claimed,
       });
     } catch {
       if (profileUserIdRef.current !== userId) return;
@@ -222,6 +257,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email: user?.email ?? null,
       avatarUrl: resolveAvatarUrl(profile, user),
       connectedVia: connectedViaFromUser(user),
+      needsUsernameClaim:
+        status === "authenticated" &&
+        needsUsernameClaim(
+          profile?.username,
+          profile?.username_claimed_at,
+        ),
       refreshProfile,
     }),
     [session, status, user, profile, refreshProfile],

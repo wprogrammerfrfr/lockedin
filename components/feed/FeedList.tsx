@@ -2,25 +2,43 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent } from "@/components/ui/card";
+import { Flag, MoreHorizontal, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { CommentBox } from "@/components/feed/CommentBox";
 import { LikeButton } from "@/components/feed/LikeButton";
-import { listFollowingFeed, type FeedPost } from "@/features/feed/api";
+import { ReportDialog } from "@/components/moderation/ReportDialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  deletePost,
+  listFollowingFeed,
+  publicPostCardUrl,
+  type FeedPost,
+} from "@/features/feed/api";
 import { publicAvatarUrl } from "@/features/profile/api";
 import { lockedInForLabel, outcomeEmoji } from "@/features/session/format";
 import type { OutcomeKind } from "@/features/session/types";
 import { createClient } from "@/lib/supabase/client";
+import { userFacingError } from "@/lib/supabase/errors";
 
 function asOutcome(o: string | null | undefined): OutcomeKind {
   if (o === "pr" || o === "tapout" || o === "break" || o === "solid") return o;
   return "solid";
 }
 
-export function FeedList() {
+export function FeedList({
+  emptyExtra,
+}: {
+  emptyExtra?: React.ReactNode;
+}) {
+  const { user } = useAuth();
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reportPostId, setReportPostId] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -30,9 +48,7 @@ export function FeedList() {
         const data = await listFollowingFeed(supabase);
         if (!cancelled) setPosts(data);
       } catch {
-        if (!cancelled) {
-          setError("unavailable");
-        }
+        if (!cancelled) setError("unavailable");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -42,6 +58,16 @@ export function FeedList() {
       cancelled = true;
     };
   }, []);
+
+  async function handleDelete(postId: string) {
+    try {
+      await deletePost(createClient(), postId);
+      setPosts((prev) => prev.filter((p) => p.id !== postId));
+      toast.success("Post removed");
+    } catch (err) {
+      toast.error(userFacingError(err, "Could not delete post"));
+    }
+  }
 
   if (loading) {
     return <p className="text-sm text-slate-400">Loading feed…</p>;
@@ -57,10 +83,20 @@ export function FeedList() {
 
   if (posts.length === 0) {
     return (
-      <p className="text-sm text-slate-400">
-        No shared sessions yet. Explicit shares from people you follow land
-        here.
-      </p>
+      <div className="space-y-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center">
+        <p className="text-sm text-slate-500">
+          No shared sessions yet. Explicit shares from people you follow land
+          here.
+        </p>
+        <p className="text-xs text-slate-400">
+          Find friends on search above, or{" "}
+          <Link href="/lockin" className="font-medium text-slate-700 underline">
+            LOCK IN
+          </Link>{" "}
+          and share your own.
+        </p>
+        {emptyExtra}
+      </div>
     );
   }
 
@@ -68,7 +104,9 @@ export function FeedList() {
     <div className="space-y-4">
       {posts.map((post) => {
         const url = publicAvatarUrl(post.author?.avatar_path ?? null);
+        const cardUrl = publicPostCardUrl(post.image_path);
         const outcome = asOutcome(post.session?.outcome);
+        const isOwn = user?.id === post.author_id;
         return (
           <Card key={post.id} className="border-slate-200 bg-white">
             <CardContent className="space-y-3 p-4">
@@ -91,7 +129,60 @@ export function FeedList() {
                   </p>
                 </div>
                 <span className="text-xl">{outcomeEmoji(outcome)}</span>
+                <div className="relative">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-lg"
+                    onClick={() =>
+                      setMenuOpen((id) => (id === post.id ? null : post.id))
+                    }
+                    aria-label="Post actions"
+                  >
+                    <MoreHorizontal className="h-4 w-4 text-slate-400" />
+                  </Button>
+                  {menuOpen === post.id ? (
+                    <div className="absolute right-0 z-10 mt-1 w-40 rounded-xl border border-slate-200 bg-white py-1 shadow-sm">
+                      {isOwn ? (
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-rose-600 hover:bg-slate-50"
+                          onClick={() => {
+                            setMenuOpen(null);
+                            void handleDelete(post.id);
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Unshare
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"
+                          onClick={() => {
+                            setMenuOpen(null);
+                            setReportPostId(post.id);
+                          }}
+                        >
+                          <Flag className="h-3.5 w-3.5" />
+                          Report
+                        </button>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
               </div>
+
+              {cardUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={cardUrl}
+                  alt="Session summary"
+                  className="w-full rounded-2xl border border-slate-100 object-cover"
+                />
+              ) : null}
+
               <p className="font-mono text-sm tabular-nums text-slate-700">
                 {lockedInForLabel(post.session?.active_ms ?? 0)}
               </p>
@@ -99,13 +190,33 @@ export function FeedList() {
                 <p className="text-sm text-slate-600">{post.caption}</p>
               )}
               <div className="flex items-center gap-3">
-                <LikeButton postId={post.id} liked={Boolean(post.liked_by_me)} />
+                <LikeButton
+                  postId={post.id}
+                  liked={Boolean(post.liked_by_me)}
+                  count={post.like_count ?? 0}
+                />
+                {(post.comment_count ?? 0) > 0 ? (
+                  <span className="font-mono text-xs tabular-nums text-slate-400">
+                    {post.comment_count} comments
+                  </span>
+                ) : null}
               </div>
               <CommentBox postId={post.id} />
             </CardContent>
           </Card>
         );
       })}
+
+      {reportPostId ? (
+        <ReportDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setReportPostId(null);
+          }}
+          targetType="post"
+          targetId={reportPostId}
+        />
+      ) : null}
     </div>
   );
 }

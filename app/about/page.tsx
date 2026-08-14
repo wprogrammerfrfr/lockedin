@@ -48,8 +48,18 @@ export default function AboutPage() {
           <CardContent className="space-y-2 text-sm text-slate-600">
             <p>
               Profiles are public by default. Session activity never auto-posts.
-              Explore only shows sessions you explicitly share. Verification
-              badges: GitHub Verified vs Self-Reported.
+              Explore only shows sessions you explicitly share. Focus calendars
+              on other profiles unlock after an accepted follow. Verification
+              badges: GitHub Verified (linked GitHub account) vs Self-Reported.
+            </p>
+            <p>
+              <a href="/privacy" className="font-medium text-slate-800 underline">
+                Privacy Policy
+              </a>
+              {" · "}
+              <a href="/terms" className="font-medium text-slate-800 underline">
+                Terms of Service
+              </a>
             </p>
           </CardContent>
         </Card>

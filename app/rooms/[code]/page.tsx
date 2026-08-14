@@ -11,6 +11,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { Copy } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { FocusTimer } from "@/components/session/FocusTimer";
 import { ClosingBanner } from "@/components/rooms/ClosingBanner";
@@ -26,6 +27,7 @@ import {
   castBreakVote,
   fetchBreakVotes,
   fetchRoomByCode,
+  joinRoom,
   leaveRoom,
   requestSharedBreak,
   resolveBreakVote,
@@ -70,7 +72,7 @@ export default function RoomFocusPage({
 }) {
   const { code } = use(params);
   const router = useRouter();
-  const { status, user, profile, avatarUrl } = useAuth();
+  const { status, user, profile, avatarUrl, isAuthenticated } = useAuth();
   const [room, setRoom] = useState<RoomSummary | null>(null);
   const [missing, setMissing] = useState(false);
   const [state, dispatch] = useReducer(reducer, initialState);
@@ -84,6 +86,7 @@ export default function RoomFocusPage({
   const stateRef = useRef(state);
   stateRef.current = state;
   const seenRoomRef = useRef(false);
+  const joinedRef = useRef(false);
   const appliedVoteRoundRef = useRef<string | null>(null);
   const loadErrorToastRef = useRef(false);
 
@@ -93,7 +96,42 @@ export default function RoomFocusPage({
 
   const loadRoom = useCallback(async () => {
     try {
-      const next = await fetchRoomByCode(createClient(), code);
+      const supabase = createClient();
+      const normalized = code.replace(/\D/g, "").slice(0, 6);
+
+      // Auto-join when authenticated so shared invite URLs seat the viewer.
+      if (isAuthenticated && normalized.length === 6 && !joinedRef.current) {
+        try {
+          const joined = await joinRoom(supabase, normalized);
+          joinedRef.current = true;
+          seenRoomRef.current = true;
+          setMissing(false);
+          setRoom(joined);
+          if (joined.activeBreakRoundId) {
+            const votes = await fetchBreakVotes(
+              supabase,
+              joined.id,
+              joined.activeBreakRoundId,
+            );
+            setTallies({ break: votes.break, stay: votes.stay });
+            setMyVote(votes.myVote);
+          } else {
+            setTallies({ break: 0, stay: 0 });
+            setMyVote(null);
+          }
+          return;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "";
+          if (/room_not_found|room_closed/i.test(msg)) {
+            setMissing(true);
+            setRoom(null);
+            return;
+          }
+          // Fall through to fetch-only (e.g. rate_limited, already member via fetch)
+        }
+      }
+
+      const next = await fetchRoomByCode(supabase, code);
       if (!next) {
         if (seenRoomRef.current) {
           toast.message("This room closed.");
@@ -110,7 +148,7 @@ export default function RoomFocusPage({
       setRoom(next);
       if (next.activeBreakRoundId) {
         const votes = await fetchBreakVotes(
-          createClient(),
+          supabase,
           next.id,
           next.activeBreakRoundId,
         );
@@ -126,7 +164,7 @@ export default function RoomFocusPage({
         toast.error("Could not load room");
       }
     }
-  }, [code, router]);
+  }, [code, router, isAuthenticated]);
 
   useEffect(() => {
     void loadRoom();
@@ -217,23 +255,40 @@ export default function RoomFocusPage({
   }, [isPomodoro, phase, remainingMs]);
 
   const presenceSelf = useMemo(
-    () => ({
-      userId,
-      username,
-      displayName: username,
-      avatarPath,
-      status:
-        state.session === "LOCKED_IN"
+    () => {
+      const onBreak =
+        state.session === "ON_BREAK" ||
+        state.session === "CHOOSING_BREAK" ||
+        state.session === "BREAK_DONE";
+      const breakType =
+        state.breakChoiceId ??
+        (isPomodoro && onBreak ? "pomodoro" : null);
+      return {
+        userId,
+        username,
+        displayName: username,
+        avatarPath,
+        status: state.session === "LOCKED_IN"
           ? ("LOCKED_IN" as const)
-          : state.session === "ON_BREAK" ||
-              state.session === "CHOOSING_BREAK" ||
-              state.session === "BREAK_DONE"
+          : onBreak
             ? ("BREAK" as const)
             : ("WAITING" as const),
-      elapsedMs: state.elapsedMs,
-      seat: null as number | null,
-    }),
-    [state.elapsedMs, state.session, userId, username, avatarPath],
+        elapsedMs: state.elapsedMs,
+        seat: null as number | null,
+        breakLabel: onBreak ? state.breakLabel || null : null,
+        breakType: onBreak ? breakType : null,
+      };
+    },
+    [
+      state.elapsedMs,
+      state.session,
+      state.breakLabel,
+      state.breakChoiceId,
+      isPomodoro,
+      userId,
+      username,
+      avatarPath,
+    ],
   );
 
   const { members } = useRoomChannel(code, room?.id ?? null, presenceSelf);
@@ -276,7 +331,7 @@ export default function RoomFocusPage({
     if (appliedVoteRoundRef.current === voteRound) return;
     appliedVoteRoundRef.current = voteRound;
     if (result === "break") {
-      dispatch({ type: "START_SHARED_BREAK" });
+      dispatch({ type: "OPEN_SHARED_BREAK_PICKER" });
     } else if (result === "cancelled") {
       toast.message("Break vote cancelled.");
     }
@@ -445,6 +500,29 @@ export default function RoomFocusPage({
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-xl"
+              onClick={async () => {
+                const link = `${window.location.origin}/rooms/${displayCode}`;
+                try {
+                  await navigator.clipboard.writeText(link);
+                  toast.success("Invite link copied");
+                } catch {
+                  try {
+                    await navigator.clipboard.writeText(displayCode);
+                    toast.success("Room code copied");
+                  } catch {
+                    toast.error("Could not copy");
+                  }
+                }
+              }}
+            >
+              <Copy className="mr-1.5 h-3.5 w-3.5" />
+              Invite
+            </Button>
             {isVoteRoom ? (
               <Button
                 variant="outline"
@@ -479,6 +557,8 @@ export default function RoomFocusPage({
           personalRecordMs={state.personalRecordMs}
           didBreakPR={state.didBreakPR}
           breakRemainingMs={state.breakRemainingMs}
+          breakElapsedMs={state.breakElapsedMs}
+          breakOpenEnded={state.breakOpenEnded}
           breakLabel={state.breakLabel}
           breakEmoji={state.breakEmoji}
           sessionName={sessionNameDraft}
@@ -502,8 +582,16 @@ export default function RoomFocusPage({
 
       <PitStopDialog
         open={state.session === "CHOOSING_BREAK"}
+        required={state.breakSource === "shared"}
+        openEnded={state.breakSource === "shared"}
         onClose={() => dispatch({ type: "CLOSE_PIT_STOP" })}
-        onSelect={(choice) => dispatch({ type: "START_BREAK", choice })}
+        onSelect={(choice) =>
+          dispatch({
+            type: "START_BREAK",
+            choice,
+            openEnded: state.breakSource === "shared",
+          })
+        }
       />
 
       <BreakVoteDialog

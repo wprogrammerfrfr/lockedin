@@ -24,6 +24,25 @@ function failureRedirect(origin: string, next: string, _type: string | null) {
   return NextResponse.redirect(`${origin}/login?${params.toString()}`);
 }
 
+function successRedirect(origin: string, next: string, typeParam: string | null) {
+  // Email confirmation landing: send users to login with a friendly banner.
+  if (
+    typeParam === "signup" ||
+    typeParam === "email" ||
+    next.startsWith("/login")
+  ) {
+    const url = new URL(`${origin}${next.startsWith("/login") ? next : "/login"}`);
+    if (!url.searchParams.has("confirmed")) {
+      url.searchParams.set("confirmed", "1");
+    }
+    // Avoid forcing confirmed on intentional login-only next without email verify
+    if (typeParam === "signup" || typeParam === "email" || next.includes("confirmed")) {
+      return NextResponse.redirect(url.toString());
+    }
+  }
+  return NextResponse.redirect(`${origin}${next}`);
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
@@ -38,7 +57,7 @@ export async function GET(request: NextRequest) {
     return failureRedirect(origin, next, typeParam);
   }
 
-  const redirectResponse = NextResponse.redirect(`${origin}${next}`);
+  const redirectResponse = successRedirect(origin, next, typeParam);
 
   const supabase = createServerClient(url, anonKey, {
     cookies: {

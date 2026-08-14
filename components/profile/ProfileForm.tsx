@@ -113,12 +113,6 @@ export function ProfileForm({ profile, disabled, onSave }: ProfileFormProps) {
           ))}
         </select>
       </div>
-      <div>
-        <Label>Avatar</Label>
-        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-6 text-center text-xs text-slate-400">
-          Upload unlocks with Phase 2 storage (jpeg/png/webp, 2MB).
-        </div>
-      </div>
       <Button type="submit" disabled={disabled || saving} className="rounded-xl">
         {saving ? "Saving…" : "Save profile"}
       </Button>

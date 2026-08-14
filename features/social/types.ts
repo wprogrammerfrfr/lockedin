@@ -4,6 +4,7 @@ export type FollowRelationStatus =
   | "pending_incoming"
   | "accepted"
   | "rejected"
+  | "blocked"
   | "self";
 
 export type ProfileSearchHit = {
@@ -27,4 +28,23 @@ export type LeaderboardEntry = {
   avatar_path: string | null;
   active_ms: number;
   rank: number;
+};
+
+export type ProfileSocialCounts = {
+  friends: number;
+  followers: number;
+  following: number;
+};
+
+export type ProfileDaySession = {
+  id: string;
+  session_name?: string | null;
+  active_ms?: number;
+  break_ms?: number;
+  break_types_used?: unknown;
+  started_at?: string;
+  ended_at?: string | null;
+  outcome?: string | null;
+  pr_broken?: boolean;
+  status?: string;
 };

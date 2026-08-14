@@ -5,7 +5,6 @@ import { ChromePage } from "@/components/layout/ChromePage";
 import { AuthGateModal } from "@/components/auth/AuthGateModal";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { JoinCreateBar } from "@/components/rooms/JoinCreateBar";
-import { RoomLobby } from "@/components/rooms/RoomLobby";
 import { WeeklyLeaderboard } from "@/components/social/WeeklyLeaderboard";
 import { createClient } from "@/lib/supabase/client";
 
@@ -60,7 +59,6 @@ export default function RoomsPage() {
               authed={isAuthenticated}
               onNeedAuth={() => setGateOpen(true)}
             />
-            <RoomLobby />
             <WeeklyLeaderboard timezone={tz} compact />
           </>
         ) : (

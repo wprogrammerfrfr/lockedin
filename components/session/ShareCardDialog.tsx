@@ -21,8 +21,14 @@ import {
   lockedInForLabel,
   shareCardChrome,
 } from "@/features/session/format";
-import { exportStoryPng } from "@/features/session/exportStoryPng";
-import { shareSessionToFeed } from "@/features/feed/api";
+import {
+  cardToPngBlob,
+  exportStoryPng,
+} from "@/features/session/exportStoryPng";
+import {
+  shareSessionToFeed,
+  uploadPostCard,
+} from "@/features/feed/api";
 import type { OutcomeKind } from "@/features/session/types";
 import { createClient } from "@/lib/supabase/client";
 import { userFacingError } from "@/lib/supabase/errors";
@@ -57,7 +63,9 @@ export function ShareCardDialog({
 
   const [caption, setCaption] = useState("");
   const exportRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
+  const [posting, setPosting] = useState(false);
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -65,7 +73,10 @@ export function ShareCardDialog({
   }, [open, durationMs, displayOutcome]);
 
   useEffect(() => {
-    if (!open) setExporting(false);
+    if (!open) {
+      setExporting(false);
+      setPosting(false);
+    }
   }, [open]);
 
   async function handleExportStory() {
@@ -80,16 +91,65 @@ export function ShareCardDialog({
     }
   }
 
+  async function handleDownloadCard() {
+    setExporting(true);
+    try {
+      const blob = await cardToPngBlob(cardRef.current);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "lockedin-session.png";
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Card downloaded");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Download failed");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   async function handlePost() {
     if (!sessionId) {
       toast.error("No cloud session to share yet");
       return;
     }
+    setPosting(true);
     try {
-      await shareSessionToFeed(createClient(), sessionId, caption);
-      toast.success("Posted to followers");
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("not_authenticated");
+
+      let imagePath: string | null = null;
+      try {
+        const blob = await cardToPngBlob(cardRef.current);
+        imagePath = await uploadPostCard(
+          supabase,
+          user.id,
+          sessionId,
+          blob,
+        );
+      } catch {
+        // Still post caption if image capture/upload fails.
+        imagePath = null;
+      }
+
+      await shareSessionToFeed(supabase, sessionId, caption, imagePath);
+      toast.success("Posted to Explore", {
+        action: {
+          label: "View",
+          onClick: () => {
+            window.location.assign("/explore");
+          },
+        },
+      });
+      onOpenChange(false);
     } catch (err) {
       toast.error(userFacingError(err, "Post failed"));
+    } finally {
+      setPosting(false);
     }
   }
 
@@ -104,6 +164,7 @@ export function ShareCardDialog({
         </DialogHeader>
 
         <div
+          ref={cardRef}
           className={cn(
             "relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br p-6 shadow-soft",
             chrome.gradient,
@@ -158,7 +219,7 @@ export function ShareCardDialog({
               variant="outline"
               className="rounded-xl border-slate-200"
               onClick={handleExportStory}
-              disabled={exporting}
+              disabled={exporting || posting}
             >
               <ImageDown className="h-4 w-4" />
               Export Story
@@ -166,8 +227,8 @@ export function ShareCardDialog({
             <Button
               variant="outline"
               className="rounded-xl border-slate-200"
-              onClick={handleExportStory}
-              disabled={exporting}
+              onClick={handleDownloadCard}
+              disabled={exporting || posting}
             >
               <Download className="h-4 w-4" />
               Download
@@ -187,11 +248,38 @@ export function ShareCardDialog({
               <Copy className="h-4 w-4" />
               Copy
             </Button>
+            <Button
+              variant="outline"
+              className="rounded-xl border-slate-200"
+              onClick={async () => {
+                const shareData = {
+                  title: "LockedIn",
+                  text: caption,
+                };
+                try {
+                  if (navigator.share) {
+                    await navigator.share(shareData);
+                  } else {
+                    await navigator.clipboard.writeText(caption);
+                    toast.success("Caption copied");
+                  }
+                } catch {
+                  /* user cancelled share */
+                }
+              }}
+            >
+              <Share2 className="h-4 w-4" />
+              Share
+            </Button>
           </div>
           {canPost && (
-            <Button className="w-full rounded-xl" onClick={handlePost}>
+            <Button
+              className="w-full rounded-xl"
+              onClick={() => void handlePost()}
+              disabled={posting || exporting}
+            >
               <Share2 className="h-4 w-4" />
-              Post to followers
+              {posting ? "Posting…" : "Post to followers"}
             </Button>
           )}
         </DialogFooter>

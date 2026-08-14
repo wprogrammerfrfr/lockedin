@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Menu } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { ClaimUsernameDialog } from "@/components/auth/ClaimUsernameDialog";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { springSoft } from "@/components/session/state-accent";
@@ -236,6 +237,7 @@ export function AppShell({
           )}
         </AnimatePresence>
       </div>
+      <ClaimUsernameDialog />
     </div>
   );
 }
