@@ -151,7 +151,7 @@ function LoginPageContent() {
           );
           return;
         }
-        window.location.assign("/");
+        window.location.assign("/lockin");
         return;
       }
 
@@ -296,7 +296,7 @@ function LoginPageContent() {
                 Back to Sign In
               </Button>
               <p className="mt-6 text-center text-xs text-slate-400">
-                <a href="/" className="underline-offset-2 hover:underline">
+                <a href="/lockin" className="underline-offset-2 hover:underline">
                   Back to Solo
                 </a>
               </p>
@@ -378,7 +378,7 @@ function LoginPageContent() {
               </Tabs>
 
               <p className="mt-6 text-center text-xs text-slate-400">
-                <a href="/" className="underline-offset-2 hover:underline">
+                <a href="/lockin" className="underline-offset-2 hover:underline">
                   Back to Solo
                 </a>
               </p>

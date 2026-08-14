@@ -1,5 +1,5 @@
 /* LockedIn service worker — app shell cache; never cache Supabase auth. */
-const CACHE = "lockedin-shell-v1";
+const CACHE = "lockedin-shell-v2";
 const SHELL = ["/", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
@@ -27,7 +27,14 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  if (event.request.method !== "GET") return;
+
+  const isDocument =
+    event.request.mode === "navigate" ||
+    (event.request.headers.get("accept") || "").includes("text/html");
+
   const networkFirst =
+    isDocument ||
     url.pathname.startsWith("/dashboard") ||
     url.pathname.startsWith("/rooms") ||
     url.pathname.startsWith("/explore");
@@ -35,20 +42,26 @@ self.addEventListener("fetch", (event) => {
   if (networkFirst) {
     event.respondWith(
       fetch(event.request)
-        .then((res) => res)
-        .catch(() => caches.match(event.request).then((c) => c || caches.match("/"))),
+        .then((res) => {
+          const copy = res.clone();
+          if (res.ok && url.origin === self.location.origin) {
+            caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+          }
+          return res;
+        })
+        .catch(() =>
+          caches.match(event.request).then((c) => c || caches.match("/")),
+        ),
     );
     return;
   }
-
-  if (event.request.method !== "GET") return;
 
   event.respondWith(
     caches.match(event.request).then((cached) => {
       const fetched = fetch(event.request)
         .then((res) => {
           const copy = res.clone();
-          if (res.ok && (url.origin === self.location.origin)) {
+          if (res.ok && url.origin === self.location.origin) {
             caches.open(CACHE).then((cache) => cache.put(event.request, copy));
           }
           return res;

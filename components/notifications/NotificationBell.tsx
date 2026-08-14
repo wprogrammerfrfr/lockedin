@@ -7,7 +7,13 @@ import { NotificationList } from "@/components/notifications/NotificationList";
 import { useNotifications } from "@/features/notifications/useNotifications";
 import { cn } from "@/lib/utils";
 
-export function NotificationBell({ enabled = true }: { enabled?: boolean }) {
+export function NotificationBell({
+  enabled = true,
+  menuAlign = "sidebar",
+}: {
+  enabled?: boolean;
+  menuAlign?: "sidebar" | "header";
+}) {
   const { items, unread, markRead, markAll } = useNotifications(enabled);
   const [open, setOpen] = useState(false);
 
@@ -31,7 +37,14 @@ export function NotificationBell({ enabled = true }: { enabled?: boolean }) {
         )}
       </Button>
       {open && (
-        <div className="absolute bottom-12 left-0 z-50 w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-soft lg:bottom-auto lg:left-full lg:top-0 lg:ml-2">
+        <div
+          className={cn(
+            "absolute z-50 w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-soft",
+            menuAlign === "header"
+              ? "right-0 top-full mt-2"
+              : "bottom-12 left-0 lg:bottom-auto lg:left-full lg:top-0 lg:ml-2",
+          )}
+        >
           <NotificationList
             items={items}
             onMarkRead={markRead}

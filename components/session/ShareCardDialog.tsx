@@ -18,7 +18,7 @@ import { StoryExportCard } from "@/components/session/StoryExportCard";
 import {
   buildShareCaption,
   formatCentiseconds,
-  formatMs,
+  lockedInForLabel,
   shareCardChrome,
 } from "@/features/session/format";
 import { exportStoryPng } from "@/features/session/exportStoryPng";
@@ -125,14 +125,14 @@ export function ShareCardDialog({
             {chrome.headline}
           </p>
           <Separator className="my-4 bg-white/50" />
-          <div className="flex justify-between text-xs text-slate-600">
+          <div className="flex justify-between gap-3 text-xs text-slate-600">
             <span className="font-mono tabular-nums">
-              {formatMs(durationMs, true)}
+              {lockedInForLabel(durationMs)}
               <span className="ml-0.5 text-[0.65em] opacity-70">
                 :{formatCentiseconds(durationMs)}
               </span>
             </span>
-            <span>{chrome.footerLabel}</span>
+            <span className="shrink-0">{chrome.footerLabel}</span>
           </div>
         </div>
 

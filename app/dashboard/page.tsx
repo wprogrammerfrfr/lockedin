@@ -5,7 +5,7 @@ import { ChromePage } from "@/components/layout/ChromePage";
 import { AuthGateModal } from "@/components/auth/AuthGateModal";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatMs } from "@/features/session/format";
+import { formatMs, lockedInForLabel } from "@/features/session/format";
 import { createClient } from "@/lib/supabase/client";
 
 type DashboardStats = {
@@ -144,7 +144,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-slate-400">{s.status}</p>
                 </div>
                 <span className="font-mono text-xs tabular-nums text-slate-600">
-                  {formatMs(s.active_ms ?? 0, true)}
+                  {lockedInForLabel(s.active_ms ?? 0)}
                 </span>
               </div>
             ))}

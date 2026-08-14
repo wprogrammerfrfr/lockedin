@@ -2,6 +2,7 @@
 
 import { Flame } from "lucide-react";
 
+import { InstallAppButton } from "@/components/pwa/InstallAppButton";
 import { CountUp } from "@/components/ui/count-up";
 import { cn } from "@/lib/utils";
 
@@ -15,15 +16,16 @@ export function LockInHeader({
   return (
     <header
       className={cn(
-        "flex items-center justify-between gap-4 transition-[filter,opacity]",
-        muted && "opacity-80 saturate-50"
+        "flex items-center justify-between gap-2 transition-[filter,opacity] sm:gap-4",
+        muted && "opacity-80 saturate-50",
       )}
     >
-      <h1 className="font-display text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+      <h1 className="hidden font-display text-3xl font-bold tracking-tight text-slate-900 lg:block">
         LockedIn
       </h1>
 
-      <div className="flex items-center gap-3">
+      <div className="ml-auto flex items-center gap-2 sm:gap-3">
+        <InstallAppButton />
         <div
           className={cn(
             "flex items-center gap-1.5 rounded-xl border px-3 py-1.5",

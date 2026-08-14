@@ -8,7 +8,7 @@ import { CommentBox } from "@/components/feed/CommentBox";
 import { LikeButton } from "@/components/feed/LikeButton";
 import { listFollowingFeed, type FeedPost } from "@/features/feed/api";
 import { publicAvatarUrl } from "@/features/profile/api";
-import { formatMs, outcomeEmoji } from "@/features/session/format";
+import { lockedInForLabel, outcomeEmoji } from "@/features/session/format";
 import type { OutcomeKind } from "@/features/session/types";
 import { createClient } from "@/lib/supabase/client";
 
@@ -93,7 +93,7 @@ export function FeedList() {
                 <span className="text-xl">{outcomeEmoji(outcome)}</span>
               </div>
               <p className="font-mono text-sm tabular-nums text-slate-700">
-                {formatMs(post.session?.active_ms ?? 0, true)} locked in
+                {lockedInForLabel(post.session?.active_ms ?? 0)}
               </p>
               {post.caption && (
                 <p className="text-sm text-slate-600">{post.caption}</p>

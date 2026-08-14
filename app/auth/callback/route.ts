@@ -13,7 +13,7 @@ const OTP_TYPES = new Set<EmailOtpType>([
 
 function safeNext(raw: string | null): string {
   if (raw && raw.startsWith("/") && !raw.startsWith("//")) return raw;
-  return "/";
+  return "/lockin";
 }
 
 function failureRedirect(origin: string, next: string, _type: string | null) {

@@ -15,6 +15,11 @@ export function formatMs(ms: number, forceHours = false) {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+/** Share / summary copy: "Locked in for HH:MM:SS". */
+export function lockedInForLabel(ms: number) {
+  return `Locked in for ${formatMs(ms, true)}`;
+}
+
 /** Two-digit centiseconds (`00`–`99`), not full milliseconds. */
 export function formatCentiseconds(ms: number) {
   const cs = Math.floor((Math.max(0, ms) % 1000) / 10);

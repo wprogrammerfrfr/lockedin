@@ -26,7 +26,7 @@ export type NavItem = {
 };
 
 export const NAV_ITEMS: NavItem[] = [
-  { id: "lockin", label: "Lock In", href: "/", icon: Target },
+  { id: "lockin", label: "Lock In", href: "/lockin", icon: Target },
   { id: "rooms", label: "Rooms", href: "/rooms", icon: Users },
   { id: "dashboard", label: "Dashboard", href: "/dashboard", icon: BarChart3 },
   { id: "explore", label: "Explore", href: "/explore", icon: Compass },
@@ -36,7 +36,7 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 export function navTabFromPathname(pathname: string): NavTab {
-  if (pathname === "/") return "lockin";
+  if (pathname.startsWith("/lockin")) return "lockin";
   if (pathname.startsWith("/rooms")) return "rooms";
   if (pathname.startsWith("/dashboard")) return "dashboard";
   if (pathname.startsWith("/explore")) return "explore";

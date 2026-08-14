@@ -87,7 +87,7 @@ export function FocusTimer({
         layout
         className={cn(
           "relative overflow-visible rounded-2xl border shadow-soft",
-          isActiveFocus ? "p-4 sm:p-5" : "p-6 sm:p-8",
+          isActiveFocus ? "p-3 sm:p-5" : "p-4 sm:p-8",
           accent.card,
           muted && "grayscale-[0.35]"
         )}
@@ -112,10 +112,10 @@ export function FocusTimer({
 
         <div
           className={cn(
-            "relative mx-auto flex w-full items-center justify-center overflow-visible rounded-2xl border px-5 sm:px-8 md:px-10",
+            "relative mx-auto flex w-full items-center justify-center overflow-visible rounded-2xl border px-2 sm:px-8 md:px-10",
             isActiveFocus
-              ? "mb-4 min-h-[160px] py-4 sm:min-h-[200px] sm:py-6 md:min-h-[220px] lg:min-h-[240px]"
-              : "mb-6 min-h-[220px] py-8 sm:min-h-[280px] sm:py-10 md:min-h-[320px] lg:min-h-[360px]",
+              ? "mb-3 min-h-[120px] py-3 sm:mb-4 sm:min-h-[200px] sm:py-6 md:min-h-[220px] lg:min-h-[240px]"
+              : "mb-4 min-h-[140px] py-4 sm:mb-6 sm:min-h-[280px] sm:py-10 md:min-h-[320px] lg:min-h-[360px]",
             muted
               ? "border-red-200/60 bg-red-50/50"
               : "border-slate-100 bg-slate-50"
@@ -213,7 +213,7 @@ export function FocusTimer({
           </div>
         </div>
 
-        <div className={cn("grid grid-cols-2 gap-3", isActiveFocus ? "mb-4" : "mb-8")}>
+        <div className={cn("grid grid-cols-2 gap-3", isActiveFocus ? "mb-3 sm:mb-4" : "mb-5 sm:mb-8")}>
           <div
             className={cn(
               "rounded-xl border px-4 py-3",
@@ -279,7 +279,7 @@ export function FocusTimer({
               >
                 <Button
                   size="xl"
-                  className="w-full py-8 text-xl font-bold tracking-wide sm:text-2xl bg-lime-400 text-slate-950 hover:bg-lime-300 border border-lime-500/40"
+                  className="w-full py-6 text-xl font-bold tracking-wide sm:py-8 sm:text-2xl bg-lime-400 text-slate-950 hover:bg-lime-300 border border-lime-500/40"
                   onClick={onLockBackIn}
                 >
                   <Play className="!size-6" />
@@ -288,7 +288,7 @@ export function FocusTimer({
                 <Button
                   size="xl"
                   variant="outline"
-                  className="w-full border-slate-300 py-8 text-xl font-bold tracking-wide text-slate-700 sm:text-2xl"
+                  className="w-full border-slate-300 py-6 text-xl font-bold tracking-wide text-slate-700 sm:py-8 sm:text-2xl"
                   onClick={onEndSession}
                 >
                   END SESSION
@@ -324,7 +324,7 @@ export function FocusTimer({
                 <Button
                   size="xl"
                   className={cn(
-                    "relative z-10 w-full py-8 text-2xl font-bold tracking-wide shadow-soft sm:text-3xl",
+                    "relative z-10 w-full py-6 text-xl font-bold tracking-wide shadow-soft sm:py-8 sm:text-2xl md:text-3xl",
                     muted ? accent.button : accent.button
                   )}
                   disabled={lockInDisabled}
@@ -344,7 +344,7 @@ export function FocusTimer({
               >
                 <div
                   className={cn(
-                    "flex w-full items-center justify-center rounded-2xl border py-6 font-display text-xl font-bold tracking-wide",
+                    "flex w-full items-center justify-center rounded-2xl border py-5 font-display text-lg font-bold tracking-wide sm:py-6 sm:text-xl",
                     accent.button
                   )}
                 >
@@ -374,7 +374,7 @@ export function FocusTimer({
                 <Button
                   size="xl"
                   className={cn(
-                    "relative z-10 w-full cursor-default py-8 text-2xl font-bold tracking-wide sm:text-3xl",
+                    "relative z-10 w-full cursor-default py-6 text-xl font-bold tracking-wide sm:py-8 sm:text-2xl md:text-3xl",
                     accent.button
                   )}
                   aria-pressed

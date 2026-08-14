@@ -1,8 +1,10 @@
 {
+  "id": "/",
   "name": "LockedIn",
   "short_name": "LockedIn",
   "description": "Focus tracking for students — lock in, rooms, streaks.",
-  "start_url": "/",
+  "start_url": "/lockin",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#84cc16",
@@ -18,6 +20,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

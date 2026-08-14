@@ -6,6 +6,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { FocusTimer } from "@/components/session/FocusTimer";
 import { ClosingBanner } from "@/components/rooms/ClosingBanner";
 import { RoomPresencePane } from "@/components/rooms/RoomPresencePane";
+import { RoomPresenceStrip } from "@/components/rooms/RoomPresenceStrip";
 import { BreakVoteDialog } from "@/components/rooms/BreakVoteDialog";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -84,6 +85,10 @@ export default function RoomFocusPage({
   const { members } = useRoomChannel(code, room?.id ?? null, presenceSelf);
   useSessionClock(state, dispatch);
 
+  const roomMembers = members.length
+    ? members
+    : ([presenceSelf].filter((m) => m.userId) as typeof members);
+
   useEffect(() => {
     if (state.session === "ENDED" || state.session === "TAPPED_OUT") {
       setSessionNameDraft("");
@@ -110,15 +115,8 @@ export default function RoomFocusPage({
   return (
     <AppShell
       layoutMode="room-focus"
-      presence={
-        <RoomPresencePane
-          members={
-            members.length
-              ? members
-              : ([presenceSelf].filter((m) => m.userId) as typeof members)
-          }
-        />
-      }
+      presence={<RoomPresencePane members={roomMembers} />}
+      presenceStrip={<RoomPresenceStrip members={roomMembers} />}
     >
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
         <div className="flex items-center justify-between">

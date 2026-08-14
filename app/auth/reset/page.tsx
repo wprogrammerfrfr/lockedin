@@ -111,7 +111,7 @@ function ResetForm() {
         return;
       }
       setMessage("Password updated. Redirecting…");
-      window.setTimeout(() => router.push("/"), 1200);
+      window.setTimeout(() => router.push("/lockin"), 1200);
     } catch (err) {
       setError(userFacingError(err, "Update failed."));
     } finally {

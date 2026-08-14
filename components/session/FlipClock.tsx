@@ -22,14 +22,35 @@ const flipBottomTransition = {
  * NOTE: Do not use marginTop % for the bottom offset — % margins resolve against
  * width, not height, which hides the bottom half of every digit.
  */
+export type FlipClockSize = "default" | "sm";
+
+const DIGIT_GLYPH: Record<FlipClockSize, string> = {
+  default:
+    "text-[4.5rem] sm:text-[5.25rem] md:text-[6.75rem] lg:text-[7.5rem]",
+  sm: "text-[2.25rem] sm:text-[2.75rem] md:text-[3.25rem]",
+};
+
+const DIGIT_BOX: Record<FlipClockSize, string> = {
+  default: "h-24 w-[4.5rem] sm:h-28 sm:w-20 md:h-36 md:w-24 lg:h-40 lg:w-28",
+  sm: "h-14 w-10 sm:h-16 sm:w-12 md:h-[4.5rem] md:w-14",
+};
+
+const COLON_BOX: Record<FlipClockSize, string> = {
+  default:
+    "h-24 w-3 sm:h-28 md:h-36 md:w-3.5 lg:h-40 text-2xl sm:text-3xl md:text-4xl lg:text-5xl",
+  sm: "h-14 w-2 sm:h-16 md:h-[4.5rem] md:w-2.5 text-lg sm:text-xl md:text-2xl",
+};
+
 export function DigitHalf({
   value,
   half,
   className,
+  size = "default",
 }: {
   value: string;
   half: "top" | "bottom";
   className?: string;
+  size?: FlipClockSize;
 }) {
   return (
     <div
@@ -46,7 +67,12 @@ export function DigitHalf({
           top: half === "top" ? "0%" : "-100%",
         }}
       >
-        <span className="flex select-none items-center justify-center font-mono text-[4.5rem] font-bold leading-none tabular-nums sm:text-[5.25rem] md:text-[6.75rem] lg:text-[7.5rem]">
+        <span
+          className={cn(
+            "flex select-none items-center justify-center font-mono font-bold leading-none tabular-nums",
+            DIGIT_GLYPH[size],
+          )}
+        >
           {value}
         </span>
       </div>
@@ -54,7 +80,15 @@ export function DigitHalf({
   );
 }
 
-export function FlipDigit({ digit, muted }: { digit: string; muted?: boolean }) {
+export function FlipDigit({
+  digit,
+  muted,
+  size = "default",
+}: {
+  digit: string;
+  muted?: boolean;
+  size?: FlipClockSize;
+}) {
   const [active, setActive] = useState(digit);
   const [prev, setPrev] = useState(digit);
   const [flipping, setFlipping] = useState(false);
@@ -104,12 +138,17 @@ export function FlipDigit({ digit, muted }: { digit: string; muted?: boolean }) 
 
   return (
     <div
-      className="relative h-24 w-[4.5rem] shrink-0 sm:h-28 sm:w-20 md:h-36 md:w-24 lg:h-40 lg:w-28"
+      className={cn("relative shrink-0", DIGIT_BOX[size])}
       style={{ perspective: 900, transformStyle: "preserve-3d" }}
     >
       {/* Static top — always the destination digit */}
       <div className="absolute inset-x-0 top-0 z-[1] h-1/2">
-        <DigitHalf value={active} half="top" className={cn(panel, "border-b-0")} />
+        <DigitHalf
+          value={active}
+          half="top"
+          size={size}
+          className={cn(panel, "border-b-0")}
+        />
       </div>
 
       {/* Static bottom — old while flipping, then destination */}
@@ -117,6 +156,7 @@ export function FlipDigit({ digit, muted }: { digit: string; muted?: boolean }) 
         <DigitHalf
           value={flipping ? prev : active}
           half="bottom"
+          size={size}
           className={cn(panel, "border-t-0")}
         />
       </div>
@@ -140,6 +180,7 @@ export function FlipDigit({ digit, muted }: { digit: string; muted?: boolean }) 
             <DigitHalf
               value={prev}
               half="top"
+              size={size}
               className={cn(panel, "border-b-0 shadow-soft")}
             />
           </motion.div>
@@ -159,6 +200,7 @@ export function FlipDigit({ digit, muted }: { digit: string; muted?: boolean }) 
             <DigitHalf
               value={active}
               half="bottom"
+              size={size}
               className={cn(panel, "border-t-0")}
             />
           </motion.div>
@@ -168,26 +210,52 @@ export function FlipDigit({ digit, muted }: { digit: string; muted?: boolean }) 
   );
 }
 
+const HOUR_MS = 3_600_000;
+
 export function FlipClock({
   ms,
   forceHours = true,
   className,
   muted,
+  size = "default",
 }: {
   ms: number;
   forceHours?: boolean;
   className?: string;
   muted?: boolean;
+  size?: FlipClockSize;
 }) {
-  const text = formatMs(ms, forceHours);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      setWidth(entries[0]?.contentRect.width ?? 0);
+    });
+    ro.observe(el);
+    setWidth(el.clientWidth);
+    return () => ro.disconnect();
+  }, []);
+
+  const measured = width > 0;
+  const compact = size === "sm";
+  const narrow = !measured || width < (compact ? 360 : 480);
+  const showHours = forceHours && (!narrow || ms >= HOUR_MS);
+  const showCs = !compact && measured && width >= 400;
+  const text = formatMs(ms, showHours);
   const cs = formatCentiseconds(ms);
+
   return (
     <div
+      ref={wrapRef}
       className={cn(
-        "flex items-end justify-center gap-1.5 sm:gap-2 md:gap-2.5",
-        className
+        "flex w-full min-w-0 items-end justify-center",
+        compact ? "gap-1 sm:gap-1.5 md:gap-2" : "gap-1.5 sm:gap-2 md:gap-2.5",
+        className,
       )}
-      aria-label={`${text}:${cs}`}
+      aria-label={showCs ? `${text}:${cs}` : text}
       style={{ perspective: 1200 }}
     >
       {text.split("").map((ch, i) =>
@@ -195,26 +263,29 @@ export function FlipClock({
           <span
             key={`colon-${i}`}
             className={cn(
-              "flex h-24 w-3 shrink-0 items-center justify-center font-mono text-2xl font-bold opacity-45 sm:h-28 sm:text-3xl md:h-36 md:w-3.5 md:text-4xl lg:h-40 lg:text-5xl",
-              muted ? "text-red-400" : "text-slate-500"
+              "flex shrink-0 items-center justify-center font-mono font-bold opacity-45",
+              COLON_BOX[size],
+              muted ? "text-red-400" : "text-slate-500",
             )}
           >
             :
           </span>
         ) : (
-          <FlipDigit key={`pos-${i}`} digit={ch} muted={muted} />
-        )
+          <FlipDigit key={`pos-${i}`} digit={ch} muted={muted} size={size} />
+        ),
       )}
-      <span
-        className={cn(
-          "mb-1 flex shrink-0 items-baseline gap-0.5 font-mono font-bold tabular-nums sm:mb-1.5 md:mb-2",
-          "text-lg sm:text-xl md:text-2xl lg:text-3xl",
-          muted ? "text-red-400/70" : "text-slate-400"
-        )}
-      >
-        <span className="opacity-45">:</span>
-        {cs}
-      </span>
+      {showCs && (
+        <span
+          className={cn(
+            "mb-1 flex shrink-0 items-baseline gap-0.5 font-mono font-bold tabular-nums sm:mb-1.5 md:mb-2",
+            "text-lg sm:text-xl md:text-2xl lg:text-3xl",
+            muted ? "text-red-400/70" : "text-slate-400",
+          )}
+        >
+          <span className="opacity-45">:</span>
+          {cs}
+        </span>
+      )}
     </div>
   );
 }

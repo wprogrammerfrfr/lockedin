@@ -66,7 +66,10 @@ export const StoryExportCard = forwardRef<
 
       <div className="text-center">
         <p className="text-[140px] leading-none">{chrome.emoji}</p>
-        <p className="mt-10 font-mono text-7xl font-semibold tabular-nums">
+        <p className="mt-10 text-3xl font-semibold uppercase tracking-[0.18em] text-slate-700">
+          Locked in for
+        </p>
+        <p className="mt-4 font-mono text-7xl font-semibold tabular-nums">
           {formatMs(durationMs, true)}
           <span className="ml-1 text-3xl font-medium opacity-70">
             :{formatCentiseconds(durationMs)}
