@@ -26,13 +26,34 @@ export function formatCentiseconds(ms: number) {
   return String(cs).padStart(2, "0");
 }
 
+type ClockParts = {
+  hours: number;
+  minutes: number;
+  seconds: number;
+  totalSec: number;
+  totalMin: number;
+};
+
+function clockParts(ms: number): ClockParts {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  return {
+    hours: Math.floor(totalSec / 3600),
+    minutes: Math.floor((totalSec % 3600) / 60),
+    seconds: totalSec % 60,
+    totalSec,
+    totalMin: Math.floor(totalSec / 60),
+  };
+}
+
+/** HH:MM:SS all equal and ≥ 1 (01:01:01 … 11:11:11). Ignores centiseconds. */
+export function hasRepeatingClock(ms: number) {
+  const { hours, minutes, seconds } = clockParts(ms);
+  return hours >= 1 && hours === minutes && minutes === seconds;
+}
+
 /** Six-seven meme: 67 as a unit, or 6 sitting next to 7 on the clock. */
 export function hasSixtySeven(ms: number) {
-  const totalSec = Math.max(0, Math.floor(ms / 1000));
-  const hours = Math.floor(totalSec / 3600);
-  const minutes = Math.floor((totalSec % 3600) / 60);
-  const seconds = totalSec % 60;
-  const totalMin = Math.floor(totalSec / 60);
+  const { hours, minutes, seconds, totalSec, totalMin } = clockParts(ms);
   return (
     totalSec === 67 ||
     totalMin === 67 ||
@@ -40,6 +61,39 @@ export function hasSixtySeven(ms: number) {
     (minutes === 6 && seconds === 7) ||
     (hours === 6 && minutes === 7) ||
     String(hours).includes("67")
+  );
+}
+
+/** Nice: 69 as a unit, or 6 sitting next to 9 on the clock. */
+export function hasSixtyNine(ms: number) {
+  const { hours, minutes, seconds, totalSec, totalMin } = clockParts(ms);
+  return (
+    totalSec === 69 ||
+    totalMin === 69 ||
+    (minutes === 6 && seconds === 9) ||
+    (hours === 6 && minutes === 9)
+  );
+}
+
+/** 420: unit match or 4 sitting next to 20 on the clock. */
+export function hasFourTwenty(ms: number) {
+  const { hours, minutes, seconds, totalSec, totalMin } = clockParts(ms);
+  return (
+    totalSec === 420 ||
+    totalMin === 420 ||
+    (minutes === 4 && seconds === 20) ||
+    (hours === 4 && minutes === 20)
+  );
+}
+
+/** 404: unit match or 4:04 on the clock. */
+export function hasFourOhFour(ms: number) {
+  const { hours, minutes, seconds, totalSec, totalMin } = clockParts(ms);
+  return (
+    totalSec === 404 ||
+    totalMin === 404 ||
+    (minutes === 4 && seconds === 4) ||
+    (hours === 4 && minutes === 4)
   );
 }
 
@@ -128,7 +182,84 @@ export function formatDurationNatural(ms: number) {
   return `${parts[0]}, ${parts[1]}, and ${parts[2]}`;
 }
 
-const SIX_SEVEN_CAPTION = "six seven hehe. 😏";
+const LIME_GRADIENT = "from-emerald-200 via-lime-100 to-slate-100";
+
+export type ShareCardChrome = {
+  headline: string;
+  emoji: string;
+  gradient: string;
+  footerLabel: string;
+};
+
+type ShareEasterEgg = {
+  id: "luck" | "sixtynine" | "sixtyseven" | "fourtwenty" | "fourohfour";
+  test: (ms: number) => boolean;
+  caption: string;
+  chrome: ShareCardChrome;
+};
+
+/** Priority: luck → 69 → 67 → 420 → 404. First match wins. */
+const SHARE_EASTER_EGGS: ShareEasterEgg[] = [
+  {
+    id: "luck",
+    test: hasRepeatingClock,
+    caption: "used up all the luck.",
+    chrome: {
+      headline: "used up all the luck",
+      emoji: "🍀",
+      gradient: "from-amber-200 via-yellow-100 to-lime-100",
+      footerLabel: "luck",
+    },
+  },
+  {
+    id: "sixtynine",
+    test: hasSixtyNine,
+    caption: "nice. 👍",
+    chrome: {
+      headline: "nice.",
+      emoji: "👍",
+      gradient: LIME_GRADIENT,
+      footerLabel: "Session card",
+    },
+  },
+  {
+    id: "sixtyseven",
+    test: hasSixtySeven,
+    caption: "six seven hehe. 😏",
+    chrome: {
+      headline: "six seven",
+      emoji: "😏",
+      gradient: LIME_GRADIENT,
+      footerLabel: "Session card",
+    },
+  },
+  {
+    id: "fourtwenty",
+    test: hasFourTwenty,
+    caption: "blaze it.",
+    chrome: {
+      headline: "4:20",
+      emoji: "🔥",
+      gradient: LIME_GRADIENT,
+      footerLabel: "Session card",
+    },
+  },
+  {
+    id: "fourohfour",
+    test: hasFourOhFour,
+    caption: "session not found.",
+    chrome: {
+      headline: "404",
+      emoji: "📭",
+      gradient: "from-slate-200 via-zinc-100 to-slate-100",
+      footerLabel: "Session card",
+    },
+  },
+];
+
+export function findShareEasterEgg(ms: number): ShareEasterEgg | null {
+  return SHARE_EASTER_EGGS.find((egg) => egg.test(ms)) ?? null;
+}
 
 const CAPTION_TIERS: { maxMs: number; lines: string[] }[] = [
   { maxMs: 60_000, lines: ["brev.", "great work buddy 😭", "wow."] },
@@ -177,7 +308,7 @@ function pickLine(lines: string[], rng: () => number) {
 }
 
 /**
- * Duration-tiered share caption. 67 easter egg always wins.
+ * Duration-tiered share caption. Easter eggs always win.
  * `outcome` is unused (duration is the signal); kept for call-site compat.
  */
 export function buildShareCaption(
@@ -185,7 +316,8 @@ export function buildShareCaption(
   _outcome?: OutcomeKind,
   rng: () => number = Math.random,
 ) {
-  if (hasSixtySeven(ms)) return SIX_SEVEN_CAPTION;
+  const egg = findShareEasterEgg(ms);
+  if (egg) return egg.caption;
   const clamped = Math.max(0, ms);
   const tier =
     CAPTION_TIERS.find((t) => clamped < t.maxMs) ??
@@ -193,20 +325,13 @@ export function buildShareCaption(
   return pickLine(tier.lines, rng);
 }
 
-export type ShareCardChrome = {
-  headline: string;
-  emoji: string;
-  gradient: string;
-  footerLabel: string;
-};
-
 function durationChrome(ms: number): ShareCardChrome {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
   if (totalSec < 15 * 60) {
     return {
       headline: "Session card",
       emoji: "😏",
-      gradient: "from-emerald-200 via-lime-100 to-slate-100",
+      gradient: LIME_GRADIENT,
       footerLabel: "Session card",
     };
   }
@@ -214,7 +339,7 @@ function durationChrome(ms: number): ShareCardChrome {
     return {
       headline: "Solid session",
       emoji: "😏",
-      gradient: "from-emerald-200 via-lime-100 to-slate-100",
+      gradient: LIME_GRADIENT,
       footerLabel: "Session card",
     };
   }
@@ -226,19 +351,13 @@ function durationChrome(ms: number): ShareCardChrome {
   };
 }
 
-/** Headline / emoji / gradient from duration (and PR / 67 overrides). */
+/** Headline / emoji / gradient from duration (and PR / easter egg overrides). */
 export function shareCardChrome(
   ms: number,
   outcome: OutcomeKind,
 ): ShareCardChrome {
-  if (hasSixtySeven(ms)) {
-    return {
-      headline: "six seven",
-      emoji: "😏",
-      gradient: "from-emerald-200 via-lime-100 to-slate-100",
-      footerLabel: "Session card",
-    };
-  }
+  const egg = findShareEasterEgg(ms);
+  if (egg) return egg.chrome;
   if (outcome === "pr") {
     return {
       ...durationChrome(ms),
