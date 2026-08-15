@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Loader2, Mail } from "lucide-react";
+import { LockedInLogo } from "@/components/brand/LockedInLogo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -392,9 +393,7 @@ function LoginPageContent() {
         {signupSent ? (
           <>
             <CardHeader className="space-y-2 text-center">
-              <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-slate-500">
-                LockedIn
-              </p>
+              <LockedInLogo as="p" className="text-sm tracking-tight" />
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
                 <Mail className="h-5 w-5" aria-hidden />
               </div>
@@ -439,9 +438,7 @@ function LoginPageContent() {
         ) : forgotMode ? (
           <>
             <CardHeader className="space-y-2 text-center">
-              <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-slate-500">
-                LockedIn
-              </p>
+              <LockedInLogo as="p" className="text-sm tracking-tight" />
               <CardTitle className="font-display text-2xl font-bold text-slate-900">
                 Reset password
               </CardTitle>
@@ -503,9 +500,7 @@ function LoginPageContent() {
         ) : (
           <>
             <CardHeader className="space-y-2 text-center">
-              <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-slate-500">
-                LockedIn
-              </p>
+              <LockedInLogo as="p" className="text-sm tracking-tight" />
               <CardTitle className="font-display text-2xl font-bold text-slate-900">
                 {mode === "login" ? "Log In" : "Sign Up"}
               </CardTitle>

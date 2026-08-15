@@ -1,6 +1,7 @@
 "use client";
 
 import { Code2 } from "lucide-react";
+import { LockedInLogo } from "@/components/brand/LockedInLogo";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CountUp } from "@/components/ui/count-up";
 import { formatMs } from "@/features/session/format";
@@ -39,7 +40,7 @@ export function WelcomeDevShowcase() {
       <CardContent>
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft sm:p-6">
           <p className="font-display text-base font-semibold text-slate-900">
-            LockedIn web
+            <LockedInLogo className="text-base" /> web
           </p>
           <p className="font-mono text-xs text-slate-400">acme/lockedin</p>
 

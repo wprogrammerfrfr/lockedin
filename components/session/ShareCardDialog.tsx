@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Copy, Download, ImageDown, Share2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { LockedInLogo } from "@/components/brand/LockedInLogo";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -170,9 +171,7 @@ export function ShareCardDialog({
             chrome.gradient,
           )}
         >
-          <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-slate-700/80">
-            LockedIn
-          </p>
+          <LockedInLogo className="text-sm tracking-tight" />
           {trimmedSessionName ? (
             <p className="mt-3 font-display text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
               {trimmedSessionName}

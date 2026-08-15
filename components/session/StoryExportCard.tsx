@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef } from "react";
+import { LockedInLogo } from "@/components/brand/LockedInLogo";
 import {
   formatCentiseconds,
   formatMs,
@@ -52,9 +53,13 @@ export const StoryExportCard = forwardRef<
           ) : null}
         </div>
         <div>
-          <p className="text-4xl font-bold tracking-tight">
-            {displayName || "LockedIn"}
-          </p>
+          {displayName ? (
+            <p className="text-4xl font-bold tracking-tight text-slate-900">
+              {displayName}
+            </p>
+          ) : (
+            <LockedInLogo className="text-4xl tracking-tight" />
+          )}
           {trimmedSessionName ? (
             <p className="mt-2 text-2xl font-semibold text-slate-800">
               {trimmedSessionName}

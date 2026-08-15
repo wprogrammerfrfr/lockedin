@@ -392,7 +392,7 @@ export default function LockInPage() {
           "mx-auto flex w-full flex-col",
           layoutMode === "solo-focus"
             ? "max-w-6xl gap-0"
-            : "max-w-5xl gap-8",
+            : "max-w-5xl gap-8 lg:min-h-[calc(100svh-6rem)] lg:justify-center",
         )}
       >
         {layoutMode !== "solo-focus" && (

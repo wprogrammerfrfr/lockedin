@@ -4,9 +4,11 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Cloud, Code2, Target, Users } from "lucide-react";
+import { LockedInLogo } from "@/components/brand/LockedInLogo";
 import { WelcomeCtas } from "@/components/welcome/WelcomeCtas";
 import { WelcomeDevShowcase } from "@/components/welcome/WelcomeDevShowcase";
 import { WelcomeFeatures } from "@/components/welcome/WelcomeFeatures";
+import { WelcomeHeroEquation } from "@/components/welcome/WelcomeHeroEquation";
 import { WelcomeHowTo } from "@/components/welcome/WelcomeHowTo";
 import { WelcomeRoomsShowcase } from "@/components/welcome/WelcomeRoomsShowcase";
 import { WelcomeTimerPreview } from "@/components/welcome/WelcomeTimerPreview";
@@ -49,9 +51,9 @@ export function WelcomeLanding() {
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
           <Link
             href="/"
-            className="font-display text-lg font-bold tracking-tight text-slate-900 sm:text-xl"
+            className="font-display text-lg font-bold tracking-tight sm:text-xl"
           >
-            LockedIn
+            <LockedInLogo />
           </Link>
           <WelcomeCtas compact />
         </div>
@@ -65,12 +67,7 @@ export function WelcomeLanding() {
             animate={{ opacity: 1, y: 0 }}
             transition={springSoft}
           >
-            <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-slate-400">
-              Focus tracking for students
-            </p>
-            <h1 className="mt-3 font-display text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
-              Competitive deep work for students, developers, doomscrollers, anyone who needs to LOCK TF IN.
-            </h1>
+            <WelcomeHeroEquation />
             <p className="mt-4 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
               Lock in, join Rooms, and keep deep work streaks. Solo sessions
               work without an account. Sign in to sync hours, sit with 2–6
@@ -208,9 +205,10 @@ export function WelcomeLanding() {
       <footer className="border-t border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div>
-            <p className="font-display text-lg font-bold tracking-tight text-slate-900">
-              LockedIn
-            </p>
+            <LockedInLogo
+              as="p"
+              className="text-lg tracking-tight"
+            />
             <p className="text-sm text-slate-500">
               LockedIn — deep work, tracked.
             </p>

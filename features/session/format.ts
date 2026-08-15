@@ -202,14 +202,6 @@ export type ShareCardChrome = {
 
 function durationChrome(ms: number): ShareCardChrome {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
-  if (totalSec < 60) {
-    return {
-      headline: "Took the L",
-      emoji: "😭",
-      gradient: "from-red-200 via-rose-100 to-slate-200",
-      footerLabel: "L state",
-    };
-  }
   if (totalSec < 15 * 60) {
     return {
       headline: "Session card",

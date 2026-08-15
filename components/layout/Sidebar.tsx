@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogIn, PanelLeft, PanelLeftClose } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { LockedInLogo } from "@/components/brand/LockedInLogo";
 import { NAV_ITEMS, navTabFromPathname } from "@/components/layout/nav";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -134,9 +135,9 @@ export function Sidebar({
         <Link
           href="/lockin"
           onClick={onNavigate}
-          className="font-display text-lg font-bold tracking-tight text-slate-900 lg:text-xl"
+          className="inline-flex items-center font-display text-lg font-bold tracking-tight lg:text-xl"
         >
-          {compact ? "LI" : "LockedIn"}
+          <LockedInLogo compact={compact} className="text-lg lg:text-xl" />
         </Link>
         {variant === "rail" && onToggleCollapse && (
           <Button

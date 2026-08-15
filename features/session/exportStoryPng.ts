@@ -33,10 +33,41 @@ async function canvasFallbackBlob(el: HTMLElement): Promise<Blob> {
   ctx.fillRect(0, 0, width, height);
 
   const text = el.innerText || "LockedIn";
-  ctx.fillStyle = "#0f172a";
   ctx.font = "bold 28px sans-serif";
-  ctx.fillText("LockedIn", 32, 48);
+  ctx.fillStyle = "#0f172a";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText("Locked", 32, 48);
+  const lockedWidth = ctx.measureText("Locked").width;
+  const gap = 3;
+  const padX = 5;
+  const padY = 4;
+  ctx.font = "bold 28px sans-serif";
+  const inWidth = ctx.measureText("in").width;
+  const badgeW = inWidth + padX * 2;
+  const badgeH = 28;
+  const badgeX = 32 + lockedWidth + gap;
+  const badgeY = 48 - 22;
+  // Lime wrap around same-size "in"
+  ctx.fillStyle = "#a3e635";
+  const r = 5;
+  ctx.beginPath();
+  ctx.moveTo(badgeX + r, badgeY);
+  ctx.arcTo(badgeX + badgeW, badgeY, badgeX + badgeW, badgeY + badgeH, r);
+  ctx.arcTo(badgeX + badgeW, badgeY + badgeH, badgeX, badgeY + badgeH, r);
+  ctx.arcTo(badgeX, badgeY + badgeH, badgeX, badgeY, r);
+  ctx.arcTo(badgeX, badgeY, badgeX + badgeW, badgeY, r);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText("in", badgeX + padX, 48);
+  // Green baseline under full logo
+  const logoRight = badgeX + badgeW;
+  ctx.fillStyle = "#a3e635";
+  ctx.fillRect(32, 54, logoRight - 32, 3);
   ctx.font = "20px monospace";
+  ctx.fillStyle = "#0f172a";
   const lines = text.split("\n").slice(0, 16);
   lines.forEach((line, i) => {
     ctx.fillText(line.slice(0, 48), 32, 96 + i * 32);

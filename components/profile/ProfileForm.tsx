@@ -53,13 +53,17 @@ export function ProfileForm({ profile, disabled, onSave }: ProfileFormProps) {
       );
       return;
     }
+    const currentUsername = normalizeUsername(profile?.username ?? "");
+    const usernameChanged =
+      Boolean(trimmedUsername) &&
+      trimmedUsername.toLowerCase() !== currentUsername.toLowerCase();
     setSaving(true);
     setMessage(null);
     try {
       await onSave({
         bio: bio.trim(),
         timezone,
-        username: trimmedUsername || undefined,
+        username: usernameChanged ? trimmedUsername : undefined,
       });
       setMessage("Saved.");
     } catch (err) {

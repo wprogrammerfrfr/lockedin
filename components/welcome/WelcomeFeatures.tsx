@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { BadgeCheck, BarChart3, Flame, Share2, Trophy } from "lucide-react";
+import { LockedInLogo } from "@/components/brand/LockedInLogo";
 import { springSoft } from "@/components/session/state-accent";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -91,8 +92,7 @@ export function WelcomeFeatures() {
           <CardContent className="space-y-4">
             <p className="text-sm leading-relaxed text-slate-600">
               Screenshot-ready cards show “Locked in for HH:MM:SS” plus the
-              outcome emoji. Win state if you broke a PR. L state if you tapped
-              out early.
+              outcome emoji. Win state if you broke a PR.
             </p>
             <div className="flex gap-2">
               <Button
@@ -114,7 +114,7 @@ export function WelcomeFeatures() {
                 className={cn(!shareWin && "bg-slate-700 text-white")}
                 onClick={() => setShareWin(false)}
               >
-                Took the L 😭
+                Short session
               </Button>
             </div>
             <motion.div
@@ -127,9 +127,7 @@ export function WelcomeFeatures() {
                 chrome.gradient,
               )}
             >
-              <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-slate-700/80">
-                LockedIn
-              </p>
+              <LockedInLogo className="text-sm tracking-tight" />
               <p className="mt-3 text-4xl leading-none">{chrome.emoji}</p>
               <p className="mt-3 font-display text-xl font-bold tracking-tight text-slate-900">
                 {chrome.headline}

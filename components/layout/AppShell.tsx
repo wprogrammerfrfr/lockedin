@@ -6,6 +6,7 @@ import { Menu } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ClaimUsernameDialog } from "@/components/auth/ClaimUsernameDialog";
+import { LockedInLogo } from "@/components/brand/LockedInLogo";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { springSoft } from "@/components/session/state-accent";
@@ -96,9 +97,9 @@ export function AppShell({
           </Button>
           <Link
             href="/lockin"
-            className="font-display text-lg font-bold tracking-tight text-slate-900"
+            className="inline-flex items-center font-display text-lg font-bold tracking-tight"
           >
-            LockedIn
+            <LockedInLogo className="text-lg" />
           </Link>
           <div className="ml-auto">
             <NotificationBell menuAlign="header" />
@@ -143,7 +144,7 @@ export function AppShell({
       <div
         className={cn(
           "flex min-h-0 flex-1",
-          layoutMode === "solo-focus" && "h-full overflow-hidden",
+          layoutMode === "solo-focus" && "overflow-hidden",
         )}
       >
         <AnimatePresence initial={false}>
@@ -184,7 +185,7 @@ export function AppShell({
           className={cn(
             "min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8",
             layoutMode === "solo-focus"
-              ? "flex h-full items-center justify-center overflow-hidden px-3 py-4 sm:px-6"
+              ? "flex min-h-0 items-center justify-center overflow-hidden px-3 py-4 sm:px-6"
               : "overflow-y-auto",
           )}
           style={

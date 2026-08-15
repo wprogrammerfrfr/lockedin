@@ -6,7 +6,8 @@ const ALLOWED_KEYS: Record<string, string> = {
     "Username must be 3–20 characters: letters, numbers, and underscores only.",
   username_taken: "That username is already taken.",
   username_reserved: "That username is reserved.",
-  username_cooldown: "You can change your username again after the cooldown.",
+  username_cooldown:
+    "You can only change your username once every 30 days.",
   not_authenticated: "You must be signed in to continue.",
   rate_limited: "Slow down — try again in a moment.",
   blocked: "You can't interact with this user.",

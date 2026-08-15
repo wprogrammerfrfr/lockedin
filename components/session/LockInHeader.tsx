@@ -2,6 +2,7 @@
 
 import { Flame } from "lucide-react";
 
+import { LockedInLogo } from "@/components/brand/LockedInLogo";
 import { InstallAppButton } from "@/components/pwa/InstallAppButton";
 import { CountUp } from "@/components/ui/count-up";
 import { cn } from "@/lib/utils";
@@ -20,9 +21,10 @@ export function LockInHeader({
         muted && "opacity-80 saturate-50",
       )}
     >
-      <h1 className="hidden font-display text-3xl font-bold tracking-tight text-slate-900 lg:block">
-        LockedIn
-      </h1>
+      <LockedInLogo
+        as="h1"
+        className="hidden text-3xl tracking-tight lg:inline-flex"
+      />
 
       <div className="ml-auto flex items-center gap-2 sm:gap-3">
         <InstallAppButton />
