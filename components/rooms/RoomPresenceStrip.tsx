@@ -42,7 +42,7 @@ export function RoomPresenceStrip({
         )}
       </div>
       <p className={cn("ml-auto text-xs font-medium text-slate-500")}>
-        {filled}/{slots.length} · Presence
+        {filled}/{slots.length} · Attendance
       </p>
     </div>
   );

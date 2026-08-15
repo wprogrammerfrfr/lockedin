@@ -4,6 +4,8 @@ type LockedInLogoProps = {
   className?: string;
   /** Icon-only: lime "in" badge (LinkedIn-style mark) */
   compact?: boolean;
+  /** Full mark word before the lime "in" badge. Default Locked. */
+  word?: "Locked" | "Lock";
   as?: "span" | "p" | "h1";
 };
 
@@ -27,6 +29,7 @@ function InBadge() {
 export function LockedInLogo({
   className,
   compact = false,
+  word = "Locked",
   as: Tag = "span",
 }: LockedInLogoProps) {
   if (compact) {
@@ -52,10 +55,10 @@ export function LockedInLogo({
         "inline-flex flex-col items-stretch font-display text-slate-900 font-bold leading-none tracking-tight",
         className,
       )}
-      aria-label="LockedIn"
+      aria-label={word === "Lock" ? "Lock in" : "LockedIn"}
     >
       <span className="inline-flex items-baseline gap-[0.08em] leading-none">
-        <span className="leading-none">Locked</span>
+        <span className="leading-none">{word}</span>
         <InBadge />
       </span>
       <span

@@ -22,23 +22,26 @@ const flipBottomTransition = {
  * NOTE: Do not use marginTop % for the bottom offset — % margins resolve against
  * width, not height, which hides the bottom half of every digit.
  */
-export type FlipClockSize = "default" | "sm";
+export type FlipClockSize = "default" | "sm" | "xs";
 
 const DIGIT_GLYPH: Record<FlipClockSize, string> = {
   default:
     "text-[4.5rem] sm:text-[5.25rem] md:text-[6.75rem] lg:text-[7.5rem]",
   sm: "text-[2.25rem] sm:text-[2.75rem] md:text-[3.25rem]",
+  xs: "text-lg font-bold",
 };
 
 const DIGIT_BOX: Record<FlipClockSize, string> = {
   default: "h-24 w-[4.5rem] sm:h-28 sm:w-20 md:h-36 md:w-24 lg:h-40 lg:w-28",
   sm: "h-14 w-10 sm:h-16 sm:w-12 md:h-[4.5rem] md:w-14",
+  xs: "h-10 w-7 rounded-lg",
 };
 
 const COLON_BOX: Record<FlipClockSize, string> = {
   default:
     "h-24 w-3 sm:h-28 md:h-36 md:w-3.5 lg:h-40 text-2xl sm:text-3xl md:text-4xl lg:text-5xl",
   sm: "h-14 w-2 sm:h-16 md:h-[4.5rem] md:w-2.5 text-lg sm:text-xl md:text-2xl",
+  xs: "h-10 w-1.5 text-sm",
 };
 
 export function DigitHalf({
@@ -56,7 +59,11 @@ export function DigitHalf({
     <div
       className={cn(
         "relative h-full w-full overflow-hidden",
-        half === "top" ? "rounded-t-xl" : "rounded-b-xl",
+        size === "xs"
+          ? null
+          : half === "top"
+            ? "rounded-t-xl"
+            : "rounded-b-xl",
         className
       )}
     >
@@ -135,10 +142,21 @@ export function FlipDigit({
   const panel = muted
     ? "bg-red-100/90 text-red-700/80 border border-red-200/70"
     : "bg-slate-900 text-white border border-slate-700";
+  const xsPanel = muted
+    ? "bg-red-100/90 text-red-700/80"
+    : "bg-slate-900 text-white";
+  const digitPanel = size === "xs" ? xsPanel : panel;
 
   return (
     <div
-      className={cn("relative shrink-0", DIGIT_BOX[size])}
+      className={cn(
+        "relative shrink-0 overflow-hidden",
+        DIGIT_BOX[size],
+        size === "xs" &&
+          (muted
+            ? "border border-red-200/70"
+            : "border border-slate-700"),
+      )}
       style={{ perspective: 900, transformStyle: "preserve-3d" }}
     >
       {/* Static top — always the destination digit */}
@@ -147,7 +165,7 @@ export function FlipDigit({
           value={active}
           half="top"
           size={size}
-          className={cn(panel, "border-b-0")}
+          className={cn(digitPanel, size !== "xs" && "border-b-0")}
         />
       </div>
 
@@ -157,12 +175,14 @@ export function FlipDigit({
           value={flipping ? prev : active}
           half="bottom"
           size={size}
-          className={cn(panel, "border-t-0")}
+          className={cn(digitPanel, size !== "xs" && "border-t-0")}
         />
       </div>
 
-      {/* Hinge — full-width, 1px, dead center */}
-      <div className="pointer-events-none absolute inset-x-0 top-1/2 z-40 h-[1px] -translate-y-1/2 bg-black/40" />
+      {/* Hinge — full-width, 1px, dead center (hidden on xs wall clock) */}
+      {size !== "xs" && (
+        <div className="pointer-events-none absolute inset-x-0 top-1/2 z-40 h-[1px] -translate-y-1/2 bg-black/40" />
+      )}
 
       {flipping && (
         <>
@@ -181,7 +201,10 @@ export function FlipDigit({
               value={prev}
               half="top"
               size={size}
-              className={cn(panel, "border-b-0 shadow-soft")}
+              className={cn(
+                digitPanel,
+                size !== "xs" && "border-b-0 shadow-soft",
+              )}
             />
           </motion.div>
 
@@ -201,7 +224,7 @@ export function FlipDigit({
               value={active}
               half="bottom"
               size={size}
-              className={cn(panel, "border-t-0")}
+              className={cn(digitPanel, size !== "xs" && "border-t-0")}
             />
           </motion.div>
         </>
@@ -214,12 +237,15 @@ const HOUR_MS = 3_600_000;
 
 export function FlipClock({
   ms,
+  value,
   forceHours = true,
   className,
   muted,
   size = "default",
 }: {
-  ms: number;
+  ms?: number;
+  /** Wall-clock / literal display string (e.g. "14:32"). Skips duration formatting. */
+  value?: string;
   forceHours?: boolean;
   className?: string;
   muted?: boolean;
@@ -240,19 +266,24 @@ export function FlipClock({
   }, []);
 
   const measured = width > 0;
-  const compact = size === "sm";
-  const narrow = !measured || width < (compact ? 360 : 480);
-  const showHours = forceHours && (!narrow || ms >= HOUR_MS);
-  const showCs = !compact && measured && width >= 400;
-  const text = formatMs(ms, showHours);
-  const cs = formatCentiseconds(ms);
+  const compact = size === "sm" || size === "xs";
+  const elapsed = ms ?? 0;
+  const narrow = !measured || width < (size === "xs" ? 0 : compact ? 360 : 480);
+  const showHours = forceHours && (!narrow || elapsed >= HOUR_MS);
+  const showCs = !value && size === "default" && measured && width >= 400;
+  const text = value ?? formatMs(elapsed, showHours);
+  const cs = formatCentiseconds(elapsed);
 
   return (
     <div
       ref={wrapRef}
       className={cn(
         "flex w-full min-w-0 items-end justify-center",
-        compact ? "gap-1 sm:gap-1.5 md:gap-2" : "gap-1.5 sm:gap-2 md:gap-2.5",
+        size === "xs"
+          ? "gap-0.5"
+          : compact
+            ? "gap-1 sm:gap-1.5 md:gap-2"
+            : "gap-1.5 sm:gap-2 md:gap-2.5",
         className,
       )}
       aria-label={showCs ? `${text}:${cs}` : text}

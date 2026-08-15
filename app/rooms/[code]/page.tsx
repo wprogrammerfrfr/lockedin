@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Copy } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
+import { LockedInLogo } from "@/components/brand/LockedInLogo";
 import { FocusTimer } from "@/components/session/FocusTimer";
 import { ClosingBanner } from "@/components/rooms/ClosingBanner";
 import { RoomPresencePane } from "@/components/rooms/RoomPresencePane";
@@ -291,7 +292,12 @@ export default function RoomFocusPage({
     ],
   );
 
-  const { members } = useRoomChannel(code, room?.id ?? null, presenceSelf);
+  const { members } = useRoomChannel(
+    code,
+    room?.id ?? null,
+    presenceSelf,
+    room?.name,
+  );
   useSessionClock(state, dispatch);
 
   useEffect(() => {
@@ -482,24 +488,27 @@ export default function RoomFocusPage({
   return (
     <AppShell
       layoutMode="room-focus"
-      presence={<RoomPresencePane members={members} />}
+      presence={
+        <RoomPresencePane members={members} selfUserId={userId} />
+      }
       presenceStrip={<RoomPresenceStrip members={members} />}
     >
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="truncate font-display text-lg font-bold text-slate-900">
-              {room?.name || "Room"}
-            </p>
-            <p className="font-mono text-xs tabular-nums tracking-[0.18em] text-slate-500">
-              {displayCode}
-              <span className="ml-2 tracking-normal text-slate-400">
-                {isPomodoro ? "Pomodoro cadence" : "Vote room"} ·{" "}
-                {room?.status ?? "…"}
+            <p className="text-xs font-medium text-slate-500">
+              Room Code :{" "}
+              <span className="font-mono text-base font-bold tabular-nums tracking-widest text-slate-900">
+                {displayCode}
               </span>
             </p>
+            <p className="mt-0.5 text-xs text-slate-400">
+              {isPomodoro ? "Pomodoro cadence" : "Vote room"} ·{" "}
+              {room?.status ?? "…"}
+            </p>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Button
               type="button"
               variant="outline"
@@ -564,6 +573,15 @@ export default function RoomFocusPage({
           sessionName={sessionNameDraft}
           onSessionNameChange={setSessionNameDraft}
           lockInDisabled={status === "loading"}
+          heroTitle={
+            <h1 className="flex max-w-full flex-wrap items-baseline justify-center gap-x-2 gap-y-1 font-display text-2xl font-bold leading-none tracking-tight text-slate-900 sm:text-3xl">
+              <span className="max-w-[14rem] truncate sm:max-w-[20rem]">
+                {room?.name || "Room"}
+              </span>
+              <LockedInLogo word="Lock" className="text-[0.85em] sm:text-[0.9em]" />
+              <span>session</span>
+            </h1>
+          }
           onLockIn={() => {
             void onLockIn();
           }}

@@ -132,7 +132,7 @@ export function AppShell({
             side="left"
             className="w-80 p-0 pt-[env(safe-area-inset-top)] sm:max-w-sm"
           >
-            <SheetTitle className="sr-only">Room presence</SheetTitle>
+            <SheetTitle className="sr-only">Room attendance</SheetTitle>
             <SheetDescription className="sr-only">
               Who is in this room
             </SheetDescription>
@@ -210,11 +210,11 @@ export function AppShell({
                 type="button"
                 className="mb-4 w-full lg:hidden"
                 onClick={() => setPresenceOpen(true)}
-                aria-label="Open presence"
+                aria-label="Open attendance"
               >
                 {presenceStrip ?? (
                   <span className="block rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-600">
-                    Presence
+                    Attendance
                   </span>
                 )}
               </button>

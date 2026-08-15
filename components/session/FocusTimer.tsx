@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Lock, Pause, Play, Share2, Trophy } from "lucide-react";
 
@@ -37,6 +37,7 @@ export function FocusTimer({
   onClearPrBurst,
   lockInDisabled = false,
   hidePersonalBreak = false,
+  heroTitle,
 }: {
   state: SessionState;
   elapsedMs: number;
@@ -59,6 +60,8 @@ export function FocusTimer({
   onClearPrBurst: () => void;
   lockInDisabled?: boolean;
   hidePersonalBreak?: boolean;
+  /** When set (rooms), replaces the small Lock + sessionName row above the clock. */
+  heroTitle?: ReactNode;
 }) {
   const accent = stateAccent(state);
   const muted = state === "TAPPED_OUT";
@@ -104,17 +107,33 @@ export function FocusTimer({
               : undefined,
         }}
       >
-        <div className={cn("flex items-center gap-2", isActiveFocus ? "mb-3" : "mb-5")}>
-          <Lock className={cn("h-4 w-4", accent.text)} />
-          <span
+        {heroTitle ? (
+          <div
             className={cn(
-              "font-display text-sm font-bold uppercase tracking-[0.14em]",
-              muted ? "text-red-700" : "text-slate-800"
+              "flex justify-center text-center",
+              isActiveFocus ? "mb-3" : "mb-5",
             )}
           >
-            {(sessionName ?? "").trim() || "FOCUS TIMER"}
-          </span>
-        </div>
+            {heroTitle}
+          </div>
+        ) : (
+          <div
+            className={cn(
+              "flex items-center gap-2",
+              isActiveFocus ? "mb-3" : "mb-5",
+            )}
+          >
+            <Lock className={cn("h-4 w-4", accent.text)} />
+            <span
+              className={cn(
+                "font-display text-sm font-bold uppercase tracking-[0.14em]",
+                muted ? "text-red-700" : "text-slate-800",
+              )}
+            >
+              {(sessionName ?? "").trim() || "FOCUS TIMER"}
+            </span>
+          </div>
+        )}
 
         <div
           className={cn(

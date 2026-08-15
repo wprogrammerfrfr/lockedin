@@ -1,12 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import {
   fetchRoomMembers,
   touchRoomPresence,
 } from "@/features/rooms/api";
 import type { RoomPresenceMember } from "@/features/rooms/types";
+import {
+  getFollowRelation,
+  requestFollow,
+} from "@/features/social/api";
+import { userFacingError } from "@/lib/supabase/errors";
 
 const TOUCH_MS = 10_000;
 
@@ -52,10 +58,51 @@ function mergeMembers(
   return [...slots, ...extras];
 }
 
+function joinToastMessage(username: string, roomName: string | null | undefined) {
+  const name = roomName?.trim();
+  const who = username.trim() || "Someone";
+  return name ? `${who} entered ${name}` : `${who} entered the room`;
+}
+
+async function toastMemberJoined(
+  member: RoomPresenceMember,
+  roomName: string | null | undefined,
+  selfUserId: string | null,
+) {
+  if (!selfUserId || member.userId === selfUserId) return;
+
+  const message = joinToastMessage(member.username, roomName);
+  let relation: Awaited<ReturnType<typeof getFollowRelation>> = "none";
+  try {
+    relation = await getFollowRelation(createClient(), member.userId);
+  } catch {
+    /* still show join toast without Follow */
+  }
+
+  if (relation === "none" || relation === "rejected") {
+    toast.message(message, {
+      action: {
+        label: "Follow",
+        onClick: () => {
+          void requestFollow(createClient(), member.userId)
+            .then(() => toast.success(`Followed @${member.username}`))
+            .catch((err) =>
+              toast.error(userFacingError(err, "Follow action failed")),
+            );
+        },
+      },
+    });
+    return;
+  }
+
+  toast.message(message);
+}
+
 export function useRoomChannel(
   code: string | null,
   roomId: string | null,
   self: Omit<RoomPresenceMember, "userId"> & { userId: string | null },
+  roomName?: string | null,
 ) {
   const [tableMembers, setTableMembers] = useState<RoomPresenceMember[]>([]);
   const [presenceById, setPresenceById] = useState<
@@ -66,22 +113,50 @@ export function useRoomChannel(
   >("idle");
   const selfRef = useRef(self);
   selfRef.current = self;
+  const roomNameRef = useRef(roomName);
+  roomNameRef.current = roomName;
+  const knownIdsRef = useRef<Set<string> | null>(null);
   const channelRef = useRef<ReturnType<
     ReturnType<typeof createClient>["channel"]
   > | null>(null);
 
   const members = mergeMembers(tableMembers, presenceById);
 
-  const loadTable = useCallback(async (id: string, cancelled: { current: boolean }) => {
-    try {
-      const rows = await fetchRoomMembers(createClient(), id);
-      if (!cancelled.current) setTableMembers(rows);
-    } catch {
-      /* keep last snapshot */
-    }
-  }, []);
+  const applyTableRows = useCallback(
+    (rows: RoomPresenceMember[], cancelled: { current: boolean }) => {
+      if (cancelled.current) return;
+
+      const prev = knownIdsRef.current;
+      if (prev === null) {
+        knownIdsRef.current = new Set(rows.map((r) => r.userId));
+      } else {
+        const selfId = selfRef.current.userId;
+        for (const row of rows) {
+          if (prev.has(row.userId)) continue;
+          void toastMemberJoined(row, roomNameRef.current, selfId);
+        }
+        knownIdsRef.current = new Set(rows.map((r) => r.userId));
+      }
+
+      setTableMembers(rows);
+    },
+    [],
+  );
+
+  const loadTable = useCallback(
+    async (id: string, cancelled: { current: boolean }) => {
+      try {
+        const rows = await fetchRoomMembers(createClient(), id);
+        applyTableRows(rows, cancelled);
+      } catch {
+        /* keep last snapshot */
+      }
+    },
+    [applyTableRows],
+  );
 
   useEffect(() => {
+    knownIdsRef.current = null;
     if (!roomId) {
       setTableMembers([]);
       return;
@@ -108,6 +183,7 @@ export function useRoomChannel(
 
     return () => {
       cancelled.current = true;
+      knownIdsRef.current = null;
       void supabase.removeChannel(channel);
     };
   }, [roomId, loadTable]);
