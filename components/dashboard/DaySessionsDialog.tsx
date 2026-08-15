@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { AnimatePresence, motion } from "framer-motion";
 import { Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,29 +13,240 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ShareCardDialog } from "@/components/session/ShareCardDialog";
+import {
+  SessionReceiptCard,
+  sessionToReceiptData,
+} from "@/components/session/SessionReceiptCard";
+import { SessionSummaryCard } from "@/components/session/SessionSummaryCard";
+import {
+  SessionCardViewToggle,
+  useSessionCardView,
+} from "@/components/session/SessionCardViewToggle";
+import { springSoft } from "@/components/session/state-accent";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { formatMs, lockedInForLabel } from "@/features/session/format";
-import { profileSessionsForDay } from "@/features/social/api";
+import {
+  buildShareCaption,
+  formatMs,
+  youLockedInForLabel,
+} from "@/features/session/format";
 import type { ProfileDaySession } from "@/features/social/types";
 import type { OutcomeKind } from "@/features/session/types";
-import { createClient } from "@/lib/supabase/client";
-import { userFacingError } from "@/lib/supabase/errors";
+import { cn } from "@/lib/utils";
 
-function sessionSummary(s: ProfileDaySession): string {
-  if (s.pr_broken || s.outcome === "pr") return "PR";
-  if (s.outcome === "tapout" || s.status === "tapped_out") return "Tapped out";
-  if (s.outcome === "break") return "Break";
-  if (s.outcome === "solid") return "Solid";
-  if (s.status === "active" || s.status === "on_break") return "Live";
-  return "Ended";
-}
-
-function asOutcome(s: ProfileDaySession): OutcomeKind {
+export function asSessionOutcome(s: ProfileDaySession): OutcomeKind {
   if (s.pr_broken || s.outcome === "pr") return "pr";
   if (s.outcome === "tapout" || s.status === "tapped_out") return "tapout";
   if (s.outcome === "break") return "break";
   if (s.outcome === "solid") return "solid";
   return "solid";
+}
+
+function formatClock(iso: string | null | undefined, timeZone: string): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone,
+  }).format(d);
+}
+
+function formatListDate(iso: string | null | undefined, timeZone: string): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone,
+  }).format(d);
+}
+
+export function SessionListRow({
+  session,
+  timeZone,
+  onClick,
+  showDate = false,
+}: {
+  session: ProfileDaySession;
+  timeZone: string;
+  onClick: () => void;
+  showDate?: boolean;
+}) {
+  const isRoom =
+    session.kind === "room" || Boolean(session.room_session_id);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "w-full rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 text-left transition-colors",
+        "hover:border-slate-200 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50",
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate font-medium text-slate-800">
+            {session.session_name?.trim() ||
+              session.room_name?.trim() ||
+              "Untitled"}
+            <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              {isRoom ? "Room" : "Solo"}
+            </span>
+          </p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            {youLockedInForLabel(session.active_ms ?? 0)}
+            {(session.break_ms ?? 0) > 0
+              ? ` · break ${formatMs(session.break_ms ?? 0)}`
+              : ""}
+          </p>
+          <p className="mt-0.5 font-mono text-[11px] tabular-nums text-slate-400">
+            {showDate ? (
+              <>
+                {formatListDate(session.started_at, timeZone)}
+                {" · "}
+              </>
+            ) : null}
+            {formatClock(session.started_at, timeZone)}
+            {" – "}
+            {formatClock(session.ended_at, timeZone)}
+          </p>
+        </div>
+        <span className="shrink-0 font-mono text-xs tabular-nums text-slate-500">
+          {formatMs(session.active_ms ?? 0, true)}
+        </span>
+      </div>
+    </button>
+  );
+}
+
+/** Receipt detail + optional share actions for a history session. */
+export function SessionDetailDialog({
+  open,
+  onOpenChange,
+  session,
+  timeZone,
+  canShare = false,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  session: ProfileDaySession | null;
+  timeZone: string;
+  canShare?: boolean;
+}) {
+  const { isAuthenticated, profileLabel, avatarUrl, user } = useAuth();
+  const [shareOpen, setShareOpen] = useState(false);
+  const [cardView, setCardView] = useSessionCardView("summary");
+  const [caption, setCaption] = useState("");
+
+  useEffect(() => {
+    if (!open) setShareOpen(false);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !session) return;
+    setCaption(
+      buildShareCaption(session.active_ms ?? 0, asSessionOutcome(session)),
+    );
+  }, [open, session]);
+
+  const receipt = session
+    ? sessionToReceiptData(session, {
+        viewerUserId: user?.id,
+        flavorCaption: caption,
+      })
+    : null;
+  const canPostShare =
+    canShare &&
+    session &&
+    session.status !== "active" &&
+    session.status !== "on_break";
+  const outcome = session ? asSessionOutcome(session) : "solid";
+  const sessionTitle =
+    session?.session_name?.trim() ||
+    session?.room_name?.trim() ||
+    null;
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="flex max-h-[min(90dvh,52rem)] max-w-md flex-col gap-3 overflow-hidden border-slate-200 bg-white">
+          <DialogHeader className="shrink-0">
+            <DialogTitle>
+              {cardView === "summary" ? "Session summary" : "Session receipt"}
+            </DialogTitle>
+          </DialogHeader>
+
+          {session && receipt ? (
+            <div className="flex min-h-0 flex-1 flex-col gap-3">
+              <SessionCardViewToggle
+                value={cardView}
+                onChange={setCardView}
+                className="shrink-0"
+              />
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-0.5">
+                <AnimatePresence mode="wait" initial={false}>
+                  {cardView === "summary" ? (
+                    <motion.div
+                      key="summary"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={springSoft}
+                    >
+                      <SessionSummaryCard
+                        durationMs={session.active_ms ?? 0}
+                        outcome={outcome}
+                        sessionName={sessionTitle}
+                        caption={caption}
+                      />
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="receipt"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={springSoft}
+                    >
+                      <SessionReceiptCard data={receipt} timeZone={timeZone} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+              {canPostShare ? (
+                <Button
+                  className="w-full shrink-0 rounded-xl"
+                  onClick={() => setShareOpen(true)}
+                >
+                  <Share2 className="h-4 w-4" />
+                  Share / export
+                </Button>
+              ) : null}
+            </div>
+          ) : (
+            <p className="py-4 text-sm text-slate-400">No session selected.</p>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <ShareCardDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        durationMs={session?.active_ms ?? 0}
+        outcome={session ? asSessionOutcome(session) : "solid"}
+        displayName={profileLabel}
+        avatarUrl={avatarUrl}
+        sessionId={session?.id}
+        sessionName={session?.session_name ?? session?.room_name}
+        canPost={isAuthenticated && Boolean(session?.id)}
+        timeZone={timeZone}
+        receipt={receipt}
+      />
+    </>
+  );
 }
 
 export function DaySessionsDialog({
@@ -45,6 +257,9 @@ export function DaySessionsDialog({
   timezone,
   canShare = false,
   locked = false,
+  sessions,
+  loading = false,
+  error = null,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -54,46 +269,16 @@ export function DaySessionsDialog({
   canShare?: boolean;
   /** Viewer cannot see sessions (not following). */
   locked?: boolean;
+  sessions: ProfileDaySession[];
+  loading?: boolean;
+  error?: string | null;
 }) {
-  const { isAuthenticated, profileLabel, avatarUrl } = useAuth();
-  const [sessions, setSessions] = useState<ProfileDaySession[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [shareSession, setShareSession] = useState<ProfileDaySession | null>(
-    null,
-  );
+  const [detail, setDetail] = useState<ProfileDaySession | null>(null);
+  const tz = timezone || "UTC";
 
   useEffect(() => {
-    if (!open || !day || !username || locked) {
-      setSessions([]);
-      setError(null);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    void (async () => {
-      try {
-        const rows = await profileSessionsForDay(
-          createClient(),
-          username,
-          day,
-          timezone,
-        );
-        if (!cancelled) setSessions(rows);
-      } catch (err) {
-        if (!cancelled) {
-          setSessions([]);
-          setError(userFacingError(err, "Could not load sessions"));
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [open, day, username, timezone, locked]);
+    if (!open) setDetail(null);
+  }, [open]);
 
   return (
     <>
@@ -106,7 +291,7 @@ export function DaySessionsDialog({
             <DialogDescription>
               {locked
                 ? "Follow this student to see their session details."
-                : "Sessions started on this day."}
+                : "Click a session for the summary or receipt."}
             </DialogDescription>
           </DialogHeader>
 
@@ -135,39 +320,12 @@ export function DaySessionsDialog({
           ) : (
             <ul className="max-h-[50vh] space-y-2 overflow-y-auto">
               {sessions.map((s) => (
-                <li
-                  key={s.id}
-                  className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-slate-800">
-                        {s.session_name?.trim() || "Untitled"}
-                      </p>
-                      <p className="mt-0.5 font-mono text-xs tabular-nums text-slate-500">
-                        {lockedInForLabel(s.active_ms ?? 0)}
-                        {(s.break_ms ?? 0) > 0
-                          ? ` · break ${formatMs(s.break_ms ?? 0)}`
-                          : ""}
-                      </p>
-                      <p className="mt-0.5 text-[11px] text-slate-400">
-                        {sessionSummary(s)}
-                      </p>
-                    </div>
-                    {canShare &&
-                    s.status !== "active" &&
-                    s.status !== "on_break" ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="shrink-0 rounded-xl"
-                        onClick={() => setShareSession(s)}
-                      >
-                        <Share2 className="h-3.5 w-3.5" />
-                        Share
-                      </Button>
-                    ) : null}
-                  </div>
+                <li key={s.id}>
+                  <SessionListRow
+                    session={s}
+                    timeZone={tz}
+                    onClick={() => setDetail(s)}
+                  />
                 </li>
               ))}
             </ul>
@@ -175,18 +333,14 @@ export function DaySessionsDialog({
         </DialogContent>
       </Dialog>
 
-      <ShareCardDialog
-        open={Boolean(shareSession)}
+      <SessionDetailDialog
+        open={Boolean(detail)}
         onOpenChange={(next) => {
-          if (!next) setShareSession(null);
+          if (!next) setDetail(null);
         }}
-        durationMs={shareSession?.active_ms ?? 0}
-        outcome={shareSession ? asOutcome(shareSession) : "solid"}
-        sessionId={shareSession?.id ?? null}
-        canPost={isAuthenticated && Boolean(shareSession?.id)}
-        sessionName={shareSession?.session_name ?? null}
-        displayName={profileLabel}
-        avatarUrl={avatarUrl}
+        session={detail}
+        timeZone={tz}
+        canShare={canShare}
       />
     </>
   );

@@ -38,6 +38,7 @@ export function FocusTimer({
   lockInDisabled = false,
   hidePersonalBreak = false,
   heroTitle,
+  topBar,
 }: {
   state: SessionState;
   elapsedMs: number;
@@ -62,6 +63,8 @@ export function FocusTimer({
   hidePersonalBreak?: boolean;
   /** When set (rooms), replaces the small Lock + sessionName row above the clock. */
   heroTitle?: ReactNode;
+  /** Optional chrome inside the timer card (room code + actions). */
+  topBar?: ReactNode;
 }) {
   const accent = stateAccent(state);
   const muted = state === "TAPPED_OUT";
@@ -107,6 +110,9 @@ export function FocusTimer({
               : undefined,
         }}
       >
+        {topBar ? (
+          <div className={cn(isActiveFocus ? "mb-3" : "mb-4")}>{topBar}</div>
+        ) : null}
         {heroTitle ? (
           <div
             className={cn(

@@ -128,4 +128,6 @@ export type NotificationRow = {
 export type HeatmapDay = {
   day: string;
   active_ms: number;
+  /** Longest session title for that day (truncated in calendar cells). */
+  title?: string | null;
 };

@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Copy, Download, ImageDown, Share2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { LockedInLogo } from "@/components/brand/LockedInLogo";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,12 +14,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Separator } from "@/components/ui/separator";
+import {
+  SessionReceiptCard,
+  type SessionReceiptData,
+} from "@/components/session/SessionReceiptCard";
+import { SessionSummaryCard } from "@/components/session/SessionSummaryCard";
+import {
+  SessionCardViewToggle,
+  useSessionCardView,
+} from "@/components/session/SessionCardViewToggle";
 import { StoryExportCard } from "@/components/session/StoryExportCard";
+import { springSoft } from "@/components/session/state-accent";
 import {
   buildShareCaption,
-  formatCentiseconds,
-  lockedInForLabel,
+  receiptOutcomeLabel,
   shareCardChrome,
 } from "@/features/session/format";
 import {
@@ -33,7 +41,6 @@ import {
 import type { OutcomeKind } from "@/features/session/types";
 import { createClient } from "@/lib/supabase/client";
 import { userFacingError } from "@/lib/supabase/errors";
-import { cn } from "@/lib/utils";
 
 export function ShareCardDialog({
   open,
@@ -45,6 +52,8 @@ export function ShareCardDialog({
   sessionId,
   canPost = false,
   sessionName,
+  timeZone,
+  receipt,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -55,14 +64,15 @@ export function ShareCardDialog({
   sessionId?: string | null;
   canPost?: boolean;
   sessionName?: string | null;
+  timeZone?: string;
+  /** Full receipt payload when available (history / room). */
+  receipt?: SessionReceiptData | null;
 }) {
   const displayOutcome: OutcomeKind =
     outcome === "idle" ? "solid" : outcome === "break" ? "break" : outcome;
 
-  const trimmedSessionName = (sessionName ?? "").trim();
-  const chrome = shareCardChrome(durationMs, displayOutcome);
-
   const [caption, setCaption] = useState("");
+  const [cardView, setCardView] = useSessionCardView("summary");
   const exportRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
@@ -79,6 +89,24 @@ export function ShareCardDialog({
       setPosting(false);
     }
   }, [open]);
+
+  const receiptData: SessionReceiptData = useMemo(() => {
+    if (receipt) {
+      return { ...receipt, flavorCaption: caption || receipt.flavorCaption };
+    }
+    return {
+      sessionName: sessionName,
+      kind: "solo",
+      activeMs: durationMs,
+      outcome: displayOutcome,
+      flavorCaption: caption,
+    };
+  }, [receipt, sessionName, durationMs, displayOutcome, caption]);
+
+  const chrome = shareCardChrome(durationMs, displayOutcome);
+  const footerHint = receiptOutcomeLabel(displayOutcome, displayOutcome === "pr");
+  const resolvedSessionName =
+    (receiptData.sessionName ?? sessionName ?? "").trim() || null;
 
   async function handleExportStory() {
     setExporting(true);
@@ -156,44 +184,57 @@ export function ShareCardDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md border-slate-200 bg-white">
-        <DialogHeader>
-          <DialogTitle>Session Summary</DialogTitle>
+      <DialogContent className="flex max-h-[min(90dvh,52rem)] max-w-md flex-col gap-3 overflow-hidden border-slate-200 bg-white">
+        <DialogHeader className="shrink-0">
+          <DialogTitle>
+            {cardView === "summary" ? "Session summary" : "Session receipt"}
+          </DialogTitle>
           <DialogDescription>
-            Screenshot card, 9:16 story export, or post to followers.
+            Switch between the meme summary and the itemized receipt. Export,
+            download, or post the selected card.
           </DialogDescription>
         </DialogHeader>
 
-        <div
-          ref={cardRef}
-          className={cn(
-            "relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br p-6 shadow-soft",
-            chrome.gradient,
-          )}
-        >
-          <LockedInLogo className="text-sm tracking-tight" />
-          {trimmedSessionName ? (
-            <p className="mt-3 font-display text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
-              {trimmedSessionName}
-            </p>
-          ) : null}
-          <p className="mt-4 text-5xl leading-none">{chrome.emoji}</p>
-          <p className="mt-4 font-display text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
-            {caption}
-          </p>
-          <p className="mt-2 text-sm font-medium text-slate-700">
-            {chrome.headline}
-          </p>
-          <Separator className="my-4 bg-white/50" />
-          <div className="flex justify-between gap-3 text-xs text-slate-600">
-            <span className="font-mono tabular-nums">
-              {lockedInForLabel(durationMs)}
-              <span className="ml-0.5 text-[0.65em] opacity-70">
-                :{formatCentiseconds(durationMs)}
-              </span>
-            </span>
-            <span className="shrink-0">{chrome.footerLabel}</span>
-          </div>
+        <SessionCardViewToggle
+          value={cardView}
+          onChange={setCardView}
+          className="shrink-0"
+        />
+
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-0.5">
+          <AnimatePresence mode="wait" initial={false}>
+            {cardView === "summary" ? (
+              <motion.div
+                key="summary"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={springSoft}
+              >
+                <SessionSummaryCard
+                  ref={cardRef}
+                  durationMs={durationMs}
+                  outcome={displayOutcome}
+                  sessionName={resolvedSessionName}
+                  caption={caption}
+                />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="receipt"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={springSoft}
+              >
+                <SessionReceiptCard
+                  ref={cardRef}
+                  data={receiptData}
+                  timeZone={timeZone || "UTC"}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Off-screen 9:16 export target */}
@@ -207,12 +248,19 @@ export function ShareCardDialog({
             outcome={displayOutcome}
             displayName={displayName}
             avatarUrl={avatarUrl}
-            sessionName={trimmedSessionName || null}
+            sessionName={resolvedSessionName}
             caption={caption}
+            receipt={receiptData}
+            timeZone={timeZone || "UTC"}
+            cardView={cardView}
           />
         </div>
 
-        <DialogFooter className="flex-col gap-2 sm:flex-col">
+        <p className="shrink-0 text-center text-[11px] text-slate-400">
+          {chrome.headline} · {footerHint}
+        </p>
+
+        <DialogFooter className="shrink-0 flex-col gap-2 sm:flex-col">
           <div className="flex w-full flex-wrap gap-2">
             <Button
               variant="outline"

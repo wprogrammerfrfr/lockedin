@@ -68,9 +68,6 @@ export function WeeklyLeaderboard({
       <p className="font-display text-sm font-semibold text-slate-800">
         This week&apos;s top lock ins
       </p>
-      <p className="mt-1 text-xs text-slate-500">
-        Mutual friends · active hours this week (your timezone).
-      </p>
 
       {needsAuth && (
         <p className="mt-3 text-xs text-slate-400">

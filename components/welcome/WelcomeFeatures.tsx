@@ -3,18 +3,12 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { BadgeCheck, BarChart3, Flame, Share2, Trophy } from "lucide-react";
-import { LockedInLogo } from "@/components/brand/LockedInLogo";
+import { SessionReceiptCard } from "@/components/session/SessionReceiptCard";
 import { springSoft } from "@/components/session/state-accent";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CountUp } from "@/components/ui/count-up";
-import { Separator } from "@/components/ui/separator";
-import {
-  formatCentiseconds,
-  lockedInForLabel,
-  shareCardChrome,
-} from "@/features/session/format";
 import { cn } from "@/lib/utils";
 
 const WIN_MS = 1 * 60 * 60 * 1000 + 12 * 60 * 1000;
@@ -30,7 +24,9 @@ function formatHoursMinutes(ms: number) {
 export function WelcomeFeatures() {
   const [shareWin, setShareWin] = useState(true);
   const durationMs = shareWin ? WIN_MS : L_MS;
-  const chrome = shareCardChrome(durationMs, shareWin ? "pr" : "tapout");
+  const started = new Date();
+  started.setHours(9, 0, 0, 0);
+  const ended = new Date(started.getTime() + durationMs);
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -43,8 +39,8 @@ export function WelcomeFeatures() {
           </CardHeader>
           <CardContent>
             <p className="mb-4 text-sm leading-relaxed text-slate-600">
-              Today totals, personal records, and streaks live on the dashboard.
-              PRs glow gold. Numbers count up — they don’t snap.
+              Today totals, personal records, streaks, and lifetime session
+              counts live on the dashboard. Numbers count up — they don’t snap.
             </p>
             <div className="grid grid-cols-3 gap-2">
               <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
@@ -86,13 +82,13 @@ export function WelcomeFeatures() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Share2 className="h-4 w-4 text-emerald-600" />
-              Share card
+              Session receipt
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm leading-relaxed text-slate-600">
-              Screenshot-ready cards show “Locked in for HH:MM:SS” plus the
-              outcome emoji. Win state if you broke a PR.
+              Screenshot-ready receipts show lock-in time, breaks, and outcome.
+              Win state if you broke a PR.
             </p>
             <div className="flex gap-2">
               <Button
@@ -114,7 +110,7 @@ export function WelcomeFeatures() {
                 className={cn(!shareWin && "bg-slate-700 text-white")}
                 onClick={() => setShareWin(false)}
               >
-                Short session
+                Tap out
               </Button>
             </div>
             <motion.div
@@ -122,26 +118,23 @@ export function WelcomeFeatures() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={springSoft}
-              className={cn(
-                "relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br p-5 shadow-soft",
-                chrome.gradient,
-              )}
             >
-              <LockedInLogo className="text-sm tracking-tight" />
-              <p className="mt-3 text-4xl leading-none">{chrome.emoji}</p>
-              <p className="mt-3 font-display text-xl font-bold tracking-tight text-slate-900">
-                {chrome.headline}
-              </p>
-              <Separator className="my-3 bg-white/50" />
-              <div className="flex justify-between gap-3 text-xs text-slate-600">
-                <span className="font-mono tabular-nums">
-                  {lockedInForLabel(durationMs)}
-                  <span className="ml-0.5 text-[0.65em] opacity-70">
-                    :{formatCentiseconds(durationMs)}
-                  </span>
-                </span>
-                <span className="shrink-0">{chrome.footerLabel}</span>
-              </div>
+              <SessionReceiptCard
+                data={{
+                  sessionName: shareWin ? "Deep work block" : "Almost had it",
+                  kind: "solo",
+                  startedAt: started.toISOString(),
+                  endedAt: ended.toISOString(),
+                  activeMs: durationMs,
+                  breakMs: shareWin ? 15 * 60_000 : 0,
+                  breakTypesUsed: shareWin ? ["hydration"] : [],
+                  outcome: shareWin ? "pr" : "tapout",
+                  prBroken: shareWin,
+                  flavorCaption: shareWin
+                    ? "goated."
+                    : "great work buddy 😭",
+                }}
+              />
             </motion.div>
           </CardContent>
         </Card>

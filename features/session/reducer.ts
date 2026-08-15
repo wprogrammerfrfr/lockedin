@@ -67,6 +67,7 @@ export const initialState: AppState = {
   breakMs: 0,
   remoteSessionId: null,
   clientId: null,
+  sessionStartedAt: null,
 };
 
 export function reducer(state: AppState, action: Action): AppState {
@@ -90,6 +91,7 @@ export function reducer(state: AppState, action: Action): AppState {
         sessionName: action.sessionName?.trim() || null,
         breakTypesUsed: [],
         breakMs: 0,
+        sessionStartedAt: new Date().toISOString(),
         remoteSessionId:
           action.remoteSessionId !== undefined
             ? action.remoteSessionId
@@ -113,6 +115,10 @@ export function reducer(state: AppState, action: Action): AppState {
         clientId:
           action.clientId !== undefined ? action.clientId : state.clientId,
         didBreakPR: false,
+        sessionStartedAt:
+          action.startedAt?.trim() ||
+          state.sessionStartedAt ||
+          new Date().toISOString(),
         ...clearBreakFields(),
       };
     case "HYDRATE_STATS":

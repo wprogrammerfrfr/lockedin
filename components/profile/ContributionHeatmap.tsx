@@ -40,14 +40,24 @@ function monthLabel(year: number, month: number): string {
   }).format(new Date(year, month, 1));
 }
 
+type DayMeta = { ms: number; title: string | null };
+
 type CalendarCell =
   | { kind: "empty"; key: string }
-  | { kind: "day"; key: string; date: string; dayNum: number; ms: number; isToday: boolean };
+  | {
+      kind: "day";
+      key: string;
+      date: string;
+      dayNum: number;
+      ms: number;
+      title: string | null;
+      isToday: boolean;
+    };
 
 function buildMonthCells(
   year: number,
   month: number,
-  msByDay: Map<string, number>,
+  byDay: Map<string, DayMeta>,
 ): CalendarCell[] {
   const first = new Date(year, month, 1);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -60,12 +70,14 @@ function buildMonthCells(
   }
   for (let day = 1; day <= daysInMonth; day++) {
     const date = toDayKey(new Date(year, month, day));
+    const meta = byDay.get(date);
     cells.push({
       kind: "day",
       key: date,
       date,
       dayNum: day,
-      ms: msByDay.get(date) ?? 0,
+      ms: meta?.ms ?? 0,
+      title: meta?.title ?? null,
       isToday: date === todayKey,
     });
   }
@@ -90,21 +102,24 @@ export function ContributionHeatmap({
     month: now.getMonth(),
   });
 
-  const msByDay = useMemo(() => {
-    const map = new Map<string, number>();
+  const byDay = useMemo(() => {
+    const map = new Map<string, DayMeta>();
     for (const d of days) {
       const key =
         typeof d.day === "string"
           ? d.day.slice(0, 10)
           : String(d.day).slice(0, 10);
-      map.set(key, Number(d.active_ms) || 0);
+      map.set(key, {
+        ms: Number(d.active_ms) || 0,
+        title: d.title?.trim() || null,
+      });
     }
     return map;
   }, [days]);
 
   const cells = useMemo(
-    () => buildMonthCells(cursor.year, cursor.month, msByDay),
-    [cursor.year, cursor.month, msByDay],
+    () => buildMonthCells(cursor.year, cursor.month, byDay),
+    [cursor.year, cursor.month, byDay],
   );
 
   const monthMs = useMemo(
@@ -117,8 +132,8 @@ export function ContributionHeatmap({
   );
 
   const totalMs = useMemo(
-    () => [...msByDay.values()].reduce((a, b) => a + b, 0),
-    [msByDay],
+    () => [...byDay.values()].reduce((a, b) => a + b.ms, 0),
+    [byDay],
   );
 
   function shiftMonth(delta: number) {
@@ -129,7 +144,7 @@ export function ContributionHeatmap({
   }
 
   return (
-    <div className="w-full max-w-md">
+    <div className="w-full">
       {emptyHint && totalMs <= 0 ? (
         <p className="mb-3 text-sm text-slate-400">
           No focus yet —{" "}
@@ -166,7 +181,7 @@ export function ContributionHeatmap({
         </Button>
       </div>
 
-      <div className="mb-1 grid grid-cols-7 gap-1.5">
+      <div className="mb-1.5 grid grid-cols-7 gap-2">
         {WEEKDAYS.map((label, i) => (
           <div
             key={`${label}-${i}`}
@@ -177,19 +192,34 @@ export function ContributionHeatmap({
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-1.5">
+      <div className="grid grid-cols-7 gap-2">
         {cells.map((cell) => {
           if (cell.kind === "empty") {
-            return <div key={cell.key} className="aspect-square" />;
+            return <div key={cell.key} className="min-h-[4.5rem] sm:min-h-[5.5rem]" />;
           }
           const level = levelFromMs(cell.ms);
-          const label = `${cell.date}: ${formatMs(cell.ms, true)}`;
+          const label = cell.title
+            ? `${cell.date}: ${cell.title} · ${formatMs(cell.ms, true)}`
+            : `${cell.date}: ${formatMs(cell.ms, true)}`;
           const className = cn(
-            "flex aspect-square min-h-[2.5rem] items-center justify-center rounded-xl text-sm font-medium tabular-nums transition sm:min-h-[2.75rem]",
+            "flex min-h-[4.5rem] flex-col items-stretch justify-start gap-0.5 rounded-xl p-1.5 text-left transition sm:min-h-[5.5rem] sm:p-2",
             LEVEL_CLASS[level],
             cell.isToday && "ring-2 ring-slate-400 ring-offset-1",
             onDayClick &&
               "cursor-pointer hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400",
+          );
+
+          const content = (
+            <>
+              <span className="text-xs font-semibold tabular-nums sm:text-sm">
+                {cell.dayNum}
+              </span>
+              {cell.title ? (
+                <span className="line-clamp-2 text-[9px] font-medium leading-tight opacity-90 sm:text-[10px]">
+                  {cell.title}
+                </span>
+              ) : null}
+            </>
           );
 
           if (onDayClick) {
@@ -202,7 +232,7 @@ export function ContributionHeatmap({
                 title={label}
                 onClick={() => onDayClick(cell.date, cell.ms)}
               >
-                {cell.dayNum}
+                {content}
               </button>
             );
           }
@@ -214,7 +244,7 @@ export function ContributionHeatmap({
               aria-label={label}
               title={label}
             >
-              {cell.dayNum}
+              {content}
             </div>
           );
         })}

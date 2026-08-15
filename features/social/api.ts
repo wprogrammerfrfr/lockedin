@@ -48,6 +48,25 @@ export async function profileSessionsForDay(
   return (Array.isArray(data) ? data : []) as ProfileDaySession[];
 }
 
+export async function profileSessionHistory(
+  supabase: SupabaseClient,
+  username: string,
+  tz: string,
+  opts?: { limit?: number; before?: string | null },
+): Promise<ProfileDaySession[]> {
+  const { data, error } = await supabase.rpc("profile_session_history", {
+    p_username: username,
+    p_tz: tz,
+    p_limit: opts?.limit ?? 30,
+    p_before: opts?.before ?? null,
+  });
+  if (error) {
+    if (isSchemaUnavailable(error)) return [];
+    throw new Error(error.message);
+  }
+  return (Array.isArray(data) ? data : []) as ProfileDaySession[];
+}
+
 export async function getFollowRelation(
   supabase: SupabaseClient,
   targetUserId: string,

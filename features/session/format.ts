@@ -20,6 +20,52 @@ export function lockedInForLabel(ms: number) {
   return `Locked in for ${formatMs(ms, true)}`;
 }
 
+/** Day-card copy: "You locked in for 1 hour 12 minutes". */
+export function youLockedInForLabel(ms: number) {
+  const totalMin = Math.max(0, Math.floor(ms / 60_000));
+  const hours = Math.floor(totalMin / 60);
+  const minutes = totalMin % 60;
+  const hourPart =
+    hours <= 0
+      ? null
+      : `${hours} ${hours === 1 ? "hour" : "hours"}`;
+  const minutePart = `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+  if (hourPart) {
+    return `You locked in for ${hourPart} ${minutePart}`;
+  }
+  return `You locked in for ${minutePart}`;
+}
+
+/** Receipt footer total: always "X hours Y minutes" (floored to whole minutes). */
+export function formatHoursMinutesWords(ms: number) {
+  const totalMin = Math.max(0, Math.floor(ms / 60_000));
+  const hours = Math.floor(totalMin / 60);
+  const minutes = totalMin % 60;
+  const hourPart = `${hours} ${hours === 1 ? "hour" : "hours"}`;
+  const minutePart = `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+  return `${hourPart} ${minutePart}`;
+}
+
+/** Summary card duration words; omits 0 hours / 0 minutes. */
+export function formatHoursMinutesSecondsWords(ms: number) {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(totalSec / 3600);
+  const minutes = Math.floor((totalSec % 3600) / 60);
+  const seconds = totalSec % 60;
+  const parts: string[] = [];
+  if (hours > 0) parts.push(`${hours} ${hours === 1 ? "hour" : "hours"}`);
+  if (minutes > 0) {
+    parts.push(`${minutes} ${minutes === 1 ? "minute" : "minutes"}`);
+  }
+  parts.push(`${seconds} ${seconds === 1 ? "second" : "seconds"}`);
+  return parts.join(" ");
+}
+
+/** Summary card line: "Locked in for …". */
+export function lockedInForWords(ms: number) {
+  return `Locked in for ${formatHoursMinutesSecondsWords(ms)}`;
+}
+
 /** Two-digit centiseconds (`00`–`99`), not full milliseconds. */
 export function formatCentiseconds(ms: number) {
   const cs = Math.floor((Math.max(0, ms) % 1000) / 10);
@@ -219,7 +265,7 @@ const SHARE_EASTER_EGGS: ShareEasterEgg[] = [
       headline: "nice.",
       emoji: "👍",
       gradient: LIME_GRADIENT,
-      footerLabel: "Session card",
+      footerLabel: "LOCKED IN",
     },
   },
   {
@@ -230,7 +276,7 @@ const SHARE_EASTER_EGGS: ShareEasterEgg[] = [
       headline: "six seven",
       emoji: "😏",
       gradient: LIME_GRADIENT,
-      footerLabel: "Session card",
+      footerLabel: "LOCKED IN",
     },
   },
   {
@@ -241,7 +287,7 @@ const SHARE_EASTER_EGGS: ShareEasterEgg[] = [
       headline: "4:20",
       emoji: "🔥",
       gradient: LIME_GRADIENT,
-      footerLabel: "Session card",
+      footerLabel: "LOCKED IN",
     },
   },
   {
@@ -252,7 +298,7 @@ const SHARE_EASTER_EGGS: ShareEasterEgg[] = [
       headline: "404",
       emoji: "📭",
       gradient: "from-slate-200 via-zinc-100 to-slate-100",
-      footerLabel: "Session card",
+      footerLabel: "LOCKED IN",
     },
   },
 ];
@@ -308,7 +354,7 @@ function pickLine(lines: string[], rng: () => number) {
 }
 
 /**
- * Duration-tiered share caption. Easter eggs always win.
+ * Duration-tiered share caption. Sub-second and easter eggs win.
  * `outcome` is unused (duration is the signal); kept for call-site compat.
  */
 export function buildShareCaption(
@@ -316,6 +362,7 @@ export function buildShareCaption(
   _outcome?: OutcomeKind,
   rng: () => number = Math.random,
 ) {
+  if (ms < 1000) return "DAWG 😭😭😭";
   const egg = findShareEasterEgg(ms);
   if (egg) return egg.caption;
   const clamped = Math.max(0, ms);
@@ -329,25 +376,25 @@ function durationChrome(ms: number): ShareCardChrome {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
   if (totalSec < 15 * 60) {
     return {
-      headline: "Session card",
+      headline: "LOCKED IN",
       emoji: "😏",
       gradient: LIME_GRADIENT,
-      footerLabel: "Session card",
+      footerLabel: "LOCKED IN",
     };
   }
   if (totalSec < 60 * 60) {
     return {
-      headline: "Solid session",
+      headline: "SOLID SESSION",
       emoji: "😏",
       gradient: LIME_GRADIENT,
-      footerLabel: "Session card",
+      footerLabel: "SOLID SESSION",
     };
   }
   return {
-    headline: "Unwell (complimentary)",
+    headline: "SOLID SESSION",
     emoji: "😏",
     gradient: "from-amber-200 via-yellow-100 to-orange-100",
-    footerLabel: "Session card",
+    footerLabel: "SOLID SESSION",
   };
 }
 
@@ -361,13 +408,87 @@ export function shareCardChrome(
   if (outcome === "pr") {
     return {
       ...durationChrome(ms),
-      headline: "New PR unlocked",
+      headline: "NEW PR",
       emoji: "😎✌️",
       gradient: "from-lime-300 via-emerald-200 to-amber-200",
-      footerLabel: "Win state",
+      footerLabel: "NEW PR",
+    };
+  }
+  if (outcome === "tapout") {
+    return {
+      ...durationChrome(ms),
+      headline: "TAP OUT",
+      emoji: "😤",
+      gradient: "from-rose-200 via-orange-100 to-slate-100",
+      footerLabel: "TAP OUT",
     };
   }
   return durationChrome(ms);
+}
+
+const BREAK_TYPE_LABELS: Record<string, string> = {
+  hydration: "Hydration",
+  doomscroll: "Doomscroll",
+  touch_grass: "Touch grass",
+  dynamic: "Dynamic",
+  smart_alignment: "Smart alignment",
+  smart: "Smart alignment",
+  pomodoro: "Pomodoro",
+};
+
+/** Human labels for stored break type ids. Prefer specific choices over group `dynamic`. */
+export function formatBreakTypes(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const keys: string[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    const key = String(item ?? "").trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    keys.push(key);
+  }
+  const hasSpecificDynamic =
+    keys.includes("doomscroll") || keys.includes("touch_grass");
+  const out: string[] = [];
+  for (const key of keys) {
+    if (key === "dynamic" && hasSpecificDynamic) continue;
+    out.push(BREAK_TYPE_LABELS[key] ?? key.replace(/_/g, " "));
+  }
+  return out;
+}
+
+/** Prefer specific choice ids; used for receipt break duration labels. */
+export function breakDurationLabel(raw: unknown): string {
+  const keys = new Set<string>();
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      const key = String(item ?? "").trim().toLowerCase();
+      if (key) keys.add(key);
+    }
+  }
+  if (keys.has("doomscroll")) return "Break: doomscrolled for";
+  if (keys.has("touch_grass")) return "Break: touched grass for";
+  return "Break: rested for";
+}
+
+/** Total hours label for lifetime stats (e.g. "12.5h"). */
+export function formatTotalHours(ms: number): string {
+  const hours = Math.max(0, ms) / 3_600_000;
+  if (hours < 10) return `${hours.toFixed(1)}h`;
+  return `${Math.round(hours)}h`;
+}
+
+/** Outcome label for receipt footers. */
+export function receiptOutcomeLabel(
+  outcome: OutcomeKind | string | null | undefined,
+  prBroken?: boolean,
+): string {
+  if (prBroken || outcome === "pr") return "NEW PR";
+  if (outcome === "tapout" || outcome === "tapped_out" || outcome === "left_early") {
+    return "TAP OUT";
+  }
+  if (outcome === "break") return "BREAK";
+  return "LOCKED IN";
 }
 
 export function resolveOutcome(

@@ -5,12 +5,11 @@ import { Flag, Ban } from "lucide-react";
 import { toast } from "sonner";
 import { AuthGateModal } from "@/components/auth/AuthGateModal";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { ContributionHeatmap } from "@/components/profile/ContributionHeatmap";
+import { SessionHistoryPanel } from "@/components/dashboard/SessionHistoryPanel";
 import {
   ProfileHeroAvatar,
   ProfileSocialStats,
 } from "@/components/profile/ProfileHero";
-import { DaySessionsDialog } from "@/components/dashboard/DaySessionsDialog";
 import {
   FollowBackButton,
   FollowButton,
@@ -18,7 +17,7 @@ import {
 import { ReportDialog } from "@/components/moderation/ReportDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { blockUser } from "@/features/moderation/api";
 import { publicAvatarUrl } from "@/features/profile/api";
 import {
@@ -61,8 +60,6 @@ export function PublicProfileView({
   });
   const [followStatus, setFollowStatus] =
     useState<FollowRelationStatus>(isSelf ? "self" : "none");
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const [dayOpen, setDayOpen] = useState(false);
   const [gateOpen, setGateOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [theyFollowYou, setTheyFollowYou] = useState(false);
@@ -220,49 +217,21 @@ export function PublicProfileView({
         </CardContent>
       </Card>
 
-      <Card className="border-slate-200 bg-white">
-        <CardHeader>
-          <CardTitle className="text-base">Focus calendar</CardTitle>
-          <p className="text-xs text-slate-500">
-            {canSeeSessions
-              ? "Click a date to see sessions."
-              : followStatus === "blocked"
-                ? "You blocked this user."
-                : "Follow to unlock session details for each date."}
-          </p>
-        </CardHeader>
-        <CardContent>
-          {canSeeSessions || days.length > 0 ? (
-            <ContributionHeatmap
-              days={days}
-              emptyHint={isSelf}
-              onDayClick={(date) => {
-                if (!canSeeSessions) {
-                  toast.message("Follow to see sessions", {
-                    description: "Accepted follows unlock day details.",
-                  });
-                  return;
-                }
-                setSelectedDay(date);
-                setDayOpen(true);
-              }}
-            />
-          ) : (
-            <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-400">
-              Focus calendar unlocks after you follow @{username}.
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-      <DaySessionsDialog
-        open={dayOpen}
-        onOpenChange={setDayOpen}
+      <SessionHistoryPanel
         username={username}
-        day={selectedDay}
         timezone={timezone || "UTC"}
+        heatmapDays={days}
         canShare={isSelf}
         locked={!canSeeSessions}
+        emptyHint={isSelf}
+        title="Session history"
+        subtitle={
+          canSeeSessions
+            ? "Calendar or list — click a session for the full receipt."
+            : followStatus === "blocked"
+              ? "You blocked this user."
+              : "Follow to unlock session details."
+        }
       />
 
       <AuthGateModal

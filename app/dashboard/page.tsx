@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import { ChromePage } from "@/components/layout/ChromePage";
 import { AuthGateModal } from "@/components/auth/AuthGateModal";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { DaySessionsDialog } from "@/components/dashboard/DaySessionsDialog";
-import { ContributionHeatmap } from "@/components/profile/ContributionHeatmap";
+import { SessionHistoryPanel } from "@/components/dashboard/SessionHistoryPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatMs } from "@/features/session/format";
+import { CountUp } from "@/components/ui/count-up";
+import { formatMs, formatTotalHours } from "@/features/session/format";
 import { createClient } from "@/lib/supabase/client";
 import type { HeatmapDay } from "@/types/database";
 
@@ -15,6 +15,9 @@ type DashboardStats = {
   today_ms?: number;
   streak_days?: number;
   pr_ms?: number;
+  total_sessions?: number;
+  group_sessions?: number;
+  total_active_ms?: number;
 };
 
 export default function DashboardPage() {
@@ -26,8 +29,6 @@ export default function DashboardPage() {
   const [timeZone, setTimeZone] = useState("UTC");
   const [username, setUsername] = useState<string | null>(null);
   const [heatmapDays, setHeatmapDays] = useState<HeatmapDay[]>([]);
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const [dayOpen, setDayOpen] = useState(false);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -101,6 +102,42 @@ export default function DashboardPage() {
     };
   }, [status, isAuthenticated, userId]);
 
+  const primaryStats = [
+    {
+      label: "Today",
+      value: stats?.today_ms ?? 0,
+      format: (n: number) => formatMs(Math.round(n), true),
+    },
+    {
+      label: "Streak",
+      value: stats?.streak_days ?? 0,
+      format: (n: number) => `${Math.round(n)}d`,
+    },
+    {
+      label: "PR",
+      value: stats?.pr_ms ?? 0,
+      format: (n: number) => formatMs(Math.round(n), true),
+    },
+  ];
+
+  const lifetimeStats = [
+    {
+      label: "Sessions",
+      value: stats?.total_sessions ?? 0,
+      format: (n: number) => String(Math.round(n)),
+    },
+    {
+      label: "Group sessions",
+      value: stats?.group_sessions ?? 0,
+      format: (n: number) => String(Math.round(n)),
+    },
+    {
+      label: "Total hours",
+      value: stats?.total_active_ms ?? 0,
+      format: (n: number) => formatTotalHours(Math.round(n)),
+    },
+  ];
+
   return (
     <ChromePage>
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
@@ -109,81 +146,78 @@ export default function DashboardPage() {
             Dashboard
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Today totals, streaks, PRs, and your focus heatmap.
+            Today, streaks, lifetime totals, and every past session as a
+            receipt.
           </p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-3">
-          {[
-            {
-              label: "Today",
-              value: formatMs(stats?.today_ms ?? 0, true),
-            },
-            {
-              label: "Streak",
-              value: `${stats?.streak_days ?? 0}d`,
-            },
-            {
-              label: "PR",
-              value: formatMs(stats?.pr_ms ?? 0, true),
-            },
-          ].map((s) => (
+          {primaryStats.map((s) => (
             <Card key={s.label} className="border-slate-200 bg-white">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-slate-500">{s.label}</CardTitle>
+                <CardTitle className="text-sm text-slate-500">
+                  {s.label}
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="font-mono text-2xl font-semibold tabular-nums text-slate-900">
-                  {isAuthenticated ? s.value : "—"}
-                </p>
+                {isAuthenticated ? (
+                  <CountUp
+                    value={s.value}
+                    format={s.format}
+                    className="text-2xl font-semibold text-slate-900"
+                  />
+                ) : (
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-slate-900">
+                    —
+                  </p>
+                )}
               </CardContent>
             </Card>
           ))}
         </div>
 
-        <Card className="border-slate-200 bg-white">
-          <CardHeader>
-            <CardTitle className="text-base">Focus calendar</CardTitle>
-            <p className="text-xs text-slate-500">
-              Click a date to review sessions and share to Explore.
-            </p>
-          </CardHeader>
-          <CardContent>
-            {unavailable && (
-              <p className="mb-3 text-sm text-slate-400">
-                Stats will appear once your sessions sync.
-              </p>
-            )}
-            {!isAuthenticated ? (
-              <p className="text-sm text-slate-400">Sign in to see your grid.</p>
-            ) : !username ? (
-              <p className="text-sm text-slate-400">
-                Set a username on your profile to unlock the heatmap.
-              </p>
-            ) : (
-              <ContributionHeatmap
-                days={heatmapDays}
-                emptyHint
-                onDayClick={(date) => {
-                  setSelectedDay(date);
-                  setDayOpen(true);
-                }}
-              />
-            )}
-          </CardContent>
-        </Card>
-      </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {lifetimeStats.map((s) => (
+            <Card key={s.label} className="border-slate-200 bg-white">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-slate-500">
+                  {s.label}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isAuthenticated ? (
+                  <CountUp
+                    value={s.value}
+                    format={s.format}
+                    className="text-2xl font-semibold text-slate-900"
+                  />
+                ) : (
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-slate-900">
+                    —
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
 
-      {username ? (
-        <DaySessionsDialog
-          open={dayOpen}
-          onOpenChange={setDayOpen}
-          username={username}
-          day={selectedDay}
-          timezone={timeZone}
-          canShare
-        />
-      ) : null}
+        {isAuthenticated ? (
+          <SessionHistoryPanel
+            username={username}
+            timezone={timeZone}
+            heatmapDays={heatmapDays}
+            canShare
+            emptyHint
+            unavailable={unavailable}
+          />
+        ) : (
+          <Card className="border-slate-200 bg-white">
+            <CardContent className="py-8 text-center text-sm text-slate-400">
+              Sign in to see your session history.
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       <AuthGateModal
         open={gateOpen}

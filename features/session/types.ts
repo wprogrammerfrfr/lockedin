@@ -56,6 +56,8 @@ export type AppState = {
   breakMs: number;
   remoteSessionId: string | null;
   clientId: string | null;
+  /** ISO timestamp when the current lock-in started (for receipts). */
+  sessionStartedAt: string | null;
 };
 
 export type Action =
@@ -82,6 +84,8 @@ export type Action =
       sessionName?: string | null;
       breakTypesUsed?: BreakTypeStored[];
       session?: SessionState;
+      /** ISO start from DB when resuming a cloud session. */
+      startedAt?: string | null;
     }
   | {
       type: "HYDRATE_STATS";

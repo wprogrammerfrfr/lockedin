@@ -21,6 +21,7 @@ import { RoomPresenceStrip } from "@/components/rooms/RoomPresenceStrip";
 import { BreakVoteDialog } from "@/components/rooms/BreakVoteDialog";
 import { ActiveSessionDialog } from "@/components/session/ActiveSessionDialog";
 import { PitStopDialog } from "@/components/session/PitStopDialog";
+import { ShareCardDialog } from "@/components/session/ShareCardDialog";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
@@ -37,8 +38,10 @@ import { useRoomCloseWatch } from "@/features/rooms/closeWatch";
 import { usePomodoroCadence } from "@/features/rooms/usePomodoroCadence";
 import { useRoomChannel } from "@/features/rooms/useRoomChannel";
 import type { BreakVoteChoice, RoomSummary } from "@/features/rooms/types";
+import { resolveOutcome } from "@/features/session/format";
 import { initialState, reducer } from "@/features/session/reducer";
 import { useSessionClock } from "@/features/session/useSessionClock";
+import type { SessionReceiptData } from "@/components/session/SessionReceiptCard";
 import {
   ActiveSessionExistsError,
   endSession,
@@ -73,7 +76,8 @@ export default function RoomFocusPage({
 }) {
   const { code } = use(params);
   const router = useRouter();
-  const { status, user, profile, avatarUrl, isAuthenticated } = useAuth();
+  const { status, user, profile, avatarUrl, isAuthenticated, profileLabel } =
+    useAuth();
   const [room, setRoom] = useState<RoomSummary | null>(null);
   const [missing, setMissing] = useState(false);
   const [state, dispatch] = useReducer(reducer, initialState);
@@ -485,6 +489,64 @@ export default function RoomFocusPage({
   const canCancelVote =
     Boolean(userId) && room?.breakVoteRequestedBy === userId;
 
+  const shareDuration =
+    state.lastSessionMs || state.elapsedMs || state.personalRecordMs;
+  const shareOutcome = resolveOutcome(
+    state.session,
+    state.lastOutcome,
+    state.didBreakPR,
+  );
+
+  const roomReceipt: SessionReceiptData = useMemo(
+    () => ({
+      sessionName: state.sessionName || room?.name || "Room session",
+      kind: "room",
+      roomCode: room?.code ?? displayCode,
+      startedAt: state.sessionStartedAt,
+      activeMs: shareDuration,
+      breakMs: state.breakMs,
+      breakTypesUsed: state.breakTypesUsed,
+      outcome: shareOutcome,
+      prBroken: state.didBreakPR,
+      participants: members.map((m) => ({
+        user_id: m.userId,
+        username: m.username,
+        active_ms:
+          m.userId === userId ? shareDuration : m.elapsedMs,
+        break_ms: m.userId === userId ? state.breakMs : 0,
+        break_types_used:
+          m.userId === userId
+            ? state.breakTypesUsed
+            : m.breakType
+              ? [m.breakType]
+              : [],
+        outcome:
+          m.userId === userId
+            ? shareOutcome
+            : m.status === "LOCKED_IN"
+              ? "solid"
+              : m.status === "BREAK"
+                ? "break"
+                : "solid",
+        isYou: m.userId === userId,
+      })),
+    }),
+    [
+      state.sessionName,
+      state.sessionStartedAt,
+      state.breakMs,
+      state.breakTypesUsed,
+      state.didBreakPR,
+      room?.name,
+      room?.code,
+      displayCode,
+      shareDuration,
+      shareOutcome,
+      members,
+      userId,
+    ],
+  );
+
   return (
     <AppShell
       layoutMode="room-focus"
@@ -494,67 +556,6 @@ export default function RoomFocusPage({
       presenceStrip={<RoomPresenceStrip members={members} />}
     >
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-slate-500">
-              Room Code :{" "}
-              <span className="font-mono text-base font-bold tabular-nums tracking-widest text-slate-900">
-                {displayCode}
-              </span>
-            </p>
-            <p className="mt-0.5 text-xs text-slate-400">
-              {isPomodoro ? "Pomodoro cadence" : "Vote room"} ·{" "}
-              {room?.status ?? "…"}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="rounded-xl"
-              onClick={async () => {
-                const link = `${window.location.origin}/rooms/${displayCode}`;
-                try {
-                  await navigator.clipboard.writeText(link);
-                  toast.success("Invite link copied");
-                } catch {
-                  try {
-                    await navigator.clipboard.writeText(displayCode);
-                    toast.success("Room code copied");
-                  } catch {
-                    toast.error("Could not copy");
-                  }
-                }
-              }}
-            >
-              <Copy className="mr-1.5 h-3.5 w-3.5" />
-              Invite
-            </Button>
-            {isVoteRoom ? (
-              <Button
-                variant="outline"
-                className="rounded-xl border-amber-300 bg-amber-50 font-display font-bold text-amber-900 hover:bg-amber-100"
-                onClick={() => void onRequestBreak()}
-              >
-                BREAK?
-              </Button>
-            ) : (
-              <p className="hidden text-[11px] text-slate-400 sm:block">
-                Breaks are automatic
-              </p>
-            )}
-            <Button
-              variant="outline"
-              className="rounded-xl"
-              onClick={() => void onLeave()}
-            >
-              Leave
-            </Button>
-          </div>
-        </div>
-
         {room?.status === "closing" && secondsLeft != null && (
           <ClosingBanner secondsLeft={secondsLeft} />
         )}
@@ -573,13 +574,79 @@ export default function RoomFocusPage({
           sessionName={sessionNameDraft}
           onSessionNameChange={setSessionNameDraft}
           lockInDisabled={status === "loading"}
+          topBar={
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-slate-500">
+                  Room Code :{" "}
+                  <span className="font-mono text-base font-bold tabular-nums tracking-widest text-slate-900">
+                    {displayCode}
+                  </span>
+                </p>
+                <p className="mt-0.5 text-xs text-slate-400">
+                  {isPomodoro ? "Pomodoro cadence" : "Vote room"} ·{" "}
+                  {room?.status ?? "…"}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl"
+                  onClick={async () => {
+                    const link = `${window.location.origin}/rooms/${displayCode}`;
+                    try {
+                      await navigator.clipboard.writeText(link);
+                      toast.success("Invite link copied");
+                    } catch {
+                      try {
+                        await navigator.clipboard.writeText(displayCode);
+                        toast.success("Room code copied");
+                      } catch {
+                        toast.error("Could not copy");
+                      }
+                    }
+                  }}
+                >
+                  <Copy className="mr-1.5 h-3.5 w-3.5" />
+                  Invite
+                </Button>
+                {isVoteRoom ? (
+                  <Button
+                    variant="outline"
+                    className="rounded-xl border-amber-300 bg-amber-50 font-display font-bold text-amber-900 hover:bg-amber-100"
+                    onClick={() => void onRequestBreak()}
+                  >
+                    BREAK?
+                  </Button>
+                ) : (
+                  <p className="hidden text-[11px] text-slate-400 sm:block">
+                    Breaks are automatic
+                  </p>
+                )}
+                <Button
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => void onLeave()}
+                >
+                  Leave
+                </Button>
+              </div>
+            </div>
+          }
           heroTitle={
-            <h1 className="flex max-w-full flex-wrap items-baseline justify-center gap-x-2 gap-y-1 font-display text-2xl font-bold leading-none tracking-tight text-slate-900 sm:text-3xl">
-              <span className="max-w-[14rem] truncate sm:max-w-[20rem]">
+            <h1 className="flex max-w-full flex-wrap items-baseline justify-center gap-x-2 gap-y-1 pb-0.5 text-center font-display text-2xl font-bold leading-snug tracking-tight text-slate-900 sm:text-3xl">
+              <span className="min-w-0 max-w-full line-clamp-2">
                 {room?.name || "Room"}
               </span>
-              <LockedInLogo word="Lock" className="text-[0.85em] sm:text-[0.9em]" />
-              <span>session</span>
+              <span className="inline-flex shrink-0 items-baseline gap-x-2 whitespace-nowrap leading-snug">
+                <LockedInLogo
+                  word="Lock"
+                  className="text-[0.85em] sm:text-[0.9em]"
+                />
+                <span>session</span>
+              </span>
             </h1>
           }
           onLockIn={() => {
@@ -647,6 +714,7 @@ export default function RoomFocusPage({
             clientId: conflictSession.client_id,
             elapsedMs: Number(conflictSession.active_ms) || 0,
             sessionName: conflictSession.session_name,
+            startedAt: conflictSession.started_at,
             session:
               conflictSession.status === "on_break" ? "ON_BREAK" : "LOCKED_IN",
           });
@@ -667,6 +735,24 @@ export default function RoomFocusPage({
           } catch (err) {
             toast.error(userFacingError(err, "Could not tap out remote"));
           }
+        }}
+      />
+
+      <ShareCardDialog
+        open={state.shareOpen}
+        onOpenChange={(open) =>
+          dispatch({ type: open ? "OPEN_SHARE" : "CLOSE_SHARE" })
+        }
+        durationMs={shareDuration}
+        outcome={shareOutcome}
+        displayName={profileLabel}
+        avatarUrl={avatarUrl}
+        sessionId={state.remoteSessionId}
+        canPost={isAuthenticated && Boolean(state.remoteSessionId)}
+        sessionName={state.sessionName || room?.name}
+        receipt={{
+          ...roomReceipt,
+          endedAt: new Date().toISOString(),
         }}
       />
     </AppShell>

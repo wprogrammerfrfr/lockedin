@@ -36,6 +36,16 @@ export type ProfileSocialCounts = {
   following: number;
 };
 
+export type ProfileDaySessionParticipant = {
+  user_id: string;
+  username?: string | null;
+  active_ms?: number;
+  break_ms?: number;
+  break_types_used?: unknown;
+  outcome?: string | null;
+  status_at_end?: string | null;
+};
+
 export type ProfileDaySession = {
   id: string;
   session_name?: string | null;
@@ -47,4 +57,9 @@ export type ProfileDaySession = {
   outcome?: string | null;
   pr_broken?: boolean;
   status?: string;
+  room_session_id?: string | null;
+  room_name?: string | null;
+  room_code?: string | null;
+  kind?: "solo" | "room" | string;
+  participants?: ProfileDaySessionParticipant[];
 };

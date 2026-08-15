@@ -449,6 +449,18 @@ export default function LockInPage() {
         sessionId={lastRemoteId}
         canPost={isAuthenticated && Boolean(lastRemoteId)}
         sessionName={state.sessionName}
+        timeZone={timezone}
+        receipt={{
+          sessionName: state.sessionName,
+          kind: "solo",
+          startedAt: state.sessionStartedAt,
+          endedAt: new Date().toISOString(),
+          activeMs: shareDuration,
+          breakMs: state.breakMs,
+          breakTypesUsed: state.breakTypesUsed,
+          outcome: shareOutcome,
+          prBroken: state.didBreakPR,
+        }}
       />
 
       <ActiveSessionDialog
@@ -465,6 +477,7 @@ export default function LockInPage() {
             clientId: conflictSession.client_id,
             elapsedMs: Number(conflictSession.active_ms) || 0,
             sessionName: conflictSession.session_name,
+            startedAt: conflictSession.started_at,
             session:
               conflictSession.status === "on_break" ? "ON_BREAK" : "LOCKED_IN",
           });

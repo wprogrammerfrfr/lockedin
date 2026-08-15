@@ -31,7 +31,14 @@ export function LockedInLogo({
   compact = false,
   word = "Locked",
   as: Tag = "span",
-}: LockedInLogoProps) {
+  prefix,
+  suffix,
+}: LockedInLogoProps & {
+  /** Text before the mark, e.g. "My ". */
+  prefix?: string;
+  /** Text after the lime badge, e.g. "s". */
+  suffix?: string;
+}) {
   if (compact) {
     return (
       <Tag
@@ -49,22 +56,50 @@ export function LockedInLogo({
     );
   }
 
+  const label =
+    prefix || suffix
+      ? `${prefix ?? ""}${word === "Lock" ? "Lock in" : "LockedIn"}${suffix ?? ""}`.trim()
+      : word === "Lock"
+        ? "Lock in"
+        : "LockedIn";
+
   return (
     <Tag
       className={cn(
         "inline-flex flex-col items-stretch font-display text-slate-900 font-bold leading-none tracking-tight",
         className,
       )}
-      aria-label={word === "Lock" ? "Lock in" : "LockedIn"}
+      aria-label={label}
     >
       <span className="inline-flex items-baseline gap-[0.08em] leading-none">
+        {prefix ? <span className="leading-none">{prefix}</span> : null}
         <span className="leading-none">{word}</span>
         <InBadge />
+        {suffix ? <span className="leading-none">{suffix}</span> : null}
       </span>
       <span
         className="mt-[0.12em] h-[0.08em] min-h-[2px] w-full rounded-full bg-lime-400"
         aria-hidden
       />
     </Tag>
+  );
+}
+
+/** Dashboard history heading: My Lock + lime in + s */
+export function MyLockInsTitle({
+  className,
+  as: Tag = "span",
+}: {
+  className?: string;
+  as?: "span" | "p" | "h1" | "h2";
+}) {
+  return (
+    <LockedInLogo
+      as={Tag === "h2" ? "h1" : Tag}
+      word="Lock"
+      prefix="My "
+      suffix="s"
+      className={className}
+    />
   );
 }
