@@ -17,6 +17,8 @@ import {
   mergeLocalSessionsIntoUser,
   saveLocalSessionDraft,
   loadLocalSessionDrafts,
+  finalizeActiveSessionDraft,
+  clearActiveSessionDraft,
 } from "@/lib/auth/merge";
 import { cn } from "@/lib/utils";
 import { initialState, reducer } from "@/features/session/reducer";
@@ -33,6 +35,8 @@ import {
   ActiveSessionExistsError,
   endSession,
   heartbeatSession,
+  isSessionStale,
+  resumeActiveSession,
   startSession,
   tapOutSession,
 } from "@/features/session/sync";
@@ -221,10 +225,87 @@ export default function LockInPage() {
           prBroken: op.prBroken,
         });
       }
-    }).catch(() => undefined);
+    })
+      .then((result) => {
+        if (result.replayed > 0) setStatsNonce((n) => n + 1);
+      })
+      .catch(() => undefined);
   }, [authReady]);
 
-  useSessionClock(state, dispatch);
+  // Orphan recovery: auto-end stale active sessions left by sleep / kill / crash
+  useEffect(() => {
+    if (!authReady || !isAuthenticated) return;
+    if (isFocusSession(state.session)) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const sb = createClient();
+        const existing = await resumeActiveSession(sb);
+        if (cancelled || !existing) return;
+        if (!isSessionStale(existing)) return;
+
+        const activeMs = Number(existing.active_ms) || 0;
+        const breakMs = Number(existing.break_ms) || 0;
+        let prMs = 0;
+        try {
+          const tz =
+            timezone ||
+            Intl.DateTimeFormat().resolvedOptions().timeZone ||
+            "UTC";
+          const { data } = await sb.rpc("dashboard_stats", { p_tz: tz });
+          prMs = Number((data as { pr_ms?: number } | null)?.pr_ms) || 0;
+        } catch {
+          prMs = 0;
+        }
+        const prBroken = prMs > 0 && activeMs > prMs;
+
+        await endSession(sb, {
+          id: existing.id,
+          activeMs,
+          breakMs,
+          breakTypes: existing.break_types_used,
+          outcome: prBroken ? "pr" : "solid",
+          prBroken,
+        });
+        if (cancelled) return;
+        setLastRemoteId(existing.id);
+        setStatsNonce((n) => n + 1);
+        toast.success(
+          prBroken
+            ? "Saved your last session — new PR"
+            : "Saved your last session",
+        );
+      } catch {
+        /* leave conflict dialog to handle on next LOCK IN */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // Only on auth / idle entry — not every session tick
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount/auth gate
+  }, [authReady, isAuthenticated, timezone]);
+
+  // Guest: promote abandoned mid-session draft after unexpected close
+  useEffect(() => {
+    if (!authReady || isAuthenticated) return;
+    if (isFocusSession(state.session)) return;
+
+    const finished = finalizeActiveSessionDraft();
+    if (finished) {
+      setStatsNonce((n) => n + 1);
+      toast.success(
+        finished.outcome === "pr"
+          ? "Saved your last session — new PR"
+          : "Saved your last session",
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once when idle after auth ready
+  }, [authReady, isAuthenticated]);
+
+  useSessionClock(state, dispatch, { isAuthenticated });
 
   useEffect(() => {
     if (state.session === "ENDED" || state.session === "TAPPED_OUT") {
@@ -257,14 +338,52 @@ export default function LockInPage() {
       });
     } catch (err) {
       if (err instanceof ActiveSessionExistsError) {
-        setConflictSession(err.existing);
+        const existing = err.existing;
+        if (existing && isSessionStale(existing)) {
+          try {
+            const activeMs = Number(existing.active_ms) || 0;
+            const breakMs = Number(existing.break_ms) || 0;
+            const prBroken =
+              state.personalRecordMs > 0 && activeMs > state.personalRecordMs;
+            await endSession(createClient(), {
+              id: existing.id,
+              activeMs,
+              breakMs,
+              breakTypes: existing.break_types_used,
+              outcome: prBroken ? "pr" : "solid",
+              prBroken,
+            });
+            setStatsNonce((n) => n + 1);
+            const row = await startSession(createClient(), {
+              sessionName: sessionNameDraft,
+              clientId,
+            });
+            setLastRemoteId(row.id);
+            dispatch({
+              type: "LOCK_IN",
+              sessionName: sessionNameDraft,
+              remoteSessionId: row.id,
+              clientId,
+            });
+            return;
+          } catch (retryErr) {
+            console.error("stale session auto-end failed", retryErr);
+          }
+        }
+        setConflictSession(existing);
         setConflictOpen(true);
         return;
       }
       console.error("start_session failed", err);
       toast.error(userFacingError(err, "Could not start session"));
     }
-  }, [authReady, isAuthenticated, sessionNameDraft, state.clientId]);
+  }, [
+    authReady,
+    isAuthenticated,
+    sessionNameDraft,
+    state.clientId,
+    state.personalRecordMs,
+  ]);
 
   const onBreak = useCallback(() => {
     dispatch({ type: "OPEN_PIT_STOP" });
@@ -273,6 +392,7 @@ export default function LockInPage() {
   const persistGuestDraft = useCallback(
     (outcome: string) => {
       if (isAuthenticated) return;
+      clearActiveSessionDraft();
       saveLocalSessionDraft({
         sessionName: state.sessionName,
         elapsedMs: state.elapsedMs,

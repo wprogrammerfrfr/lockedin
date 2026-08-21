@@ -235,6 +235,18 @@ export function FlipDigit({
 
 const HOUR_MS = 3_600_000;
 
+/** Stable digit roles so resize never remaps FlipDigit identity. */
+const TIME_KEYS = [
+  "h0",
+  "h1",
+  "colon-hm",
+  "m0",
+  "m1",
+  "colon-ms",
+  "s0",
+  "s1",
+] as const;
+
 export function FlipClock({
   ms,
   value,
@@ -268,11 +280,16 @@ export function FlipClock({
   const measured = width > 0;
   const compact = size === "sm" || size === "xs";
   const elapsed = ms ?? 0;
-  const narrow = !measured || width < (size === "xs" ? 0 : compact ? 360 : 480);
-  const showHours = forceHours && (!narrow || elapsed >= HOUR_MS);
+  // forceHours: always HH:MM:SS so resize never changes digit count/roles
+  const showHours = Boolean(value)
+    ? false
+    : forceHours || elapsed >= HOUR_MS;
   const showCs = !value && size === "default" && measured && width >= 400;
   const text = value ?? formatMs(elapsed, showHours);
   const cs = formatCentiseconds(elapsed);
+
+  const chars = text.split("");
+  const useRoleKeys = !value && showHours && chars.length === 8;
 
   return (
     <div
@@ -289,10 +306,10 @@ export function FlipClock({
       aria-label={showCs ? `${text}:${cs}` : text}
       style={{ perspective: 1200 }}
     >
-      {text.split("").map((ch, i) =>
+      {chars.map((ch, i) =>
         ch === ":" ? (
           <span
-            key={`colon-${i}`}
+            key={useRoleKeys ? TIME_KEYS[i] : `colon-${i}`}
             className={cn(
               "flex shrink-0 items-center justify-center font-mono font-bold opacity-45",
               COLON_BOX[size],
@@ -302,7 +319,12 @@ export function FlipClock({
             :
           </span>
         ) : (
-          <FlipDigit key={`pos-${i}`} digit={ch} muted={muted} size={size} />
+          <FlipDigit
+            key={useRoleKeys ? TIME_KEYS[i] : `pos-${i}`}
+            digit={ch}
+            muted={muted}
+            size={size}
+          />
         ),
       )}
       {showCs && (
@@ -320,3 +342,4 @@ export function FlipClock({
     </div>
   );
 }
+

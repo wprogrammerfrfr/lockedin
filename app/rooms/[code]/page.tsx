@@ -45,6 +45,8 @@ import type { SessionReceiptData } from "@/components/session/SessionReceiptCard
 import {
   ActiveSessionExistsError,
   endSession,
+  isSessionStale,
+  resumeActiveSession,
   startSession,
   tapOutSession,
 } from "@/features/session/sync";
@@ -302,7 +304,46 @@ export default function RoomFocusPage({
     presenceSelf,
     room?.name,
   );
-  useSessionClock(state, dispatch);
+  useSessionClock(state, dispatch, { isAuthenticated });
+
+  // Auto-end stale orphans left by sleep / kill while in a room session
+  useEffect(() => {
+    if (status === "loading" || !isAuthenticated || !userId) return;
+    if (isFocusSession(state.session)) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const existing = await resumeActiveSession(createClient());
+        if (cancelled || !existing || !isSessionStale(existing)) return;
+        const activeMs = Number(existing.active_ms) || 0;
+        const breakMs = Number(existing.break_ms) || 0;
+        const prBroken =
+          state.personalRecordMs > 0 && activeMs > state.personalRecordMs;
+        await endSession(createClient(), {
+          id: existing.id,
+          activeMs,
+          breakMs,
+          breakTypes: existing.break_types_used,
+          outcome: prBroken ? "pr" : "solid",
+          prBroken,
+        });
+        if (!cancelled) {
+          toast.success(
+            prBroken
+              ? "Saved your last session — new PR"
+              : "Saved your last session",
+          );
+        }
+      } catch {
+        /* conflict dialog covers fresh multi-device */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- auth gate only
+  }, [status, isAuthenticated, userId]);
 
   useEffect(() => {
     if (status === "loading" || !userId) return;
@@ -403,7 +444,38 @@ export default function RoomFocusPage({
       });
     } catch (err) {
       if (err instanceof ActiveSessionExistsError) {
-        setConflictSession(err.existing);
+        const existing = err.existing;
+        if (existing && isSessionStale(existing)) {
+          try {
+            const activeMs = Number(existing.active_ms) || 0;
+            const breakMs = Number(existing.break_ms) || 0;
+            const prBroken =
+              state.personalRecordMs > 0 && activeMs > state.personalRecordMs;
+            await endSession(createClient(), {
+              id: existing.id,
+              activeMs,
+              breakMs,
+              breakTypes: existing.break_types_used,
+              outcome: prBroken ? "pr" : "solid",
+              prBroken,
+            });
+            const row = await startSession(createClient(), {
+              sessionName: sessionNameDraft || room?.name || null,
+              clientId,
+              roomSessionId: room?.roomSessionId ?? null,
+            });
+            dispatch({
+              type: "LOCK_IN",
+              sessionName: sessionNameDraft || room?.name || undefined,
+              remoteSessionId: row.id,
+              clientId,
+            });
+            return;
+          } catch {
+            /* fall through to dialog */
+          }
+        }
+        setConflictSession(existing);
         setConflictOpen(true);
         return;
       }
@@ -413,6 +485,7 @@ export default function RoomFocusPage({
     status,
     userId,
     state.clientId,
+    state.personalRecordMs,
     sessionNameDraft,
     room?.name,
     room?.roomSessionId,

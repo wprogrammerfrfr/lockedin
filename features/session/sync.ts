@@ -5,6 +5,9 @@ import {
   isLikelyOffline,
 } from "@/features/session/offlineQueue";
 
+/** No heartbeat for this long → treat as abandoned (sleep / kill / crash). */
+export const STALE_SESSION_MS = 3 * 60 * 1000;
+
 export class ActiveSessionExistsError extends Error {
   readonly existing: SessionRow | null;
 
@@ -22,6 +25,76 @@ function isActiveExistsError(error: { message?: string; code?: string } | null) 
     msg.includes("active_session_exists") ||
     error.code === "active_session_exists"
   );
+}
+
+function isAlreadyTerminalError(error: { message?: string } | null) {
+  if (!error?.message) return false;
+  return /session_not_active/i.test(error.message);
+}
+
+/**
+ * Approximate last progress wall-time from started_at + active + break.
+ * Heartbeats advance active_ms/break_ms; a large gap means the client died.
+ */
+export function isSessionStale(
+  row: Pick<SessionRow, "started_at" | "active_ms" | "break_ms">,
+  now = Date.now(),
+  staleMs = STALE_SESSION_MS,
+): boolean {
+  const started = new Date(row.started_at).getTime();
+  if (!Number.isFinite(started)) return true;
+  const progressAt =
+    started + (Number(row.active_ms) || 0) + (Number(row.break_ms) || 0);
+  return now - progressAt > staleMs;
+}
+
+function supabaseRpcUrl(fn: string) {
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim().replace(/\/$/, "");
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  if (!base || !anonKey) return null;
+  return { url: `${base}/rest/v1/rpc/${fn}`, anonKey };
+}
+
+/**
+ * Best-effort end_session during pagehide/beforeunload.
+ * Always pair with enqueueOfflineOp so a failed beacon still replays later.
+ */
+export function endSessionKeepalive(
+  opts: {
+    id: string;
+    activeMs: number;
+    breakMs: number;
+    breakTypes: unknown;
+    outcome: string;
+    prBroken: boolean;
+  },
+  accessToken: string | null | undefined,
+): void {
+  const rpc = supabaseRpcUrl("end_session");
+  if (!rpc || !accessToken) return;
+
+  try {
+    void fetch(rpc.url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: rpc.anonKey,
+        Authorization: `Bearer ${accessToken}`,
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        p_id: opts.id,
+        p_active_ms: Math.round(opts.activeMs),
+        p_break_ms: Math.round(opts.breakMs),
+        p_break_types: opts.breakTypes ?? [],
+        p_outcome: opts.outcome,
+        p_pr_broken: opts.prBroken,
+      }),
+      keepalive: true,
+    });
+  } catch {
+    /* unload — ignore */
+  }
 }
 
 export async function startSession(
@@ -143,6 +216,7 @@ export async function endSession(
   });
 
   if (error) {
+    if (isAlreadyTerminalError(error)) return null;
     if (isLikelyOffline() || /fetch|network|failed/i.test(error.message)) {
       await enqueueOfflineOp({
         kind: "end",
@@ -197,6 +271,7 @@ export async function tapOutSession(
   });
 
   if (error) {
+    if (isAlreadyTerminalError(error)) return null;
     if (isLikelyOffline() || /fetch|network|failed/i.test(error.message)) {
       await enqueueOfflineOp({
         kind: "tap_out",

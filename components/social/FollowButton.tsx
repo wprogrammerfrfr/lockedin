@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import {
   acceptFollow,
@@ -29,6 +30,7 @@ export function FollowButton({
   /** Room presence chip: hide when already following; smaller controls. */
   compact?: boolean;
 }) {
+  const { isAuthenticated } = useAuth();
   const [status, setStatus] = useState(initialStatus);
   const [busy, setBusy] = useState(false);
 
@@ -139,18 +141,14 @@ export function FollowButton({
     );
   }
 
-  // They already follow you (accepted inbound, none outbound) — offer follow back
-  // Handled when parent passes a dedicated prop; also support followBack when
-  // status is none but parent wants follow-back CTA via initialStatus rejected flow.
-
   return (
     <Button
       size={compact ? "sm" : "default"}
       className={cn(chipClass)}
       disabled={busy}
       onClick={() => {
-        if (onNeedAuth) {
-          onNeedAuth();
+        if (!isAuthenticated) {
+          onNeedAuth?.();
           return;
         }
         void run(

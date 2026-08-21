@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { BreakTypeStored } from "@/features/session/types";
 
 const LOCAL_DRAFTS_KEY = "lockedin.sessionDrafts";
+const ACTIVE_DRAFT_KEY = "lockedin.activeSessionDraft";
 
 export type SessionDraft = {
   id: string;
@@ -11,6 +12,17 @@ export type SessionDraft = {
   breakTypesUsed: BreakTypeStored[];
   endedAt: string;
   source: "local" | "anonymous";
+};
+
+/** In-progress guest session — written periodically / on hide; finalized on unload. */
+export type ActiveSessionDraft = {
+  sessionName: string | null;
+  elapsedMs: number;
+  breakMs: number;
+  breakTypesUsed: BreakTypeStored[];
+  personalRecordMs: number;
+  didBreakPR: boolean;
+  updatedAt: string;
 };
 
 function canUseLocalStorage() {
@@ -58,6 +70,68 @@ export function saveLocalSessionDraft(
 export function clearLocalSessionDrafts() {
   if (!canUseLocalStorage()) return;
   localStorage.removeItem(LOCAL_DRAFTS_KEY);
+}
+
+export function loadActiveSessionDraft(): ActiveSessionDraft | null {
+  if (!canUseLocalStorage()) return null;
+  try {
+    const raw = localStorage.getItem(ACTIVE_DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as ActiveSessionDraft;
+    if (!parsed || typeof parsed.elapsedMs !== "number") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function saveActiveSessionDraft(
+  draft: Omit<ActiveSessionDraft, "updatedAt">,
+): void {
+  if (!canUseLocalStorage()) return;
+  const entry: ActiveSessionDraft = {
+    ...draft,
+    updatedAt: new Date().toISOString(),
+  };
+  localStorage.setItem(ACTIVE_DRAFT_KEY, JSON.stringify(entry));
+}
+
+export function clearActiveSessionDraft() {
+  if (!canUseLocalStorage()) return;
+  localStorage.removeItem(ACTIVE_DRAFT_KEY);
+}
+
+/**
+ * Promote in-progress guest draft to a finished local draft (unexpected close).
+ * Returns the finished draft, or null if nothing to finalize.
+ */
+export function finalizeActiveSessionDraft(
+  outcomeOverride?: string,
+  didBreakPROverride?: boolean,
+): SessionDraft | null {
+  const active = loadActiveSessionDraft();
+  if (!active) return null;
+  if ((active.elapsedMs || 0) <= 0) {
+    clearActiveSessionDraft();
+    return null;
+  }
+
+  const didBreakPR =
+    didBreakPROverride ??
+    (active.didBreakPR ||
+      (active.personalRecordMs > 0 &&
+        active.elapsedMs > active.personalRecordMs));
+  const outcome =
+    outcomeOverride ?? (didBreakPR ? "pr" : "solid");
+
+  const finished = saveLocalSessionDraft({
+    sessionName: active.sessionName,
+    elapsedMs: active.elapsedMs,
+    outcome,
+    breakTypesUsed: active.breakTypesUsed ?? [],
+  });
+  clearActiveSessionDraft();
+  return finished;
 }
 
 /**
