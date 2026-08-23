@@ -9,8 +9,10 @@ import {
   breakReceiptLabel,
   formatHoursMinutesWords,
   formatMs,
+  formatReceiptDurationValue,
   receiptOutcomeLabel,
   shareCardChrome,
+  type TranslateFn,
 } from "@/features/session/format";
 import type { OutcomeKind } from "@/features/session/types";
 import type {
@@ -156,7 +158,7 @@ function ParticipantBlock({
 }: {
   p: ReceiptParticipant;
   compact?: boolean;
-  t: (key: string) => string;
+  t: TranslateFn;
 }) {
   const name = participantDisplayName(p, t);
   const breakLines = resolveBreakLines(
@@ -173,7 +175,11 @@ function ParticipantBlock({
       </p>
       <LineRow
         label={t("receipt.lockedInFor")}
-        value={formatMs(p.active_ms ?? 0, true)}
+        value={formatReceiptDurationValue(
+          p.active_ms ?? 0,
+          formatMs(p.active_ms ?? 0, true),
+          t,
+        )}
       />
       {breakLines.length > 0 ? (
         breakLines.map((line, i) => (
@@ -181,7 +187,7 @@ function ParticipantBlock({
         ))
       ) : (
         <LineRow
-          label={breakDurationLabel(p.break_types_used)}
+          label={breakDurationLabel(p.break_types_used, t)}
           value={formatMs(p.break_ms ?? 0, true)}
         />
       )}
@@ -298,7 +304,7 @@ export const SessionReceiptCard = forwardRef<
       : data.outcome === "pr"
         ? "pr"
         : "solid") as OutcomeKind;
-  const chrome = shareCardChrome(durationMs, outcome);
+  const chrome = shareCardChrome(durationMs, outcome, t);
   const footer = receiptOutcomeLabel(data.outcome, data.prBroken);
   const isRoom = data.kind === "room";
   const title =
@@ -310,6 +316,16 @@ export const SessionReceiptCard = forwardRef<
     data.breakHistory,
     data.breakTypesUsed,
     data.breakMs ?? 0,
+    t,
+  );
+  const lockedInValue = formatReceiptDurationValue(
+    durationMs,
+    formatMs(durationMs, true),
+    t,
+  );
+  const totalLockInValue = formatReceiptDurationValue(
+    durationMs,
+    formatHoursMinutesWords(durationMs, t),
     t,
   );
 
@@ -413,7 +429,7 @@ export const SessionReceiptCard = forwardRef<
           <div className={cn("space-y-1.5", story && "space-y-3")}>
             <LineRow
               label={t("receipt.lockedInFor")}
-              value={formatMs(durationMs, true)}
+              value={lockedInValue}
             />
             {soloBreakLines.length > 0 ? (
               soloBreakLines.map((line, i) => (
@@ -421,7 +437,7 @@ export const SessionReceiptCard = forwardRef<
               ))
             ) : (
               <LineRow
-                label={breakDurationLabel(data.breakTypesUsed)}
+                label={breakDurationLabel(data.breakTypesUsed, t)}
                 value={formatMs(data.breakMs ?? 0, true)}
               />
             )}
@@ -452,7 +468,7 @@ export const SessionReceiptCard = forwardRef<
                 story ? "mt-2 text-5xl" : "mt-0.5 text-lg",
               )}
             >
-              {formatHoursMinutesWords(durationMs)}
+              {totalLockInValue}
             </p>
           </div>
           <p

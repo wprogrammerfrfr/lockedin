@@ -9,6 +9,7 @@ import {
   shareCardChrome,
 } from "@/features/session/format";
 import type { OutcomeKind } from "@/features/session/types";
+import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import { cn } from "@/lib/utils";
 
 export type SessionSummaryCardProps = {
@@ -46,13 +47,16 @@ export const SessionSummaryCard = forwardRef<
   },
   ref,
 ) {
+  const { t } = useTranslation();
   const displayOutcome = asDisplayOutcome(outcome);
-  const chrome = shareCardChrome(durationMs, displayOutcome);
+  const chrome = shareCardChrome(durationMs, displayOutcome, t);
   const caption = useMemo(() => {
-    if (durationMs < 1000) return "DAWG 😭😭😭";
-    return captionProp?.trim() || buildShareCaption(durationMs, displayOutcome);
-  }, [captionProp, durationMs, displayOutcome]);
-  const durationWords = lockedInForWords(durationMs);
+    return (
+      captionProp?.trim() ||
+      buildShareCaption(durationMs, displayOutcome, Math.random, t)
+    );
+  }, [captionProp, durationMs, displayOutcome, t]);
+  const durationWords = lockedInForWords(durationMs, t);
   const trimmedSessionName = (sessionName ?? "").trim();
   const story = variant === "story";
 

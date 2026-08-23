@@ -82,8 +82,8 @@ export function ShareCardDialog({
 
   useLayoutEffect(() => {
     if (!open) return;
-    setCaption(buildShareCaption(durationMs, displayOutcome));
-  }, [open, durationMs, displayOutcome]);
+    setCaption(buildShareCaption(durationMs, displayOutcome, Math.random, t));
+  }, [open, durationMs, displayOutcome, t]);
 
   useEffect(() => {
     if (!open) {
@@ -105,7 +105,7 @@ export function ShareCardDialog({
     };
   }, [receipt, sessionName, durationMs, displayOutcome, caption]);
 
-  const chrome = shareCardChrome(durationMs, displayOutcome);
+  const chrome = shareCardChrome(durationMs, displayOutcome, t);
   const footerHint = receiptOutcomeLabel(displayOutcome, displayOutcome === "pr");
   const resolvedSessionName =
     (receiptData.sessionName ?? sessionName ?? "").trim() || null;

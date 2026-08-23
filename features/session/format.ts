@@ -37,34 +37,138 @@ export function youLockedInForLabel(ms: number) {
   return `You locked in for ${minutePart}`;
 }
 
-/** Receipt footer total: always "X hours Y minutes" (floored to whole minutes). */
-export function formatHoursMinutesWords(ms: number) {
-  const totalMin = Math.max(0, Math.floor(ms / 60_000));
+/**
+ * Receipt footer total: hours + minutes (floored), or seconds-only when under 1 minute.
+ */
+export function formatHoursMinutesWords(ms: number, t?: TranslateFn) {
+  const clamped = Math.max(0, ms);
+  if (clamped < 60_000) {
+    const seconds = Math.floor(clamped / 1000);
+    return tr(t, "duration.memeFlatSeconds", "{seconds} seconds", {
+      seconds,
+    });
+  }
+  const totalMin = Math.floor(clamped / 60_000);
   const hours = Math.floor(totalMin / 60);
   const minutes = totalMin % 60;
-  const hourPart = `${hours} ${hours === 1 ? "hour" : "hours"}`;
-  const minutePart = `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+  const hourPart = `${hours} ${tr(
+    t,
+    hours === 1 ? "duration.unit.hour" : "duration.unit.hours",
+    hours === 1 ? "hour" : "hours",
+  )}`;
+  const minutePart = `${minutes} ${tr(
+    t,
+    minutes === 1 ? "duration.unit.minute" : "duration.unit.minutes",
+    minutes === 1 ? "minute" : "minutes",
+  )}`;
   return `${hourPart} ${minutePart}`;
 }
 
+export type TranslateFn = (
+  key: string,
+  params?: Record<string, string | number>,
+) => string;
+
+function tr(
+  t: TranslateFn | undefined,
+  key: string,
+  fallback: string,
+  params?: Record<string, string | number>,
+) {
+  if (!t) {
+    if (!params) return fallback;
+    let out = fallback;
+    for (const [k, value] of Object.entries(params)) {
+      out = out.replaceAll(`{${k}}`, String(value));
+    }
+    return out;
+  }
+  const translated = t(key, params);
+  return translated === key ? fallback : translated;
+}
+
+/** Exactly 67s or 69s — show flat seconds instead of 1m7s / 1m9s. */
+export function isMemeFlatSecondDuration(ms: number): 67 | 69 | null {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  if (totalSec === 67) return 67;
+  if (totalSec === 69) return 69;
+  return null;
+}
+
 /** Summary card duration words; omits 0 hours / 0 minutes. */
-export function formatHoursMinutesSecondsWords(ms: number) {
+export function formatHoursMinutesSecondsWords(
+  ms: number,
+  t?: TranslateFn,
+) {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
   const hours = Math.floor(totalSec / 3600);
   const minutes = Math.floor((totalSec % 3600) / 60);
   const seconds = totalSec % 60;
   const parts: string[] = [];
-  if (hours > 0) parts.push(`${hours} ${hours === 1 ? "hour" : "hours"}`);
-  if (minutes > 0) {
-    parts.push(`${minutes} ${minutes === 1 ? "minute" : "minutes"}`);
+  if (hours > 0) {
+    parts.push(
+      `${hours} ${tr(
+        t,
+        hours === 1 ? "duration.unit.hour" : "duration.unit.hours",
+        hours === 1 ? "hour" : "hours",
+      )}`,
+    );
   }
-  parts.push(`${seconds} ${seconds === 1 ? "second" : "seconds"}`);
+  if (minutes > 0) {
+    parts.push(
+      `${minutes} ${tr(
+        t,
+        minutes === 1 ? "duration.unit.minute" : "duration.unit.minutes",
+        minutes === 1 ? "minute" : "minutes",
+      )}`,
+    );
+  }
+  parts.push(
+    `${seconds} ${tr(
+      t,
+      seconds === 1 ? "duration.unit.second" : "duration.unit.seconds",
+      seconds === 1 ? "second" : "seconds",
+    )}`,
+  );
   return parts.join(" ");
 }
 
-/** Summary card line: "Locked in for …". */
-export function lockedInForWords(ms: number) {
-  return `Locked in for ${formatHoursMinutesSecondsWords(ms)}`;
+/** Flat "67 seconds" / "69 seconds" for receipt rows when meme duration applies. */
+export function formatMemeFlatSeconds(ms: number, t?: TranslateFn) {
+  const flat = isMemeFlatSecondDuration(ms);
+  if (!flat) return null;
+  return tr(t, "duration.memeFlatSeconds", "{seconds} seconds", {
+    seconds: flat,
+  });
+}
+
+/** Summary card line: "Locked in for …" (flat seconds at 67s / 69s). */
+export function lockedInForWords(ms: number, t?: TranslateFn) {
+  const flat = isMemeFlatSecondDuration(ms);
+  if (flat != null) {
+    return tr(
+      t,
+      "duration.lockedInForMemeFlat",
+      "Locked in for {seconds} seconds",
+      { seconds: flat },
+    );
+  }
+  const duration = formatHoursMinutesSecondsWords(ms, t);
+  return tr(t, "duration.lockedInFor", "Locked in for {duration}", {
+    duration,
+  });
+}
+
+/**
+ * Receipt locked-in / total value: flat meme seconds when 67/69,
+ * otherwise fall back to the provided normal formatter result.
+ */
+export function formatReceiptDurationValue(
+  ms: number,
+  normal: string,
+  t?: TranslateFn,
+) {
+  return formatMemeFlatSeconds(ms, t) ?? normal;
 }
 
 /** Two-digit centiseconds (`00`–`99`), not full milliseconds. */
@@ -190,120 +294,209 @@ export type ShareCardChrome = {
   footerLabel: string;
 };
 
-type ShareEasterEgg = {
+type ShareEasterEggDef = {
   id: "luck" | "sixtynine" | "sixtyseven" | "fourtwenty" | "fourohfour";
+  test: (ms: number) => boolean;
+  captionKey: string;
+  captionFallback: string;
+  headlineKey: string;
+  headlineFallback: string;
+  footerKey: string;
+  footerFallback: string;
+  emoji: string;
+  gradient: string;
+};
+
+export type ShareEasterEgg = {
+  id: ShareEasterEggDef["id"];
   test: (ms: number) => boolean;
   caption: string;
   chrome: ShareCardChrome;
 };
 
 /** Priority: luck → 69 → 67 → 420 → 404. First match wins. */
-const SHARE_EASTER_EGGS: ShareEasterEgg[] = [
+const SHARE_EASTER_EGGS: ShareEasterEggDef[] = [
   {
     id: "luck",
     test: hasRepeatingClock,
-    caption: "used up all the luck.",
-    chrome: {
-      headline: "used up all the luck",
-      emoji: "🍀",
-      gradient: "from-amber-200 via-yellow-100 to-lime-100",
-      footerLabel: "luck",
-    },
+    captionKey: "caption.egg.luck",
+    captionFallback: "used up all the luck.",
+    headlineKey: "caption.egg.luck.headline",
+    headlineFallback: "used up all the luck",
+    footerKey: "chrome.footer.luck",
+    footerFallback: "luck",
+    emoji: "🍀",
+    gradient: "from-amber-200 via-yellow-100 to-lime-100",
   },
   {
     id: "sixtynine",
     test: hasSixtyNine,
-    caption: "nice. 👍",
-    chrome: {
-      headline: "nice.",
-      emoji: "👍",
-      gradient: LIME_GRADIENT,
-      footerLabel: "LOCKED IN",
-    },
+    captionKey: "caption.egg.sixtynine",
+    captionFallback: "nice. 👍",
+    headlineKey: "caption.egg.sixtynine.headline",
+    headlineFallback: "nice.",
+    footerKey: "chrome.footer.lockedIn",
+    footerFallback: "LOCKED IN",
+    emoji: "👍",
+    gradient: LIME_GRADIENT,
   },
   {
     id: "sixtyseven",
     test: hasSixtySeven,
-    caption: "six seven hehe. 😏",
-    chrome: {
-      headline: "six seven",
-      emoji: "😏",
-      gradient: LIME_GRADIENT,
-      footerLabel: "LOCKED IN",
-    },
+    captionKey: "caption.egg.sixtyseven",
+    captionFallback: "six seven hehe. 😏",
+    headlineKey: "caption.egg.sixtyseven.headline",
+    headlineFallback: "six seven",
+    footerKey: "chrome.footer.lockedIn",
+    footerFallback: "LOCKED IN",
+    emoji: "😏",
+    gradient: LIME_GRADIENT,
   },
   {
     id: "fourtwenty",
     test: hasFourTwenty,
-    caption: "blaze it.",
-    chrome: {
-      headline: "4:20",
-      emoji: "🔥",
-      gradient: LIME_GRADIENT,
-      footerLabel: "LOCKED IN",
-    },
+    captionKey: "caption.egg.fourtwenty",
+    captionFallback: "blaze it.",
+    headlineKey: "caption.egg.fourtwenty.headline",
+    headlineFallback: "4:20",
+    footerKey: "chrome.footer.lockedIn",
+    footerFallback: "LOCKED IN",
+    emoji: "🔥",
+    gradient: LIME_GRADIENT,
   },
   {
     id: "fourohfour",
     test: hasFourOhFour,
-    caption: "session not found.",
-    chrome: {
-      headline: "404",
-      emoji: "📭",
-      gradient: "from-slate-200 via-zinc-100 to-slate-100",
-      footerLabel: "LOCKED IN",
-    },
+    captionKey: "caption.egg.fourohfour",
+    captionFallback: "session not found.",
+    headlineKey: "caption.egg.fourohfour.headline",
+    headlineFallback: "404",
+    footerKey: "chrome.footer.lockedIn",
+    footerFallback: "LOCKED IN",
+    emoji: "📭",
+    gradient: "from-slate-200 via-zinc-100 to-slate-100",
   },
 ];
 
-export function findShareEasterEgg(ms: number): ShareEasterEgg | null {
-  return SHARE_EASTER_EGGS.find((egg) => egg.test(ms)) ?? null;
+function resolveEasterEgg(
+  def: ShareEasterEggDef,
+  t?: TranslateFn,
+): ShareEasterEgg {
+  return {
+    id: def.id,
+    test: def.test,
+    caption: tr(t, def.captionKey, def.captionFallback),
+    chrome: {
+      headline: tr(t, def.headlineKey, def.headlineFallback),
+      emoji: def.emoji,
+      gradient: def.gradient,
+      footerLabel: tr(t, def.footerKey, def.footerFallback),
+    },
+  };
 }
 
-const CAPTION_TIERS: { maxMs: number; lines: string[] }[] = [
-  { maxMs: 60_000, lines: ["brev.", "great work buddy 😭", "wow."] },
-  { maxMs: 5 * 60_000, lines: ["a start.", "warmup.", "we'll allow it."] },
-  {
-    maxMs: 15 * 60_000,
-    lines: ["getting somewhere.", "not nothing.", "solid-ish."],
-  },
-  {
-    maxMs: 30 * 60_000,
-    lines: ["that's a session.", "phone lost.", "actually locked in."],
-  },
-  {
-    maxMs: 60 * 60_000,
-    lines: [
-      "that's real work.",
-      "the chair respects you.",
-      "hour-adjacent. proud.",
-    ],
-  },
-  {
-    maxMs: 2 * 60 * 60_000,
-    lines: ["one hour. unwell in a good way.", "goated.", "touch grass later."],
-  },
-  {
-    maxMs: 4 * 60 * 60_000,
-    lines: [
-      "seek help (affectionate).",
-      "this is a lifestyle.",
-      "stand up. legend.",
-    ],
-  },
-  {
-    maxMs: Number.POSITIVE_INFINITY,
-    lines: [
-      "please eat.",
-      "the session is dating you.",
-      "historic. concerning. both.",
-    ],
-  },
-];
+export function findShareEasterEgg(
+  ms: number,
+  t?: TranslateFn,
+): ShareEasterEgg | null {
+  const def = SHARE_EASTER_EGGS.find((egg) => egg.test(ms));
+  return def ? resolveEasterEgg(def, t) : null;
+}
 
-function pickLine(lines: string[], rng: () => number) {
-  const i = Math.min(lines.length - 1, Math.floor(rng() * lines.length));
-  return lines[i] ?? lines[0]!;
+const CAPTION_TIERS: { maxMs: number; keys: string[]; fallbacks: string[] }[] =
+  [
+    {
+      maxMs: 60_000,
+      keys: [
+        "caption.tier.lt1m.0",
+        "caption.tier.lt1m.1",
+        "caption.tier.lt1m.2",
+      ],
+      fallbacks: ["brev.", "great work buddy 😭", "wow."],
+    },
+    {
+      maxMs: 5 * 60_000,
+      keys: [
+        "caption.tier.lt5m.0",
+        "caption.tier.lt5m.1",
+        "caption.tier.lt5m.2",
+      ],
+      fallbacks: ["a start.", "warmup.", "we'll allow it."],
+    },
+    {
+      maxMs: 15 * 60_000,
+      keys: [
+        "caption.tier.lt15m.0",
+        "caption.tier.lt15m.1",
+        "caption.tier.lt15m.2",
+      ],
+      fallbacks: ["getting somewhere.", "not nothing.", "solid-ish."],
+    },
+    {
+      maxMs: 30 * 60_000,
+      keys: [
+        "caption.tier.lt30m.0",
+        "caption.tier.lt30m.1",
+        "caption.tier.lt30m.2",
+      ],
+      fallbacks: ["that's a session.", "phone lost.", "actually locked in."],
+    },
+    {
+      maxMs: 60 * 60_000,
+      keys: [
+        "caption.tier.lt1h.0",
+        "caption.tier.lt1h.1",
+        "caption.tier.lt1h.2",
+      ],
+      fallbacks: [
+        "that's real work.",
+        "the chair respects you.",
+        "hour-adjacent. proud.",
+      ],
+    },
+    {
+      maxMs: 2 * 60 * 60_000,
+      keys: [
+        "caption.tier.lt2h.0",
+        "caption.tier.lt2h.1",
+        "caption.tier.lt2h.2",
+      ],
+      fallbacks: [
+        "one hour. unwell in a good way.",
+        "goated.",
+        "touch grass later.",
+      ],
+    },
+    {
+      maxMs: 4 * 60 * 60_000,
+      keys: [
+        "caption.tier.lt4h.0",
+        "caption.tier.lt4h.1",
+        "caption.tier.lt4h.2",
+      ],
+      fallbacks: [
+        "seek help (affectionate).",
+        "this is a lifestyle.",
+        "stand up. legend.",
+      ],
+    },
+    {
+      maxMs: Number.POSITIVE_INFINITY,
+      keys: [
+        "caption.tier.gte4h.0",
+        "caption.tier.gte4h.1",
+        "caption.tier.gte4h.2",
+      ],
+      fallbacks: [
+        "please eat.",
+        "the session is dating you.",
+        "historic. concerning. both.",
+      ],
+    },
+  ];
+
+function pickIndex(length: number, rng: () => number) {
+  return Math.min(length - 1, Math.floor(rng() * length));
 }
 
 /**
@@ -314,40 +507,44 @@ export function buildShareCaption(
   ms: number,
   _outcome?: OutcomeKind,
   rng: () => number = Math.random,
+  t?: TranslateFn,
 ) {
-  if (ms < 1000) return "DAWG 😭😭😭";
-  const egg = findShareEasterEgg(ms);
+  if (ms < 1000) return tr(t, "caption.instant", "DAWG 😭😭😭");
+  const egg = findShareEasterEgg(ms, t);
   if (egg) return egg.caption;
   const clamped = Math.max(0, ms);
   const tier =
-    CAPTION_TIERS.find((t) => clamped < t.maxMs) ??
+    CAPTION_TIERS.find((entry) => clamped < entry.maxMs) ??
     CAPTION_TIERS[CAPTION_TIERS.length - 1]!;
-  return pickLine(tier.lines, rng);
+  const i = pickIndex(tier.keys.length, rng);
+  return tr(t, tier.keys[i]!, tier.fallbacks[i]!);
 }
 
-function durationChrome(ms: number): ShareCardChrome {
+function durationChrome(ms: number, t?: TranslateFn): ShareCardChrome {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const lockedIn = tr(t, "chrome.footer.lockedIn", "LOCKED IN");
+  const solid = tr(t, "chrome.footer.solidSession", "SOLID SESSION");
   if (totalSec < 15 * 60) {
     return {
-      headline: "LOCKED IN",
+      headline: lockedIn,
       emoji: "😏",
       gradient: LIME_GRADIENT,
-      footerLabel: "LOCKED IN",
+      footerLabel: lockedIn,
     };
   }
   if (totalSec < 60 * 60) {
     return {
-      headline: "SOLID SESSION",
+      headline: solid,
       emoji: "😏",
       gradient: LIME_GRADIENT,
-      footerLabel: "SOLID SESSION",
+      footerLabel: solid,
     };
   }
   return {
-    headline: "SOLID SESSION",
+    headline: solid,
     emoji: "😏",
     gradient: "from-amber-200 via-yellow-100 to-orange-100",
-    footerLabel: "SOLID SESSION",
+    footerLabel: solid,
   };
 }
 
@@ -355,28 +552,31 @@ function durationChrome(ms: number): ShareCardChrome {
 export function shareCardChrome(
   ms: number,
   outcome: OutcomeKind,
+  t?: TranslateFn,
 ): ShareCardChrome {
-  const egg = findShareEasterEgg(ms);
+  const egg = findShareEasterEgg(ms, t);
   if (egg) return egg.chrome;
   if (outcome === "pr") {
+    const label = tr(t, "chrome.footer.newPr", "NEW PR");
     return {
-      ...durationChrome(ms),
-      headline: "NEW PR",
+      ...durationChrome(ms, t),
+      headline: label,
       emoji: "😎✌️",
       gradient: "from-lime-300 via-emerald-200 to-amber-200",
-      footerLabel: "NEW PR",
+      footerLabel: label,
     };
   }
   if (outcome === "tapout") {
+    const label = tr(t, "chrome.footer.tapOut", "TAP OUT");
     return {
-      ...durationChrome(ms),
-      headline: "TAP OUT",
+      ...durationChrome(ms, t),
+      headline: label,
       emoji: "😤",
       gradient: "from-rose-200 via-orange-100 to-slate-100",
-      footerLabel: "TAP OUT",
+      footerLabel: label,
     };
   }
-  return durationChrome(ms);
+  return durationChrome(ms, t);
 }
 
 const BREAK_TYPE_LABELS: Record<string, string> = {
@@ -437,15 +637,18 @@ export function buildBreakLiveLabel(
 }
 
 /** Legacy fallback for sessions without break_history. */
-export function breakDurationLabel(raw: unknown): string {
+export function breakDurationLabel(
+  raw: unknown,
+  liveLabel?: TranslateFn,
+): string {
   if (Array.isArray(raw)) {
     for (const item of raw) {
       const key = String(item ?? "").trim().toLowerCase();
       const def = getBreakType(key);
-      if (def) return def.receiptLabelEn;
+      if (def) return breakReceiptLabel(def.id, liveLabel);
     }
   }
-  return "Break: rested for";
+  return breakReceiptLabel("fallback", liveLabel);
 }
 
 export function breakHistoryFromLegacy(

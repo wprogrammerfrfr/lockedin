@@ -151,9 +151,14 @@ export function SessionDetailDialog({
   useEffect(() => {
     if (!open || !session) return;
     setCaption(
-      buildShareCaption(session.active_ms ?? 0, asSessionOutcome(session)),
+      buildShareCaption(
+        session.active_ms ?? 0,
+        asSessionOutcome(session),
+        Math.random,
+        t,
+      ),
     );
-  }, [open, session]);
+  }, [open, session, t]);
 
   const receipt = session
     ? sessionToReceiptData(session, {
