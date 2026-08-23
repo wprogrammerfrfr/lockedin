@@ -1,6 +1,7 @@
 "use client";
 
 import { Label } from "@/components/ui/label";
+import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import { cn } from "@/lib/utils";
 
 const PRESETS = [
@@ -24,15 +25,17 @@ export function PomodoroCreateFields({
   onWorkChange: (n: number) => void;
   onBreakChange: (n: number) => void;
 }) {
+  const { t } = useTranslation();
+
+  const kindOptions = [
+    ["vote", t("room.voteRoom")] as const,
+    ["pomodoro", t("room.pomodoro")] as const,
+  ];
+
   return (
     <div className="space-y-3">
       <div className="flex gap-2">
-        {(
-          [
-            ["vote", "Vote room"],
-            ["pomodoro", "Pomodoro"],
-          ] as const
-        ).map(([id, label]) => (
+        {kindOptions.map(([id, label]) => (
           <button
             key={id}
             type="button"
@@ -51,7 +54,7 @@ export function PomodoroCreateFields({
 
       {kind === "pomodoro" && (
         <div className="space-y-2">
-          <Label>Cadence (work / break minutes)</Label>
+          <Label>{t("room.cadenceLabel")}</Label>
           <div className="flex flex-wrap gap-2">
             {PRESETS.map((p) => (
               <button
@@ -72,10 +75,7 @@ export function PomodoroCreateFields({
               </button>
             ))}
           </div>
-          <p className="text-xs text-slate-400">
-            Server cadence auto-flips LOCKED IN ↔ BREAK. No voting in Pomodoro
-            rooms.
-          </p>
+          <p className="text-xs text-slate-400">{t("room.pomodoroDesc")}</p>
         </div>
       )}
     </div>

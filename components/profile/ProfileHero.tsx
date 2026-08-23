@@ -17,6 +17,7 @@ import {
 import type { ProfileSearchHit } from "@/features/social/types";
 import type { ProfileSocialCounts } from "@/features/social/types";
 import { publicAvatarUrl } from "@/features/profile/api";
+import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -31,12 +32,13 @@ export function ProfileSocialStats({
   userId?: string;
   className?: string;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState<ListKind | null>(null);
 
   const items: { label: string; value: number; kind: ListKind }[] = [
-    { label: "Friends", value: counts.friends, kind: "friends" },
-    { label: "Followers", value: counts.followers, kind: "followers" },
-    { label: "Following", value: counts.following, kind: "following" },
+    { label: t("profile.friends"), value: counts.friends, kind: "friends" },
+    { label: t("profile.followers"), value: counts.followers, kind: "followers" },
+    { label: t("profile.following"), value: counts.following, kind: "following" },
   ];
 
   return (
@@ -88,6 +90,7 @@ function SocialListDialog({
   userId: string;
   kind: ListKind;
 }) {
+  const { t } = useTranslation();
   const [rows, setRows] = useState<ProfileSearchHit[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -117,10 +120,10 @@ function SocialListDialog({
 
   const title =
     kind === "friends"
-      ? "Friends"
+      ? t("profile.friends")
       : kind === "followers"
-        ? "Followers"
-        : "Following";
+        ? t("profile.followers")
+        : t("profile.following");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -129,9 +132,9 @@ function SocialListDialog({
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         {loading ? (
-          <p className="text-sm text-slate-400">Loading…</p>
+          <p className="text-sm text-slate-400">{t("common.loading")}</p>
         ) : rows.length === 0 ? (
-          <p className="text-sm text-slate-400">No one here yet.</p>
+          <p className="text-sm text-slate-400">{t("profile.noOneHere")}</p>
         ) : (
           <ul className="space-y-2">
             {rows.map((h) => {
@@ -176,6 +179,7 @@ export function ProfileHeroAvatar({
   onPickFile?: (file: File) => void;
   size?: "md" | "lg";
 }) {
+  const { t } = useTranslation();
   const dim = size === "lg" ? "h-20 w-20 sm:h-24 sm:w-24" : "h-16 w-16";
 
   return (
@@ -195,7 +199,7 @@ export function ProfileHeroAvatar({
       {editable ? (
         <>
           <span className="absolute inset-0 flex items-end justify-center rounded-2xl bg-slate-950/0 text-[10px] font-medium text-white opacity-0 transition hover:bg-slate-950/45 hover:opacity-100">
-            <span className="mb-2">Change</span>
+            <span className="mb-2">{t("profile.changeAvatar")}</span>
           </span>
           <input
             type="file"

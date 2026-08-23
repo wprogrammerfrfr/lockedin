@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import { cn } from "@/lib/utils";
 
 export type SessionCardView = "summary" | "receipt";
@@ -36,6 +37,7 @@ export function SessionCardViewToggle({
   onChange: (next: SessionCardView) => void;
   className?: string;
 }) {
+  const { t } = useTranslation();
   return (
     <Tabs
       value={value}
@@ -48,13 +50,13 @@ export function SessionCardViewToggle({
             value="summary"
             className="rounded-md data-[state=active]:bg-white data-[state=active]:text-slate-900"
           >
-            Summary
+            {t("share.summary")}
           </TabsTrigger>
           <TabsTrigger
             value="receipt"
             className="rounded-md data-[state=active]:bg-white data-[state=active]:text-slate-900"
           >
-            Receipt
+            {t("share.receipt")}
           </TabsTrigger>
         </TabsList>
       </div>

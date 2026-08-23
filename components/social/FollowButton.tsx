@@ -12,6 +12,7 @@ import {
   unfollow,
 } from "@/features/social/api";
 import type { FollowRelationStatus } from "@/features/social/types";
+import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { userFacingError } from "@/lib/supabase/errors";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,7 @@ export function FollowButton({
   /** Room presence chip: hide when already following; smaller controls. */
   compact?: boolean;
 }) {
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const [status, setStatus] = useState(initialStatus);
   const [busy, setBusy] = useState(false);
@@ -47,7 +49,7 @@ export function FollowButton({
   if (status === "blocked") {
     return (
       <Button variant="outline" className="rounded-xl" disabled>
-        Blocked
+        {t("social.blocked")}
       </Button>
     );
   }
@@ -59,7 +61,7 @@ export function FollowButton({
       setStatus(next);
       onStatusChange?.(next);
     } catch (err) {
-      toast.error(userFacingError(err, "Follow action failed"));
+      toast.error(userFacingError(err, t("social.followFailed")));
     } finally {
       setBusy(false);
     }
@@ -80,7 +82,7 @@ export function FollowButton({
           run(() => unfollow(supabase(), targetUserId), "none")
         }
       >
-        Following
+        {t("social.following")}
       </Button>
     );
   }
@@ -96,7 +98,7 @@ export function FollowButton({
           run(() => unfollow(supabase(), targetUserId), "none")
         }
       >
-        {compact ? "Requested" : "Requested · Cancel"}
+        {compact ? t("social.requested") : t("social.requestedCancel")}
       </Button>
     );
   }
@@ -112,7 +114,7 @@ export function FollowButton({
             run(() => acceptFollow(supabase(), targetUserId), "accepted")
           }
         >
-          Accept
+          {t("social.accept")}
         </Button>
       );
     }
@@ -125,7 +127,7 @@ export function FollowButton({
             run(() => acceptFollow(supabase(), targetUserId), "accepted")
           }
         >
-          Accept
+          {t("social.accept")}
         </Button>
         <Button
           variant="outline"
@@ -135,7 +137,7 @@ export function FollowButton({
             run(() => rejectFollow(supabase(), targetUserId), "none")
           }
         >
-          Reject
+          {t("social.reject")}
         </Button>
       </div>
     );
@@ -157,7 +159,7 @@ export function FollowButton({
         );
       }}
     >
-      Follow
+      {t("social.follow")}
     </Button>
   );
 }
@@ -169,13 +171,14 @@ export function FollowBackButton({
   targetUserId: string;
   onDone?: () => void;
 }) {
+  const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
 
   if (done) {
     return (
       <Button variant="outline" className="rounded-xl" disabled>
-        Friends
+        {t("social.friends")}
       </Button>
     );
   }
@@ -190,15 +193,15 @@ export function FollowBackButton({
           .then(() => {
             setDone(true);
             onDone?.();
-            toast.success("You're friends now");
+            toast.success(t("social.friendsNow"));
           })
           .catch((err) => {
-            toast.error(userFacingError(err, "Follow back failed"));
+            toast.error(userFacingError(err, t("social.followBackFailed")));
           })
           .finally(() => setBusy(false));
       }}
     >
-      Follow back
+      {t("social.followBack")}
     </Button>
   );
 }

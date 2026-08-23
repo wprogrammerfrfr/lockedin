@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { BreakVoteChoice } from "@/features/rooms/types";
+import { useTranslation } from "@/lib/i18n/LocaleProvider";
 
 export function BreakVoteDialog({
   open,
@@ -29,6 +30,7 @@ export function BreakVoteDialog({
   onVote: (choice: BreakVoteChoice) => void;
   onCancel?: () => void;
 }) {
+  const { t } = useTranslation();
   const [left, setLeft] = useState(30);
 
   useEffect(() => {
@@ -41,6 +43,12 @@ export function BreakVoteDialog({
     return () => window.clearInterval(id);
   }, [endsAt, open]);
 
+  const youVoteLabel = myVote
+    ? t("room.youVote", {
+        choice: myVote === "break" ? t("room.bet") : t("room.nah"),
+      })
+    : "";
+
   return (
     <Dialog open={open} onOpenChange={() => undefined}>
       <DialogContent
@@ -49,18 +57,16 @@ export function BreakVoteDialog({
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle>Shared break vote</DialogTitle>
-          <DialogDescription>
-            Majority of eligible voters wins. Tie or timeout → stay locked in.
-          </DialogDescription>
+          <DialogTitle>{t("room.sharedBreakVote")}</DialogTitle>
+          <DialogDescription>{t("room.breakVoteDesc")}</DialogDescription>
         </DialogHeader>
 
         <p className="font-mono text-center text-2xl tabular-nums text-slate-800">
           {left}s
         </p>
         <p className="text-center text-xs text-slate-500">
-          Bet {tallies.break} · Nah {tallies.stay}
-          {myVote ? ` · You: ${myVote === "break" ? "Bet" : "Nah"}` : ""}
+          {t("room.voteTally", { bet: tallies.break, stay: tallies.stay })}
+          {youVoteLabel}
         </p>
 
         <DialogFooter className="gap-2 sm:justify-center">
@@ -69,9 +75,9 @@ export function BreakVoteDialog({
             disabled={Boolean(myVote)}
             onClick={() => onVote("break")}
           >
-            <span className="font-display text-base font-bold">Bet</span>
+            <span className="font-display text-base font-bold">{t("room.bet")}</span>
             <span className="text-[11px] font-medium normal-case tracking-normal text-amber-800/80">
-              Take the break
+              {t("room.takeBreak")}
             </span>
           </Button>
           <Button
@@ -80,9 +86,9 @@ export function BreakVoteDialog({
             disabled={Boolean(myVote)}
             onClick={() => onVote("stay")}
           >
-            <span className="font-display text-base font-bold">Nah</span>
+            <span className="font-display text-base font-bold">{t("room.nah")}</span>
             <span className="text-[11px] font-medium normal-case tracking-normal text-slate-500">
-              Stay Locked In
+              {t("room.stayLockedIn")}
             </span>
           </Button>
         </DialogFooter>
@@ -92,7 +98,7 @@ export function BreakVoteDialog({
             className="w-full rounded-xl text-slate-500"
             onClick={() => onCancel?.()}
           >
-            Cancel vote
+            {t("room.cancelVote")}
           </Button>
         ) : null}
       </DialogContent>

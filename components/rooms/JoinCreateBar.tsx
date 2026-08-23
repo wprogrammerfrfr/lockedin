@@ -11,6 +11,7 @@ import {
   createRoom,
   joinRoom,
 } from "@/features/rooms/api";
+import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { userFacingError } from "@/lib/supabase/errors";
 
@@ -25,6 +26,7 @@ export function JoinCreateBar({
   authed: boolean;
   onNeedAuth: () => void;
 }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const [step, setStep] = useState<"lobby" | "name">("lobby");
   const [code, setCode] = useState("");
@@ -41,11 +43,11 @@ export function JoinCreateBar({
     }
     const name = sessionName.trim();
     if (!name) {
-      toast.error("Give this session a name first.");
+      toast.error(t("room.toast.nameRequired"));
       return;
     }
     if (name.length > 80) {
-      toast.error("Session name must be 80 characters or fewer.");
+      toast.error(t("room.toast.nameTooLong"));
       return;
     }
     setBusy(true);
@@ -62,7 +64,7 @@ export function JoinCreateBar({
           : await createRoom(supabase, name);
       router.push(`/rooms/${room.code}`);
     } catch (err) {
-      toast.error(userFacingError(err, "Could not create room"));
+      toast.error(userFacingError(err, t("room.toast.createFailed")));
     } finally {
       setBusy(false);
     }
@@ -74,7 +76,7 @@ export function JoinCreateBar({
       return;
     }
     if (!/^\d{6}$/.test(code)) {
-      toast.error("Enter a 6-digit room code");
+      toast.error(t("room.toast.invalidCode"));
       return;
     }
     setBusy(true);
@@ -83,9 +85,9 @@ export function JoinCreateBar({
       const room = await joinRoom(supabase, code);
       router.push(`/rooms/${room.code}`);
     } catch (err) {
-      const msg = userFacingError(err, "Could not join");
+      const msg = userFacingError(err, t("room.toast.joinFailed"));
       if (/room_full/i.test(err instanceof Error ? err.message : msg)) {
-        toast.error("Room is full (max 6)");
+        toast.error(t("room.toast.roomFull"));
       } else {
         toast.error(msg);
       }
@@ -99,16 +101,16 @@ export function JoinCreateBar({
       <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
         <div>
           <p className="font-display text-base font-bold text-slate-900">
-            Name this session
+            {t("room.nameSession")}
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            Required. This title shows in the room and on your dashboard.
+            {t("room.nameSessionDesc")}
           </p>
         </div>
         <Input
           value={sessionName}
           onChange={(e) => setSessionName(e.target.value.slice(0, 80))}
-          placeholder="e.g. CS midterm grind"
+          placeholder={t("timer.sessionNamePlaceholder")}
           maxLength={80}
           autoFocus
         />
@@ -122,7 +124,7 @@ export function JoinCreateBar({
         />
         <div className="flex flex-col gap-2">
           <Button className="w-full rounded-xl" disabled={busy} onClick={handleCreate}>
-            Enter room
+            {t("room.enter")}
           </Button>
           <Button
             className="w-full rounded-xl"
@@ -130,7 +132,7 @@ export function JoinCreateBar({
             disabled={busy}
             onClick={() => setStep("lobby")}
           >
-            Cancel
+            {t("settings.cancel")}
           </Button>
         </div>
       </div>
@@ -143,7 +145,7 @@ export function JoinCreateBar({
         <Input
           value={code}
           onChange={(e) => setCode(digitsOnly(e.target.value))}
-          placeholder="6-digit code"
+          placeholder={t("room.codePlaceholder")}
           inputMode="numeric"
           pattern="[0-9]*"
           maxLength={6}
@@ -159,13 +161,13 @@ export function JoinCreateBar({
           onClick={handleJoin}
           variant="outline"
         >
-          Join
+          {t("room.joinShort")}
         </Button>
       </div>
 
       <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.16em] text-slate-400">
         <span className="h-px flex-1 bg-slate-200" />
-        or
+        {t("common.or")}
         <span className="h-px flex-1 bg-slate-200" />
       </div>
 
@@ -180,7 +182,7 @@ export function JoinCreateBar({
           setStep("name");
         }}
       >
-        Create room
+        {t("room.create")}
       </Button>
     </div>
   );

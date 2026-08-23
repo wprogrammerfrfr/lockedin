@@ -15,7 +15,7 @@ export async function getProfile(
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "id, username, avatar_path, bio, timezone, username_changed_at, username_claimed_at",
+      "id, username, avatar_path, bio, timezone, locale, break_timer_minutes, username_changed_at, username_claimed_at",
     )
     .eq("id", userId)
     .maybeSingle();
@@ -33,6 +33,8 @@ export async function updateProfile(
     timezone: string;
     avatar_path: string | null;
     username: string;
+    locale: string;
+    break_timer_minutes: number;
   }>,
 ): Promise<Profile> {
   if (patch.username) {

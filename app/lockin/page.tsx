@@ -7,7 +7,7 @@ import { AuthGateModal } from "@/components/auth/AuthGateModal";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { FocusTimer } from "@/components/session/FocusTimer";
 import { LockInHeader } from "@/components/session/LockInHeader";
-import { PitStopDialog } from "@/components/session/PitStopDialog";
+import { BreakStartDialog } from "@/components/session/BreakStartDialog";
 import { ShareCardDialog } from "@/components/session/ShareCardDialog";
 import { ActiveSessionDialog } from "@/components/session/ActiveSessionDialog";
 import { WeeklyLeaderboard } from "@/components/social/WeeklyLeaderboard";
@@ -21,13 +21,18 @@ import {
   clearActiveSessionDraft,
 } from "@/lib/auth/merge";
 import { cn } from "@/lib/utils";
-import { initialState, reducer } from "@/features/session/reducer";
+import { initialState, projectBreakHistory, reducer } from "@/features/session/reducer";
 import {
   computePersonalRecordMs,
   computeStreak,
   computeTodayMs,
 } from "@/features/session/aggregates";
 import { resolveOutcome } from "@/features/session/format";
+import { pickRandomBreakType } from "@/features/session/break-types";
+import {
+  breakTimerMs,
+  loadBreakTimerMinutes,
+} from "@/lib/preferences/break-timer";
 import { useDocumentSessionChrome } from "@/features/session/useDocumentSessionChrome";
 import { useSessionHotkeys } from "@/features/session/useSessionHotkeys";
 import { useSessionClock } from "@/features/session/useSessionClock";
@@ -83,6 +88,9 @@ export default function LockInPage() {
   const [timezone, setTimezone] = useState("UTC");
   const [lastRemoteId, setLastRemoteId] = useState<string | null>(null);
   const [statsNonce, setStatsNonce] = useState(0);
+  const [breakTimerMinutes, setBreakTimerMinutes] = useState(
+    loadBreakTimerMinutes,
+  );
 
   const layoutMode: LayoutMode = isFocusSession(state.session)
     ? "solo-focus"
@@ -100,10 +108,17 @@ export default function LockInPage() {
       try {
         const { data: profile } = await supabase
           .from("profiles")
-          .select("timezone")
+          .select("timezone, break_timer_minutes")
           .eq("id", userId)
           .maybeSingle();
         if (!cancelled && profile?.timezone) setTimezone(profile.timezone);
+        if (
+          !cancelled &&
+          profile?.break_timer_minutes &&
+          profile.break_timer_minutes >= 1
+        ) {
+          setBreakTimerMinutes(profile.break_timer_minutes);
+        }
       } catch {
         /* profiles may be unavailable */
       }
@@ -416,6 +431,7 @@ export default function LockInPage() {
           activeMs: state.elapsedMs,
           breakMs: state.breakMs,
           breakTypes: state.breakTypesUsed,
+          breakHistory: projectBreakHistory(state),
           outcome: "tapout",
           prBroken: state.didBreakPR,
         });
@@ -445,6 +461,7 @@ export default function LockInPage() {
           activeMs: state.elapsedMs,
           breakMs: state.breakMs,
           breakTypes: state.breakTypesUsed,
+          breakHistory: projectBreakHistory(state),
           outcome: state.didBreakPR ? "pr" : "solid",
           prBroken: state.didBreakPR,
         });
@@ -528,8 +545,8 @@ export default function LockInPage() {
           breakRemainingMs={state.breakRemainingMs}
           breakElapsedMs={state.breakElapsedMs}
           breakOpenEnded={state.breakOpenEnded}
-          breakLabel={state.breakLabel}
-          breakEmoji={state.breakEmoji}
+          breakTypeId={state.breakTypeId}
+          breakDurationMs={state.breakDurationMs}
           sessionName={
             isFocusSession(state.session)
               ? sessionNameDraft.trim() || state.sessionName || ""
@@ -552,10 +569,20 @@ export default function LockInPage() {
           lockInDisabled={!authReady}
         />
 
-        <PitStopDialog
+        <BreakStartDialog
           open={state.session === "CHOOSING_BREAK"}
           onClose={() => dispatch({ type: "CLOSE_PIT_STOP" })}
-          onSelect={(choice) => dispatch({ type: "START_BREAK", choice })}
+          breakTimerMinutes={breakTimerMinutes}
+          onStart={(mode) => {
+            const typeId = pickRandomBreakType().id;
+            dispatch({
+              type: "START_BREAK",
+              mode,
+              typeId,
+              durationMs:
+                mode === "count_down" ? breakTimerMs(breakTimerMinutes) : undefined,
+            });
+          }}
         />
       </div>
 
@@ -578,6 +605,7 @@ export default function LockInPage() {
           activeMs: shareDuration,
           breakMs: state.breakMs,
           breakTypesUsed: state.breakTypesUsed,
+          breakHistory: state.breakHistory,
           outcome: shareOutcome,
           prBroken: state.didBreakPR,
         }}

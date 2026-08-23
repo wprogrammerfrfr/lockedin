@@ -6,6 +6,7 @@ import { LogIn, PanelLeft, PanelLeftClose } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { LockedInLogo } from "@/components/brand/LockedInLogo";
 import { NAV_ITEMS, navTabFromPathname } from "@/components/layout/nav";
+import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -115,6 +116,7 @@ export function Sidebar({
   onNavigate?: () => void;
   variant?: "rail" | "drawer";
 }) {
+  const { t } = useTranslation();
   const pathname = usePathname();
   const activeTab = navTabFromPathname(pathname);
   const compact = variant === "rail" && collapsed;
@@ -172,6 +174,7 @@ export function Sidebar({
         {NAV_ITEMS.map((item) => {
           const active = activeTab === item.id;
           const Icon = item.icon;
+          const label = t(`nav.${item.id}`);
           return (
             <Link
               key={item.id}
@@ -185,7 +188,7 @@ export function Sidebar({
                   : "text-slate-500 hover:bg-slate-50 hover:text-slate-700",
               )}
               aria-current={active ? "page" : undefined}
-              title={compact ? item.label : undefined}
+              title={compact ? label : undefined}
             >
               <Icon
                 className={cn(
@@ -193,7 +196,7 @@ export function Sidebar({
                   active ? "text-emerald-600" : "text-slate-400",
                 )}
               />
-              {!compact && <span>{item.label}</span>}
+              {!compact && <span>{label}</span>}
             </Link>
           );
         })}

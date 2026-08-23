@@ -188,6 +188,7 @@ export async function endSession(
     activeMs: number;
     breakMs: number;
     breakTypes: unknown;
+    breakHistory?: unknown;
     outcome: string;
     prBroken: boolean;
   },
@@ -213,6 +214,7 @@ export async function endSession(
     p_break_types: opts.breakTypes ?? [],
     p_outcome: opts.outcome,
     p_pr_broken: opts.prBroken,
+    p_break_history: opts.breakHistory ?? [],
   });
 
   if (error) {
@@ -243,6 +245,7 @@ export async function tapOutSession(
     activeMs: number;
     breakMs: number;
     breakTypes: unknown;
+    breakHistory?: unknown;
     outcome?: string;
     prBroken?: boolean;
   },
@@ -268,6 +271,7 @@ export async function tapOutSession(
     p_break_types: opts.breakTypes ?? [],
     p_outcome: opts.outcome ?? "tapout",
     p_pr_broken: opts.prBroken ?? false,
+    p_break_history: opts.breakHistory ?? [],
   });
 
   if (error) {

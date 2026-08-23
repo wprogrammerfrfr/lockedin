@@ -8,6 +8,7 @@ import { SessionHistoryPanel } from "@/components/dashboard/SessionHistoryPanel"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CountUp } from "@/components/ui/count-up";
 import { formatMs, formatTotalHours } from "@/features/session/format";
+import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import type { HeatmapDay } from "@/types/database";
 
@@ -21,6 +22,7 @@ type DashboardStats = {
 };
 
 export default function DashboardPage() {
+  const { t } = useTranslation();
   const { status, isAuthenticated, user } = useAuth();
   const userId = user?.id ?? null;
   const [gateOpen, setGateOpen] = useState(false);
@@ -104,17 +106,17 @@ export default function DashboardPage() {
 
   const primaryStats = [
     {
-      label: "Today",
+      label: t("dash.today"),
       value: stats?.today_ms ?? 0,
       format: (n: number) => formatMs(Math.round(n), true),
     },
     {
-      label: "Streak",
+      label: t("dash.streak"),
       value: stats?.streak_days ?? 0,
       format: (n: number) => `${Math.round(n)}d`,
     },
     {
-      label: "PR",
+      label: t("dash.pr"),
       value: stats?.pr_ms ?? 0,
       format: (n: number) => formatMs(Math.round(n), true),
     },
@@ -122,17 +124,17 @@ export default function DashboardPage() {
 
   const lifetimeStats = [
     {
-      label: "Sessions",
+      label: t("dash.sessions"),
       value: stats?.total_sessions ?? 0,
       format: (n: number) => String(Math.round(n)),
     },
     {
-      label: "Group sessions",
+      label: t("dash.groupSessions"),
       value: stats?.group_sessions ?? 0,
       format: (n: number) => String(Math.round(n)),
     },
     {
-      label: "Total hours",
+      label: t("dash.totalHours"),
       value: stats?.total_active_ms ?? 0,
       format: (n: number) => formatTotalHours(Math.round(n)),
     },
@@ -143,12 +145,9 @@ export default function DashboardPage() {
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
         <div>
           <h1 className="font-display text-2xl font-bold text-slate-900">
-            Dashboard
+            {t("dash.title")}
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Today, streaks, lifetime totals, and every past session as a
-            receipt.
-          </p>
+          <p className="mt-1 text-sm text-slate-500">{t("dash.subtitle")}</p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-3">

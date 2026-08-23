@@ -40,6 +40,7 @@ import {
 } from "@/features/feed/api";
 import type { OutcomeKind } from "@/features/session/types";
 import { createClient } from "@/lib/supabase/client";
+import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import { userFacingError } from "@/lib/supabase/errors";
 
 export function ShareCardDialog({
@@ -68,6 +69,7 @@ export function ShareCardDialog({
   /** Full receipt payload when available (history / room). */
   receipt?: SessionReceiptData | null;
 }) {
+  const { t } = useTranslation();
   const displayOutcome: OutcomeKind =
     outcome === "idle" ? "solid" : outcome === "break" ? "break" : outcome;
 
@@ -112,9 +114,9 @@ export function ShareCardDialog({
     setExporting(true);
     try {
       await exportStoryPng(exportRef.current);
-      toast.success("Story PNG downloaded");
+      toast.success(t("share.storyDownloaded"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Export failed");
+      toast.error(err instanceof Error ? err.message : t("share.exportFailed"));
     } finally {
       setExporting(false);
     }
@@ -130,9 +132,9 @@ export function ShareCardDialog({
       a.download = "lockedin-session.png";
       a.click();
       URL.revokeObjectURL(url);
-      toast.success("Card downloaded");
+      toast.success(t("share.cardDownloaded"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Download failed");
+      toast.error(err instanceof Error ? err.message : t("share.downloadFailed"));
     } finally {
       setExporting(false);
     }
@@ -140,7 +142,7 @@ export function ShareCardDialog({
 
   async function handlePost() {
     if (!sessionId) {
-      toast.error("No cloud session to share yet");
+      toast.error(t("share.noSession"));
       return;
     }
     setPosting(true);
@@ -166,9 +168,9 @@ export function ShareCardDialog({
       }
 
       await shareSessionToFeed(supabase, sessionId, caption, imagePath);
-      toast.success("Posted to Explore", {
+      toast.success(t("share.postedExplore"), {
         action: {
-          label: "View",
+          label: t("share.view"),
           onClick: () => {
             window.location.assign("/explore");
           },
@@ -176,7 +178,7 @@ export function ShareCardDialog({
       });
       onOpenChange(false);
     } catch (err) {
-      toast.error(userFacingError(err, "Post failed"));
+      toast.error(userFacingError(err, t("share.postFailed")));
     } finally {
       setPosting(false);
     }
@@ -187,12 +189,11 @@ export function ShareCardDialog({
       <DialogContent className="flex max-h-[min(90dvh,52rem)] max-w-md flex-col gap-3 overflow-hidden border-slate-200 bg-white">
         <DialogHeader className="shrink-0">
           <DialogTitle>
-            {cardView === "summary" ? "Session summary" : "Session receipt"}
+            {cardView === "summary"
+              ? t("dash.sessionSummary")
+              : t("dash.sessionReceipt")}
           </DialogTitle>
-          <DialogDescription>
-            Switch between the meme summary and the itemized receipt. Export,
-            download, or post the selected card.
-          </DialogDescription>
+          <DialogDescription>{t("share.desc")}</DialogDescription>
         </DialogHeader>
 
         <SessionCardViewToggle
@@ -269,7 +270,7 @@ export function ShareCardDialog({
               disabled={exporting || posting}
             >
               <ImageDown className="h-4 w-4" />
-              Export Story
+              {t("share.exportStory")}
             </Button>
             <Button
               variant="outline"
@@ -278,7 +279,7 @@ export function ShareCardDialog({
               disabled={exporting || posting}
             >
               <Download className="h-4 w-4" />
-              Download
+              {t("share.download")}
             </Button>
             <Button
               variant="outline"
@@ -286,14 +287,14 @@ export function ShareCardDialog({
               onClick={async () => {
                 try {
                   await navigator.clipboard.writeText(caption);
-                  toast.success("Caption copied");
+                  toast.success(t("share.captionCopied"));
                 } catch {
-                  toast.error("Clipboard unavailable");
+                  toast.error(t("share.clipboardUnavailable"));
                 }
               }}
             >
               <Copy className="h-4 w-4" />
-              Copy
+              {t("share.copy")}
             </Button>
             <Button
               variant="outline"
@@ -308,7 +309,7 @@ export function ShareCardDialog({
                     await navigator.share(shareData);
                   } else {
                     await navigator.clipboard.writeText(caption);
-                    toast.success("Caption copied");
+                    toast.success(t("share.captionCopied"));
                   }
                 } catch {
                   /* user cancelled share */
@@ -316,7 +317,7 @@ export function ShareCardDialog({
               }}
             >
               <Share2 className="h-4 w-4" />
-              Share
+              {t("share.share")}
             </Button>
           </div>
           {canPost && (
@@ -326,7 +327,7 @@ export function ShareCardDialog({
               disabled={posting || exporting}
             >
               <Share2 className="h-4 w-4" />
-              {posting ? "Posting…" : "Post to followers"}
+              {posting ? t("share.posting") : t("share.postFollowers")}
             </Button>
           )}
         </DialogFooter>

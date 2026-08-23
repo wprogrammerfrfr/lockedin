@@ -20,6 +20,7 @@ import {
 import { publicAvatarUrl } from "@/features/profile/api";
 import { lockedInForLabel, outcomeEmoji } from "@/features/session/format";
 import type { OutcomeKind } from "@/features/session/types";
+import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { userFacingError } from "@/lib/supabase/errors";
 
@@ -33,6 +34,7 @@ export function FeedList({
 }: {
   emptyExtra?: React.ReactNode;
 }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -63,37 +65,32 @@ export function FeedList({
     try {
       await deletePost(createClient(), postId);
       setPosts((prev) => prev.filter((p) => p.id !== postId));
-      toast.success("Post removed");
+      toast.success(t("feed.postRemoved"));
     } catch (err) {
-      toast.error(userFacingError(err, "Could not delete post"));
+      toast.error(userFacingError(err, t("feed.deleteFailed")));
     }
   }
 
   if (loading) {
-    return <p className="text-sm text-slate-400">Loading feed…</p>;
+    return <p className="text-sm text-slate-400">{t("feed.loading")}</p>;
   }
 
   if (error) {
     return (
-      <p className="text-sm text-slate-500">
-        Shared sessions will show up here once people you follow post.
-      </p>
+      <p className="text-sm text-slate-500">{t("feed.unavailable")}</p>
     );
   }
 
   if (posts.length === 0) {
     return (
       <div className="space-y-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center">
-        <p className="text-sm text-slate-500">
-          No shared sessions yet. Explicit shares from people you follow land
-          here.
-        </p>
+        <p className="text-sm text-slate-500">{t("feed.emptyTitle")}</p>
         <p className="text-xs text-slate-400">
-          Find friends on search above, or{" "}
+          {t("feed.emptyDesc")}{" "}
           <Link href="/lockin" className="font-medium text-slate-700 underline">
-            LOCK IN
+            {t("nav.lockin")}
           </Link>{" "}
-          and share your own.
+          {t("feed.emptyCta")}
         </p>
         {emptyExtra}
       </div>
@@ -138,7 +135,7 @@ export function FeedList({
                     onClick={() =>
                       setMenuOpen((id) => (id === post.id ? null : post.id))
                     }
-                    aria-label="Post actions"
+                    aria-label={t("feed.postActions")}
                   >
                     <MoreHorizontal className="h-4 w-4 text-slate-400" />
                   </Button>
@@ -154,7 +151,7 @@ export function FeedList({
                           }}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
-                          Unshare
+                          {t("feed.unshare")}
                         </button>
                       ) : (
                         <button
@@ -166,7 +163,7 @@ export function FeedList({
                           }}
                         >
                           <Flag className="h-3.5 w-3.5" />
-                          Report
+                          {t("social.report")}
                         </button>
                       )}
                     </div>
@@ -178,7 +175,7 @@ export function FeedList({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={cardUrl}
-                  alt="Session summary"
+                  alt=""
                   className="w-full rounded-2xl border border-slate-100 object-cover"
                 />
               ) : null}
@@ -197,7 +194,7 @@ export function FeedList({
                 />
                 {(post.comment_count ?? 0) > 0 ? (
                   <span className="font-mono text-xs tabular-nums text-slate-400">
-                    {post.comment_count} comments
+                    {t("feed.comments", { n: post.comment_count ?? 0 })}
                   </span>
                 ) : null}
               </div>

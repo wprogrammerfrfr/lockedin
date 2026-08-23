@@ -22,6 +22,7 @@ export type SessionRow = {
   active_ms: number;
   break_ms: number;
   break_types_used: string[] | unknown;
+  break_history?: unknown;
   is_shared: boolean;
   outcome: string | null;
   pr_broken: boolean;

@@ -33,9 +33,11 @@ import type { ProfileSocialCounts as Counts } from "@/features/social/types";
 import { createClient } from "@/lib/supabase/client";
 import { userFacingError } from "@/lib/supabase/errors";
 import type { Profile } from "@/features/profile/types";
+import { normalizeLocale, useTranslation } from "@/lib/i18n/LocaleProvider";
 import { toast } from "sonner";
 
 export default function ProfilePage() {
+  const { t, setLocale } = useTranslation();
   const {
     status,
     isAuthenticated,
@@ -79,6 +81,7 @@ export default function ProfilePage() {
         if (cancelled) return;
         setProfile(row ? { ...row, email: userEmail } : null);
         setCounts(social);
+        if (row?.locale) setLocale(normalizeLocale(row.locale));
       } catch {
         if (!cancelled) setProfile(null);
       } finally {
@@ -89,7 +92,7 @@ export default function ProfilePage() {
     return () => {
       cancelled = true;
     };
-  }, [status, isAuthenticated, userId, user?.email]);
+  }, [status, isAuthenticated, userId, user?.email, setLocale]);
 
   const name = profile?.username?.trim() || profileLabel;
   const profileAvatar = publicAvatarUrl(profile?.avatar_path) ?? avatarUrl;
@@ -113,11 +116,9 @@ export default function ProfilePage() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h1 className="font-display text-2xl font-bold text-slate-900">
-              Profile
+              {t("profile.title")}
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Your public card, friends, and account settings.
-            </p>
+            <p className="mt-1 text-sm text-slate-500">{t("profile.subtitle")}</p>
           </div>
           {isAuthenticated && user ? (
             <Button
@@ -127,13 +128,13 @@ export default function ProfilePage() {
               onClick={() => setSettingsOpen(true)}
             >
               <Settings className="h-5 w-5 text-slate-700" />
-              Settings
+              {t("profile.settings")}
             </Button>
           ) : null}
         </div>
 
         {status === "loading" ? (
-          <p className="text-sm text-slate-400">Loading…</p>
+          <p className="text-sm text-slate-400">{t("profile.loading")}</p>
         ) : isAuthenticated && user ? (
           <>
             <Card className="border-slate-200 bg-white">
@@ -173,11 +174,11 @@ export default function ProfilePage() {
 
             <Card className="border-slate-200 bg-white">
               <CardHeader>
-                <CardTitle className="text-base">Edit profile</CardTitle>
+                <CardTitle className="text-base">{t("profile.editProfile")}</CardTitle>
               </CardHeader>
               <CardContent>
                 {!profileReady ? (
-                  <p className="text-sm text-slate-400">Loading profile…</p>
+                  <p className="text-sm text-slate-400">{t("profile.loadingProfile")}</p>
                 ) : (
                   <ProfileForm
                     key={
@@ -211,13 +212,16 @@ export default function ProfilePage() {
             <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
               <DialogContent className="max-h-[min(90vh,40rem)] w-[calc(100%-2rem)] max-w-md overflow-y-auto rounded-2xl border-slate-200 bg-white p-6">
                 <DialogHeader>
-                  <DialogTitle>Settings</DialogTitle>
-                  <DialogDescription>
-                    Reset password, delete account, or log out.
-                  </DialogDescription>
+                  <DialogTitle>{t("profile.settings")}</DialogTitle>
+                  <DialogDescription>{t("profile.settingsDesc")}</DialogDescription>
                 </DialogHeader>
                 <div className="mt-2">
-                  <ProfileSettings email={email} />
+                  <ProfileSettings
+                    email={email}
+                    userId={user.id}
+                    initialLocale={profile?.locale}
+                    initialBreakTimerMinutes={profile?.break_timer_minutes}
+                  />
                 </div>
               </DialogContent>
             </Dialog>
@@ -225,15 +229,12 @@ export default function ProfilePage() {
         ) : (
           <Card className="border-slate-200 bg-white">
             <CardHeader>
-              <CardTitle className="text-base">Guest Session</CardTitle>
+              <CardTitle className="text-base">{t("profile.guestSession")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-sm text-slate-500">
-                Solo focus still works. Sign in to edit your profile and sync
-                stats.
-              </p>
+              <p className="text-sm text-slate-500">{t("profile.guestDesc")}</p>
               <Button asChild className="rounded-xl">
-                <Link href="/login">Log In</Link>
+                <Link href="/login">{t("auth.logIn")}</Link>
               </Button>
             </CardContent>
           </Card>

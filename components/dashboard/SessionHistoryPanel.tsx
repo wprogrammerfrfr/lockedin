@@ -19,6 +19,7 @@ import {
 } from "@/features/social/api";
 import type { ProfileDaySession } from "@/features/social/types";
 import { createClient } from "@/lib/supabase/client";
+import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import { userFacingError } from "@/lib/supabase/errors";
 import type { HeatmapDay } from "@/types/database";
 import { cn } from "@/lib/utils";
@@ -102,6 +103,7 @@ export function SessionHistoryPanel({
   title?: string;
   subtitle?: string;
 }) {
+  const { t } = useTranslation();
   const [view, setView] = useState<HistoryView>("calendar");
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [dayOpen, setDayOpen] = useState(false);
@@ -151,7 +153,7 @@ export function SessionHistoryPanel({
       } catch (err) {
         if (!cancelled) {
           setDaySessions([]);
-          setDayError(userFacingError(err, "Could not load sessions"));
+          setDayError(userFacingError(err, t("dash.loadSessionsFailed")));
         }
       } finally {
         if (!cancelled) setDayLoading(false);
@@ -224,7 +226,7 @@ export function SessionHistoryPanel({
           }
         }
         setListSessions([]);
-        setListError(userFacingError(err, "Could not load history"));
+        setListError(userFacingError(err, t("dash.loadHistoryFailed")));
       } finally {
         if (!cancelled) setListLoading(false);
       }
@@ -249,7 +251,7 @@ export function SessionHistoryPanel({
       setListSessions((prev) => [...prev, ...rows]);
       setListHasMore(rows.length >= 30);
     } catch (err) {
-      toast.error(userFacingError(err, "Could not load more"));
+      toast.error(userFacingError(err, t("dash.loadMoreFailed")));
     } finally {
       setListLoading(false);
     }
@@ -271,8 +273,7 @@ export function SessionHistoryPanel({
                 </CardTitle>
               )}
               <p className="mt-1 text-xs text-slate-500">
-                {subtitle ??
-                  "Switch between calendar and list. Click a session for summary or receipt."}
+                {subtitle ?? t("dash.historySubtitle")}
               </p>
             </div>
           </div>
@@ -291,31 +292,29 @@ export function SessionHistoryPanel({
                   className="gap-1.5 rounded-md data-[state=active]:bg-white data-[state=active]:text-slate-900"
                 >
                   <CalendarDays className="h-3.5 w-3.5" />
-                  Calendar
+                  {t("dash.calendar")}
                 </TabsTrigger>
                 <TabsTrigger
                   value="list"
                   className="gap-1.5 rounded-md data-[state=active]:bg-white data-[state=active]:text-slate-900"
                 >
                   <List className="h-3.5 w-3.5" />
-                  List
+                  {t("dash.list")}
                 </TabsTrigger>
               </TabsList>
             </div>
 
             {unavailable ? (
               <p className="mb-3 text-sm text-slate-400">
-                Stats will appear once your sessions sync.
+                {t("dash.statsUnavailable")}
               </p>
             ) : null}
 
             {!username ? (
-              <p className="text-sm text-slate-400">
-                Set a username on your profile to unlock history.
-              </p>
+              <p className="text-sm text-slate-400">{t("dash.setUsername")}</p>
             ) : locked && view === "list" ? (
               <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-400">
-                Follow to unlock session history.
+                {t("dash.followToUnlock")}
               </p>
             ) : (
               <>
@@ -325,9 +324,8 @@ export function SessionHistoryPanel({
                     emptyHint={emptyHint}
                     onDayClick={(date) => {
                       if (locked) {
-                        toast.message("Follow to see sessions", {
-                          description:
-                            "Accepted follows unlock day details.",
+                        toast.message(t("dash.followToSeeSessions"), {
+                          description: t("dash.followUnlockDesc"),
                         });
                         return;
                       }
@@ -339,7 +337,7 @@ export function SessionHistoryPanel({
                 <TabsContent value="list" className="mt-0">
                   {listLoading && listSessions.length === 0 ? (
                     <p className="py-8 text-center text-sm text-slate-400">
-                      Loading sessions…
+                      {t("dash.loadingSessions")}
                     </p>
                   ) : listError ? (
                     <p className="py-8 text-center text-sm text-slate-500">
@@ -347,7 +345,7 @@ export function SessionHistoryPanel({
                     </p>
                   ) : listSessions.length === 0 ? (
                     <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-400">
-                      No sessions yet — LOCK IN to start your history.
+                      {t("dash.noSessions")}
                     </p>
                   ) : (
                     <div className="space-y-2">
@@ -370,7 +368,7 @@ export function SessionHistoryPanel({
                           disabled={listLoading}
                           onClick={() => void loadMore()}
                         >
-                          {listLoading ? "Loading…" : "Load more"}
+                          {listLoading ? t("common.loading") : t("dash.loadMore")}
                         </Button>
                       ) : null}
                     </div>

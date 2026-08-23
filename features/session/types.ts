@@ -1,3 +1,9 @@
+import type {
+  BreakSegment,
+  BreakTypeId,
+  BreakTypeStored,
+} from "@/features/session/break-types";
+
 export type SessionState =
   | "IDLE"
   | "LOCKED_IN"
@@ -11,27 +17,9 @@ export type Verification = "github" | "self";
 
 export type OutcomeKind = "pr" | "solid" | "break" | "tapout" | "idle";
 
-export type BreakChoiceId =
-  | "hydration"
-  | "doomscroll"
-  | "touch_grass"
-  | "smart_alignment";
-
-export type BreakTypeUsed = "hydration" | "dynamic" | "smart_alignment";
-
-/** Groups plus optional choice ids (doomscroll / touch_grass) for finer history labels. */
-export type BreakTypeStored = BreakTypeUsed | BreakChoiceId;
-
 export type BreakSource = "personal" | "shared" | null;
 
-export type BreakChoice = {
-  id: BreakChoiceId;
-  title: string;
-  subtitle: string;
-  emoji: string;
-  group: "hydration" | "dynamic" | "smart";
-  durationMs: number;
-};
+export type BreakMode = "count_up" | "count_down";
 
 export type AppState = {
   session: SessionState;
@@ -47,12 +35,12 @@ export type AppState = {
   breakRemainingMs: number;
   breakElapsedMs: number;
   breakOpenEnded: boolean;
-  breakLabel: string;
-  breakEmoji: string;
-  breakChoiceId: BreakChoiceId | null;
+  breakDurationMs: number;
+  breakTypeId: BreakTypeId | null;
   breakSource: BreakSource;
   sessionName: string | null;
   breakTypesUsed: BreakTypeStored[];
+  breakHistory: BreakSegment[];
   breakMs: number;
   remoteSessionId: string | null;
   clientId: string | null;
@@ -65,8 +53,13 @@ export type Action =
   | { type: "OPEN_PIT_STOP" }
   | { type: "OPEN_SHARED_BREAK_PICKER" }
   | { type: "CLOSE_PIT_STOP" }
-  | { type: "START_BREAK"; choice: BreakChoice; openEnded?: boolean }
-  | { type: "START_SHARED_BREAK"; durationMs?: number }
+  | {
+      type: "START_BREAK";
+      mode: BreakMode;
+      typeId: BreakTypeId;
+      durationMs?: number;
+    }
+  | { type: "START_SHARED_BREAK"; durationMs?: number; typeId?: BreakTypeId }
   | { type: "BREAK_TICK"; delta: number }
   | { type: "LOCK_BACK_IN" }
   | { type: "END_SESSION" }
@@ -83,6 +76,7 @@ export type Action =
       elapsedMs: number;
       sessionName?: string | null;
       breakTypesUsed?: BreakTypeStored[];
+      breakHistory?: BreakSegment[];
       session?: SessionState;
       /** ISO start from DB when resuming a cloud session. */
       startedAt?: string | null;
@@ -93,3 +87,5 @@ export type Action =
       todayTotalMs: number;
       personalRecordMs?: number;
     };
+
+export type { BreakSegment, BreakTypeId, BreakTypeStored };

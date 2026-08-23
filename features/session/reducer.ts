@@ -1,35 +1,50 @@
-import type {
-  Action,
-  AppState,
-  BreakChoiceId,
-  BreakTypeStored,
-  BreakTypeUsed,
-} from "./types";
+import {
+  getBreakType,
+  pickRandomBreakType,
+  type BreakSegment,
+  type BreakTypeId,
+  type BreakTypeStored,
+} from "@/features/session/break-types";
+import type { Action, AppState } from "./types";
 
 /** Short PR so the sandbox particle burst is easy to demo (~15s). */
 export const DEFAULT_PR_MS = 0;
 export const DEFAULT_TODAY_MS = 0;
 export const DEFAULT_STREAK = 0;
 
-function breakTypeFromChoiceGroup(
-  group: "hydration" | "dynamic" | "smart",
-): BreakTypeUsed {
-  if (group === "smart") return "smart_alignment";
-  return group;
+function appendBreakTypeUsed(
+  existing: BreakTypeStored[],
+  typeId: BreakTypeId,
+): BreakTypeStored[] {
+  if (existing.includes(typeId)) return existing;
+  return [...existing, typeId];
 }
 
-function appendBreakTypesUsed(
-  existing: BreakTypeStored[],
-  group: BreakTypeUsed,
-  choiceId: BreakChoiceId,
-): BreakTypeStored[] {
-  const next = [...existing];
-  if (!next.includes(group)) next.push(group);
-  // Persist choice id alongside group so history can show Doomscroll vs Touch Grass.
-  if (choiceId !== group && !next.includes(choiceId)) {
-    next.push(choiceId);
+function segmentDuration(state: AppState): number {
+  if (state.breakOpenEnded) return state.breakElapsedMs;
+  return Math.max(0, state.breakDurationMs - state.breakRemainingMs);
+}
+
+function appendBreakSegment(state: AppState): BreakSegment[] {
+  if (!state.breakTypeId) return state.breakHistory;
+  const durationMs = segmentDuration(state);
+  if (durationMs <= 0 && state.session !== "BREAK_DONE") return state.breakHistory;
+  return [
+    ...state.breakHistory,
+    {
+      typeId: state.breakTypeId,
+      durationMs,
+      openEnded: state.breakOpenEnded,
+    },
+  ];
+}
+
+/** Break history including an in-progress break segment (for sync before dispatch). */
+export function projectBreakHistory(state: AppState): BreakSegment[] {
+  if (state.session === "ON_BREAK" || state.session === "BREAK_DONE") {
+    return appendBreakSegment(state);
   }
-  return next;
+  return state.breakHistory;
 }
 
 function clearBreakFields(): Partial<AppState> {
@@ -37,9 +52,8 @@ function clearBreakFields(): Partial<AppState> {
     breakRemainingMs: 0,
     breakElapsedMs: 0,
     breakOpenEnded: false,
-    breakLabel: "",
-    breakEmoji: "",
-    breakChoiceId: null,
+    breakDurationMs: 0,
+    breakTypeId: null,
     breakSource: null,
   };
 }
@@ -58,17 +72,39 @@ export const initialState: AppState = {
   breakRemainingMs: 0,
   breakElapsedMs: 0,
   breakOpenEnded: false,
-  breakLabel: "",
-  breakEmoji: "",
-  breakChoiceId: null,
+  breakDurationMs: 0,
+  breakTypeId: null,
   breakSource: null,
   sessionName: null,
   breakTypesUsed: [],
+  breakHistory: [],
   breakMs: 0,
   remoteSessionId: null,
   clientId: null,
   sessionStartedAt: null,
 };
+
+function applyBreakStart(
+  state: AppState,
+  typeId: BreakTypeId,
+  mode: "count_up" | "count_down",
+  durationMs: number,
+): AppState {
+  const def = getBreakType(typeId)!;
+  const openEnded = mode === "count_up";
+  return {
+    ...state,
+    session: "ON_BREAK",
+    breakRemainingMs: openEnded ? 0 : durationMs,
+    breakElapsedMs: 0,
+    breakOpenEnded: openEnded,
+    breakDurationMs: openEnded ? 0 : durationMs,
+    breakTypeId: typeId,
+    breakSource: state.breakSource ?? "personal",
+    lastOutcome: "break",
+    breakTypesUsed: appendBreakTypeUsed(state.breakTypesUsed, typeId),
+  };
+}
 
 export function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -90,6 +126,7 @@ export function reducer(state: AppState, action: Action): AppState {
         ...clearBreakFields(),
         sessionName: action.sessionName?.trim() || null,
         breakTypesUsed: [],
+        breakHistory: [],
         breakMs: 0,
         sessionStartedAt: new Date().toISOString(),
         remoteSessionId:
@@ -111,6 +148,7 @@ export function reducer(state: AppState, action: Action): AppState {
             ? action.sessionName
             : state.sessionName,
         breakTypesUsed: action.breakTypesUsed ?? state.breakTypesUsed,
+        breakHistory: action.breakHistory ?? state.breakHistory,
         remoteSessionId: action.remoteSessionId,
         clientId:
           action.clientId !== undefined ? action.clientId : state.clientId,
@@ -151,7 +189,6 @@ export function reducer(state: AppState, action: Action): AppState {
       };
     case "CLOSE_PIT_STOP":
       if (state.session !== "CHOOSING_BREAK") return state;
-      // Shared vote result requires a type pick — cannot cancel back to locked in.
       if (state.breakSource === "shared") return state;
       return {
         ...state,
@@ -161,47 +198,24 @@ export function reducer(state: AppState, action: Action): AppState {
       };
     case "START_BREAK": {
       if (state.session !== "CHOOSING_BREAK") return state;
-      const used = breakTypeFromChoiceGroup(action.choice.group);
-      const openEnded = Boolean(action.openEnded);
-      return {
-        ...state,
-        session: "ON_BREAK",
-        breakRemainingMs: openEnded ? 0 : action.choice.durationMs,
-        breakElapsedMs: 0,
-        breakOpenEnded: openEnded,
-        breakLabel: action.choice.title,
-        breakEmoji: action.choice.emoji,
-        breakChoiceId: action.choice.id,
-        breakSource: state.breakSource ?? "personal",
-        lastOutcome: "break",
-        breakTypesUsed: appendBreakTypesUsed(
-          state.breakTypesUsed,
-          used,
-          action.choice.id,
-        ),
-      };
+      const durationMs =
+        action.mode === "count_down"
+          ? Math.max(60_000, action.durationMs ?? 15 * 60_000)
+          : 0;
+      return applyBreakStart(state, action.typeId, action.mode, durationMs);
     }
     case "START_SHARED_BREAK": {
-      // Pomodoro cadence path — timed shared break, no type picker.
       if (state.session !== "LOCKED_IN" && state.session !== "CHOOSING_BREAK") {
         return state;
       }
-      const breakTypesUsed = state.breakTypesUsed.includes("dynamic")
-        ? state.breakTypesUsed
-        : [...state.breakTypesUsed, "dynamic" as const];
-      return {
-        ...state,
-        session: "ON_BREAK",
-        breakRemainingMs: action.durationMs ?? 5 * 60 * 1000,
-        breakElapsedMs: 0,
-        breakOpenEnded: false,
-        breakLabel: "Pomodoro break",
-        breakEmoji: "☕",
-        breakChoiceId: null,
-        breakSource: "shared",
-        lastOutcome: "break",
-        breakTypesUsed,
-      };
+      const typeId = action.typeId ?? pickRandomBreakType().id;
+      const durationMs = action.durationMs ?? 5 * 60 * 1000;
+      return applyBreakStart(
+        { ...state, breakSource: "shared" },
+        typeId,
+        "count_down",
+        durationMs,
+      );
     }
     case "BREAK_TICK": {
       if (state.session !== "ON_BREAK") return state;
@@ -228,7 +242,7 @@ export function reducer(state: AppState, action: Action): AppState {
         breakMs: state.breakMs + spent,
       };
     }
-    case "LOCK_BACK_IN":
+    case "LOCK_BACK_IN": {
       if (
         state.session !== "BREAK_DONE" &&
         state.session !== "ON_BREAK" &&
@@ -236,20 +250,25 @@ export function reducer(state: AppState, action: Action): AppState {
       ) {
         return state;
       }
-      // Shared picker cannot be skipped via LOCK BACK IN either.
       if (
         state.session === "CHOOSING_BREAK" &&
         state.breakSource === "shared"
       ) {
         return state;
       }
+      const breakHistory =
+        state.session === "ON_BREAK" || state.session === "BREAK_DONE"
+          ? appendBreakSegment(state)
+          : state.breakHistory;
       return {
         ...state,
         session: "LOCKED_IN",
+        breakHistory,
         ...clearBreakFields(),
         lastOutcome: state.didBreakPR ? "pr" : "solid",
       };
-    case "END_SESSION":
+    }
+    case "END_SESSION": {
       if (
         state.session !== "BREAK_DONE" &&
         state.session !== "LOCKED_IN" &&
@@ -258,14 +277,20 @@ export function reducer(state: AppState, action: Action): AppState {
       ) {
         return state;
       }
+      const breakHistory =
+        state.session === "ON_BREAK" || state.session === "BREAK_DONE"
+          ? appendBreakSegment(state)
+          : state.breakHistory;
       return {
         ...state,
         session: "ENDED",
         lastSessionMs: state.elapsedMs,
         lastOutcome: state.didBreakPR ? "pr" : "solid",
+        breakHistory,
         ...clearBreakFields(),
         remoteSessionId: null,
       };
+    }
     case "TICK": {
       if (state.session !== "LOCKED_IN") return state;
       const elapsedMs = state.elapsedMs + action.delta;

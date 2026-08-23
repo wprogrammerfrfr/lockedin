@@ -10,6 +10,7 @@ import {
   normalizeUsername,
 } from "@/lib/profile/username";
 import { userFacingError } from "@/lib/supabase/errors";
+import { useTranslation } from "@/lib/i18n/LocaleProvider";
 
 type ProfileFormProps = {
   profile: Profile | null;
@@ -22,6 +23,7 @@ type ProfileFormProps = {
 };
 
 export function ProfileForm({ profile, disabled, onSave }: ProfileFormProps) {
+  const { t } = useTranslation();
   const timezones = useMemo(() => {
     try {
       return Intl.supportedValuesOf("timeZone");
@@ -49,7 +51,7 @@ export function ProfileForm({ profile, disabled, onSave }: ProfileFormProps) {
     const trimmedUsername = normalizeUsername(username);
     if (trimmedUsername && !isValidUsername(trimmedUsername)) {
       setMessage(
-        "Username must be 3–20 characters: letters, numbers, and underscores only.",
+        t("profile.usernameInvalid"),
       );
       return;
     }
@@ -65,10 +67,10 @@ export function ProfileForm({ profile, disabled, onSave }: ProfileFormProps) {
         timezone,
         username: usernameChanged ? trimmedUsername : undefined,
       });
-      setMessage("Saved.");
+      setMessage(t("profile.saved"));
     } catch (err) {
       console.error("updateProfile failed", err);
-      setMessage(userFacingError(err, "Save failed."));
+      setMessage(userFacingError(err, t("common.saveFailed")));
     } finally {
       setSaving(false);
     }
@@ -77,7 +79,7 @@ export function ProfileForm({ profile, disabled, onSave }: ProfileFormProps) {
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
       <div>
-        <Label htmlFor="username">Username</Label>
+        <Label htmlFor="username">{t("profile.username")}</Label>
         <Input
           id="username"
           value={username}
@@ -90,7 +92,7 @@ export function ProfileForm({ profile, disabled, onSave }: ProfileFormProps) {
         />
       </div>
       <div>
-        <Label htmlFor="bio">Bio</Label>
+        <Label htmlFor="bio">{t("profile.bio")}</Label>
         <textarea
           id="bio"
           value={bio}
@@ -102,7 +104,7 @@ export function ProfileForm({ profile, disabled, onSave }: ProfileFormProps) {
         />
       </div>
       <div>
-        <Label htmlFor="timezone">Timezone</Label>
+        <Label htmlFor="timezone">{t("profile.timezone")}</Label>
         <select
           id="timezone"
           value={timezone}
@@ -118,7 +120,7 @@ export function ProfileForm({ profile, disabled, onSave }: ProfileFormProps) {
         </select>
       </div>
       <Button type="submit" disabled={disabled || saving} className="rounded-xl">
-        {saving ? "Saving…" : "Save profile"}
+        {saving ? t("profile.saving") : t("profile.saveProfile")}
       </Button>
       {message && <p className="text-xs text-slate-500">{message}</p>}
     </form>

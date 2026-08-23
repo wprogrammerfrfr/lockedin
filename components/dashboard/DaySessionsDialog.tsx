@@ -31,6 +31,7 @@ import {
 } from "@/features/session/format";
 import type { ProfileDaySession } from "@/features/social/types";
 import type { OutcomeKind } from "@/features/session/types";
+import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import { cn } from "@/lib/utils";
 
 export function asSessionOutcome(s: ProfileDaySession): OutcomeKind {
@@ -75,6 +76,7 @@ export function SessionListRow({
   onClick: () => void;
   showDate?: boolean;
 }) {
+  const { t } = useTranslation();
   const isRoom =
     session.kind === "room" || Boolean(session.room_session_id);
   return (
@@ -91,9 +93,9 @@ export function SessionListRow({
           <p className="truncate font-medium text-slate-800">
             {session.session_name?.trim() ||
               session.room_name?.trim() ||
-              "Untitled"}
+              t("dash.untitled")}
             <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-              {isRoom ? "Room" : "Solo"}
+              {isRoom ? t("receipt.room") : t("receipt.solo")}
             </span>
           </p>
           <p className="mt-0.5 text-xs text-slate-500">
@@ -136,6 +138,7 @@ export function SessionDetailDialog({
   timeZone: string;
   canShare?: boolean;
 }) {
+  const { t } = useTranslation();
   const { isAuthenticated, profileLabel, avatarUrl, user } = useAuth();
   const [shareOpen, setShareOpen] = useState(false);
   const [cardView, setCardView] = useSessionCardView("summary");
@@ -175,7 +178,9 @@ export function SessionDetailDialog({
         <DialogContent className="flex max-h-[min(90dvh,52rem)] max-w-md flex-col gap-3 overflow-hidden border-slate-200 bg-white">
           <DialogHeader className="shrink-0">
             <DialogTitle>
-              {cardView === "summary" ? "Session summary" : "Session receipt"}
+              {cardView === "summary"
+                ? t("dash.sessionSummary")
+                : t("dash.sessionReceipt")}
             </DialogTitle>
           </DialogHeader>
 
@@ -222,12 +227,14 @@ export function SessionDetailDialog({
                   onClick={() => setShareOpen(true)}
                 >
                   <Share2 className="h-4 w-4" />
-                  Share / export
+                  {t("dash.shareExport")}
                 </Button>
               ) : null}
             </div>
           ) : (
-            <p className="py-4 text-sm text-slate-400">No session selected.</p>
+            <p className="py-4 text-sm text-slate-400">
+              {t("dash.noSessionSelected")}
+            </p>
           )}
         </DialogContent>
       </Dialog>
@@ -273,6 +280,7 @@ export function DaySessionsDialog({
   loading?: boolean;
   error?: string | null;
 }) {
+  const { t } = useTranslation();
   const [detail, setDetail] = useState<ProfileDaySession | null>(null);
   const tz = timezone || "UTC";
 
@@ -286,34 +294,34 @@ export function DaySessionsDialog({
         <DialogContent className="max-w-md border-slate-200 bg-white">
           <DialogHeader>
             <DialogTitle className="font-mono tabular-nums">
-              {day ?? "Sessions"}
+              {day ?? t("dash.daySessions")}
             </DialogTitle>
             <DialogDescription>
               {locked
-                ? "Follow this student to see their session details."
-                : "Click a session for the summary or receipt."}
+                ? t("dash.followForDetails")
+                : t("dash.clickForDetails")}
             </DialogDescription>
           </DialogHeader>
 
           {locked ? (
             <div className="space-y-3 py-2">
               <p className="text-sm text-slate-500">
-                Session lists unlock after you follow them (accepted).
+                {t("dash.followUnlockList")}
               </p>
               <Button asChild className="rounded-xl">
-                <Link href={`/u/${username}`}>View profile</Link>
+                <Link href={`/u/${username}`}>{t("dash.viewProfile")}</Link>
               </Button>
             </div>
           ) : loading ? (
-            <p className="py-4 text-sm text-slate-400">Loading sessions…</p>
+            <p className="py-4 text-sm text-slate-400">{t("dash.loadingSessions")}</p>
           ) : error ? (
             <p className="py-4 text-sm text-slate-500">{error}</p>
           ) : sessions.length === 0 ? (
             <div className="space-y-3 py-2">
-              <p className="text-sm text-slate-400">No sessions this day.</p>
+              <p className="text-sm text-slate-400">{t("dash.noSessionsDay")}</p>
               {canShare ? (
                 <Button asChild variant="outline" className="rounded-xl">
-                  <Link href="/lockin">LOCK IN</Link>
+                  <Link href="/lockin">{t("nav.lockin")}</Link>
                 </Button>
               ) : null}
             </div>

@@ -42,6 +42,7 @@ export type ProfileDaySessionParticipant = {
   active_ms?: number;
   break_ms?: number;
   break_types_used?: unknown;
+  break_history?: unknown;
   outcome?: string | null;
   status_at_end?: string | null;
 };
@@ -52,6 +53,7 @@ export type ProfileDaySession = {
   active_ms?: number;
   break_ms?: number;
   break_types_used?: unknown;
+  break_history?: unknown;
   started_at?: string;
   ended_at?: string | null;
   outcome?: string | null;

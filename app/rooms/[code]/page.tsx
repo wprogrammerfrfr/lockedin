@@ -20,7 +20,7 @@ import { RoomPresencePane } from "@/components/rooms/RoomPresencePane";
 import { RoomPresenceStrip } from "@/components/rooms/RoomPresenceStrip";
 import { BreakVoteDialog } from "@/components/rooms/BreakVoteDialog";
 import { ActiveSessionDialog } from "@/components/session/ActiveSessionDialog";
-import { PitStopDialog } from "@/components/session/PitStopDialog";
+import { BreakStartDialog } from "@/components/session/BreakStartDialog";
 import { ShareCardDialog } from "@/components/session/ShareCardDialog";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -39,7 +39,12 @@ import { usePomodoroCadence } from "@/features/rooms/usePomodoroCadence";
 import { useRoomChannel } from "@/features/rooms/useRoomChannel";
 import type { BreakVoteChoice, RoomSummary } from "@/features/rooms/types";
 import { resolveOutcome } from "@/features/session/format";
-import { initialState, reducer } from "@/features/session/reducer";
+import { pickRandomBreakType } from "@/features/session/break-types";
+import { initialState, projectBreakHistory, reducer } from "@/features/session/reducer";
+import {
+  breakTimerMs,
+  loadBreakTimerMinutes,
+} from "@/lib/preferences/break-timer";
 import { useSessionClock } from "@/features/session/useSessionClock";
 import type { SessionReceiptData } from "@/components/session/SessionReceiptCard";
 import {
@@ -52,6 +57,7 @@ import {
 } from "@/features/session/sync";
 import type { SessionRow } from "@/types/database";
 import { createClient } from "@/lib/supabase/client";
+import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import { userFacingError } from "@/lib/supabase/errors";
 
 const UUID_RE =
@@ -78,12 +84,16 @@ export default function RoomFocusPage({
 }) {
   const { code } = use(params);
   const router = useRouter();
+  const { t } = useTranslation();
   const { status, user, profile, avatarUrl, isAuthenticated, profileLabel } =
     useAuth();
   const [room, setRoom] = useState<RoomSummary | null>(null);
   const [missing, setMissing] = useState(false);
   const [state, dispatch] = useReducer(reducer, initialState);
   const [sessionNameDraft, setSessionNameDraft] = useState("");
+  const [breakTimerMinutes, setBreakTimerMinutes] = useState(
+    loadBreakTimerMinutes,
+  );
   const [tallies, setTallies] = useState({ break: 0, stay: 0 });
   const [myVote, setMyVote] = useState<BreakVoteChoice | null>(null);
   const [conflictOpen, setConflictOpen] = useState(false);
@@ -141,7 +151,7 @@ export default function RoomFocusPage({
       const next = await fetchRoomByCode(supabase, code);
       if (!next) {
         if (seenRoomRef.current) {
-          toast.message("This room closed.");
+          toast.message(t("room.toast.closed"));
           router.push("/rooms");
           return;
         }
@@ -168,7 +178,7 @@ export default function RoomFocusPage({
     } catch {
       if (!loadErrorToastRef.current) {
         loadErrorToastRef.current = true;
-        toast.error("Could not load room");
+        toast.error(t("room.toast.loadFailed"));
       }
     }
   }, [code, router, isAuthenticated]);
@@ -198,7 +208,7 @@ export default function RoomFocusPage({
         },
         (payload) => {
           if (payload.eventType === "DELETE") {
-            toast.message("This room closed.");
+            toast.message(t("room.toast.closed"));
             router.push("/rooms");
             return;
           }
@@ -231,7 +241,7 @@ export default function RoomFocusPage({
 
   useEffect(() => {
     if (missing) {
-      toast.error("That room code doesn't exist.");
+      toast.error(t("room.toast.notFound"));
       router.push("/rooms");
     }
   }, [missing, router]);
@@ -268,7 +278,7 @@ export default function RoomFocusPage({
         state.session === "CHOOSING_BREAK" ||
         state.session === "BREAK_DONE";
       const breakType =
-        state.breakChoiceId ??
+        state.breakTypeId ??
         (isPomodoro && onBreak ? "pomodoro" : null);
       return {
         userId,
@@ -282,15 +292,14 @@ export default function RoomFocusPage({
             : ("WAITING" as const),
         elapsedMs: state.elapsedMs,
         seat: null as number | null,
-        breakLabel: onBreak ? state.breakLabel || null : null,
+        breakLabel: null,
         breakType: onBreak ? breakType : null,
       };
     },
     [
       state.elapsedMs,
       state.session,
-      state.breakLabel,
-      state.breakChoiceId,
+      state.breakTypeId,
       isPomodoro,
       userId,
       username,
@@ -331,8 +340,8 @@ export default function RoomFocusPage({
         if (!cancelled) {
           toast.success(
             prBroken
-              ? "Saved your last session — new PR"
-              : "Saved your last session",
+              ? t("room.toast.savedPr")
+              : t("room.toast.saved"),
           );
         }
       } catch {
@@ -384,7 +393,7 @@ export default function RoomFocusPage({
     if (result === "break") {
       dispatch({ type: "OPEN_SHARED_BREAK_PICKER" });
     } else if (result === "cancelled") {
-      toast.message("Break vote cancelled.");
+      toast.message(t("room.toast.voteCancelled"));
     }
   }, [room?.lastVoteRoundId, room?.lastVoteResult]);
 
@@ -416,6 +425,7 @@ export default function RoomFocusPage({
       activeMs: s.elapsedMs,
       breakMs: s.breakMs,
       breakTypes: s.breakTypesUsed,
+      breakHistory: projectBreakHistory(s),
       outcome: kind === "tapout" ? "tapout" : s.didBreakPR ? "pr" : "solid",
       prBroken: s.didBreakPR,
     };
@@ -479,7 +489,7 @@ export default function RoomFocusPage({
         setConflictOpen(true);
         return;
       }
-      toast.error(userFacingError(err, "Could not start session"));
+      toast.error(userFacingError(err, t("room.toast.startFailed")));
     }
   }, [
     status,
@@ -496,7 +506,7 @@ export default function RoomFocusPage({
       await persistEnd("tapout");
       dispatch({ type: "TAP_OUT" });
     } catch (err) {
-      toast.error(userFacingError(err, "Tap out sync failed"));
+      toast.error(userFacingError(err, t("room.toast.tapOutFailed")));
     }
   }, []);
 
@@ -505,7 +515,7 @@ export default function RoomFocusPage({
       await persistEnd("end");
       dispatch({ type: "END_SESSION" });
     } catch (err) {
-      toast.error(userFacingError(err, "End sync failed"));
+      toast.error(userFacingError(err, t("room.toast.endFailed")));
     }
   }, []);
 
@@ -520,7 +530,7 @@ export default function RoomFocusPage({
         await loadRoom();
         return;
       }
-      toast.error(userFacingError(err, "Could not start shared break"));
+      toast.error(userFacingError(err, t("room.toast.sharedBreakFailed")));
     }
   }
 
@@ -530,7 +540,7 @@ export default function RoomFocusPage({
       await cancelBreakVote(createClient(), room.id);
       await loadRoom();
     } catch (err) {
-      toast.error(userFacingError(err, "Could not cancel vote"));
+      toast.error(userFacingError(err, t("room.toast.cancelVoteFailed")));
     }
   }
 
@@ -546,14 +556,14 @@ export default function RoomFocusPage({
         } catch (err) {
           const msg = err instanceof Error ? err.message : "";
           if (!msg.includes("not_in_room")) {
-            toast.error(userFacingError(err, "Could not leave room"));
+            toast.error(userFacingError(err, t("room.toast.leaveFailed")));
             return;
           }
         }
       }
       router.push("/rooms");
     } catch (err) {
-      toast.error(userFacingError(err, "Could not leave room"));
+      toast.error(userFacingError(err, t("room.toast.leaveFailed")));
     }
   }
 
@@ -572,13 +582,14 @@ export default function RoomFocusPage({
 
   const roomReceipt: SessionReceiptData = useMemo(
     () => ({
-      sessionName: state.sessionName || room?.name || "Room session",
+      sessionName: state.sessionName || room?.name || t("room.sessionFallback"),
       kind: "room",
       roomCode: room?.code ?? displayCode,
       startedAt: state.sessionStartedAt,
       activeMs: shareDuration,
       breakMs: state.breakMs,
       breakTypesUsed: state.breakTypesUsed,
+      breakHistory: state.breakHistory,
       outcome: shareOutcome,
       prBroken: state.didBreakPR,
       participants: members.map((m) => ({
@@ -642,8 +653,8 @@ export default function RoomFocusPage({
           breakRemainingMs={state.breakRemainingMs}
           breakElapsedMs={state.breakElapsedMs}
           breakOpenEnded={state.breakOpenEnded}
-          breakLabel={state.breakLabel}
-          breakEmoji={state.breakEmoji}
+          breakTypeId={state.breakTypeId}
+          breakDurationMs={state.breakDurationMs}
           sessionName={sessionNameDraft}
           onSessionNameChange={setSessionNameDraft}
           lockInDisabled={status === "loading"}
@@ -651,13 +662,13 @@ export default function RoomFocusPage({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-xs font-medium text-slate-500">
-                  Room Code :{" "}
+                  {t("room.roomCode")}{" "}
                   <span className="font-mono text-base font-bold tabular-nums tracking-widest text-slate-900">
                     {displayCode}
                   </span>
                 </p>
                 <p className="mt-0.5 text-xs text-slate-400">
-                  {isPomodoro ? "Pomodoro cadence" : "Vote room"} ·{" "}
+                  {isPomodoro ? t("room.pomodoroCadence") : t("room.voteRoom")} ·{" "}
                   {room?.status ?? "…"}
                 </p>
               </div>
@@ -671,19 +682,19 @@ export default function RoomFocusPage({
                     const link = `${window.location.origin}/rooms/${displayCode}`;
                     try {
                       await navigator.clipboard.writeText(link);
-                      toast.success("Invite link copied");
+                      toast.success(t("room.toast.inviteCopied"));
                     } catch {
                       try {
                         await navigator.clipboard.writeText(displayCode);
-                        toast.success("Room code copied");
+                        toast.success(t("room.toast.codeCopied"));
                       } catch {
-                        toast.error("Could not copy");
+                        toast.error(t("room.toast.copyFailed"));
                       }
                     }
                   }}
                 >
                   <Copy className="mr-1.5 h-3.5 w-3.5" />
-                  Invite
+                  {t("room.invite")}
                 </Button>
                 {isVoteRoom ? (
                   <Button
@@ -691,11 +702,11 @@ export default function RoomFocusPage({
                     className="rounded-xl border-amber-300 bg-amber-50 font-display font-bold text-amber-900 hover:bg-amber-100"
                     onClick={() => void onRequestBreak()}
                   >
-                    BREAK?
+                    {t("room.breakQuestion")}
                   </Button>
                 ) : (
                   <p className="hidden text-[11px] text-slate-400 sm:block">
-                    Breaks are automatic
+                    {t("room.breaksAutomatic")}
                   </p>
                 )}
                 <Button
@@ -703,7 +714,7 @@ export default function RoomFocusPage({
                   className="rounded-xl"
                   onClick={() => void onLeave()}
                 >
-                  Leave
+                  {t("room.leave")}
                 </Button>
               </div>
             </div>
@@ -711,14 +722,14 @@ export default function RoomFocusPage({
           heroTitle={
             <h1 className="flex max-w-full flex-wrap items-baseline justify-center gap-x-2 gap-y-1 pb-0.5 text-center font-display text-2xl font-bold leading-snug tracking-tight text-slate-900 sm:text-3xl">
               <span className="min-w-0 max-w-full line-clamp-2">
-                {room?.name || "Room"}
+                {room?.name || t("room.fallbackName")}
               </span>
               <span className="inline-flex shrink-0 items-baseline gap-x-2 whitespace-nowrap leading-snug">
                 <LockedInLogo
                   word="Lock"
                   className="text-[0.85em] sm:text-[0.9em]"
                 />
-                <span>session</span>
+                <span>{t("room.heroSession")}</span>
               </span>
             </h1>
           }
@@ -738,18 +749,21 @@ export default function RoomFocusPage({
         />
       </div>
 
-      <PitStopDialog
+      <BreakStartDialog
         open={state.session === "CHOOSING_BREAK"}
         required={state.breakSource === "shared"}
-        openEnded={state.breakSource === "shared"}
+        breakTimerMinutes={breakTimerMinutes}
         onClose={() => dispatch({ type: "CLOSE_PIT_STOP" })}
-        onSelect={(choice) =>
+        onStart={(mode) => {
+          const typeId = pickRandomBreakType().id;
           dispatch({
             type: "START_BREAK",
-            choice,
-            openEnded: state.breakSource === "shared",
-          })
-        }
+            mode,
+            typeId,
+            durationMs:
+              mode === "count_down" ? breakTimerMs(breakTimerMinutes) : undefined,
+          });
+        }}
       />
 
       <BreakVoteDialog
@@ -767,7 +781,7 @@ export default function RoomFocusPage({
               await loadRoom();
             } catch (err) {
               setMyVote(previous);
-              toast.error(userFacingError(err, "Vote failed"));
+              toast.error(userFacingError(err, t("room.toast.voteFailed")));
             }
           }
         }}
@@ -804,9 +818,9 @@ export default function RoomFocusPage({
             });
             setConflictOpen(false);
             setConflictSession(null);
-            toast.success("Remote session tapped out — try LOCK IN again");
+            toast.success(t("room.toast.remoteTapOut"));
           } catch (err) {
-            toast.error(userFacingError(err, "Could not tap out remote"));
+            toast.error(userFacingError(err, t("room.toast.remoteTapOutFailed")));
           }
         }}
       />

@@ -8,6 +8,7 @@ import { formatMs } from "@/features/session/format";
 import { weeklyLeaderboard } from "@/features/social/api";
 import type { LeaderboardEntry } from "@/features/social/types";
 import { publicAvatarUrl } from "@/features/profile/api";
+import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 
 export function WeeklyLeaderboard({
@@ -17,6 +18,7 @@ export function WeeklyLeaderboard({
   timezone?: string;
   compact?: boolean;
 }) {
+  const { t } = useTranslation();
   const { status, isAuthenticated } = useAuth();
   const [rows, setRows] = useState<LeaderboardEntry[]>([]);
   const [error, setError] = useState(false);
@@ -66,36 +68,34 @@ export function WeeklyLeaderboard({
       }
     >
       <p className="font-display text-sm font-semibold text-slate-800">
-        This week&apos;s top lock ins
+        {t("leaderboard.title")}
       </p>
 
       {needsAuth && (
-        <p className="mt-3 text-xs text-slate-400">
-          Please log in to use this feature
-        </p>
+        <p className="mt-3 text-xs text-slate-400">{t("auth.loginRequired")}</p>
       )}
 
       {!needsAuth && error && (
         <p className="mt-3 text-xs text-slate-400">
-          Ranks will appear once the leaderboard is available.
+          {t("leaderboard.unavailable")}
         </p>
       )}
 
       {!needsAuth && !error && rows.length === 0 && (
         <p className="mt-3 text-xs text-slate-400">
-          No activity yet.{" "}
+          {t("leaderboard.empty")}{" "}
           <Link href="/lockin" className="font-medium text-slate-700 underline">
-            LOCK IN
+            {t("nav.lockin")}
           </Link>{" "}
-          to start the week.
+          {t("leaderboard.emptyCta")}
         </p>
       )}
 
       {alone && rows.length === 1 ? (
         <p className="mt-3 text-xs text-slate-500">
-          Just you for now. Accept follow-backs to climb with friends —{" "}
+          {t("leaderboard.alone")}{" "}
           <Link href="/explore" className="font-medium text-slate-800 underline">
-            find students on Explore
+            {t("leaderboard.exploreLink")}
           </Link>
           .
         </p>

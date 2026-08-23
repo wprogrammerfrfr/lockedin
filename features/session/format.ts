@@ -1,8 +1,9 @@
-import type { BreakChoice, OutcomeKind, SessionState } from "./types";
-
-export const HYDRATION_MS = 15 * 60 * 1000;
-export const DOOMSCROLL_MS = 5 * 60 * 1000;
-export const TOUCH_GRASS_MS = 8 * 60 * 1000;
+import {
+  getBreakType,
+  type BreakSegment,
+  type BreakTypeId,
+} from "./break-types";
+import type { OutcomeKind, SessionState } from "./types";
 
 export function formatMs(ms: number, forceHours = false) {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
@@ -141,54 +142,6 @@ export function hasFourOhFour(ms: number) {
     (minutes === 4 && seconds === 4) ||
     (hours === 4 && minutes === 4)
   );
-}
-
-export function minutesUntilNextHourMs(now = new Date()) {
-  const next = new Date(now);
-  next.setMinutes(0, 0, 0);
-  next.setHours(next.getHours() + 1);
-  const ms = next.getTime() - now.getTime();
-  // At least 1 minute so a near-hour edge still starts a countdown
-  return Math.max(60_000, ms);
-}
-
-export function buildBreakChoices(now = new Date()): BreakChoice[] {
-  const smartMs = minutesUntilNextHourMs(now);
-  const smartMins = Math.ceil(smartMs / 60_000);
-  return [
-    {
-      id: "hydration",
-      title: "15-minute Hydration Break",
-      subtitle: "Water up. Reset the eyes.",
-      emoji: "💧",
-      group: "hydration",
-      durationMs: HYDRATION_MS,
-    },
-    {
-      id: "doomscroll",
-      title: "Quick Doomscroll",
-      subtitle: "Dynamic · 5 minutes",
-      emoji: "📱",
-      group: "dynamic",
-      durationMs: DOOMSCROLL_MS,
-    },
-    {
-      id: "touch_grass",
-      title: "Touch Grass",
-      subtitle: "Dynamic · 8 minutes",
-      emoji: "🌿",
-      group: "dynamic",
-      durationMs: TOUCH_GRASS_MS,
-    },
-    {
-      id: "smart_alignment",
-      title: "Smart Alignment",
-      subtitle: `${smartMins} min until top of the hour`,
-      emoji: "⌛",
-      group: "smart",
-      durationMs: smartMs,
-    },
-  ];
 }
 
 export function outcomeEmoji(outcome: OutcomeKind) {
@@ -430,13 +383,17 @@ const BREAK_TYPE_LABELS: Record<string, string> = {
   hydration: "Hydration",
   doomscroll: "Doomscroll",
   touch_grass: "Touch grass",
+  bathroom: "Bathroom",
+  not_locked_in: "Not locked in",
+  snacking: "Snacking",
+  stretching: "Stretching",
+  zoning_out: "Zoning out",
+  petting_dog: "Petting the dog",
   dynamic: "Dynamic",
-  smart_alignment: "Smart alignment",
-  smart: "Smart alignment",
   pomodoro: "Pomodoro",
 };
 
-/** Human labels for stored break type ids. Prefer specific choices over group `dynamic`. */
+/** Human labels for stored break type ids. */
 export function formatBreakTypes(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   const keys: string[] = [];
@@ -447,28 +404,63 @@ export function formatBreakTypes(raw: unknown): string[] {
     seen.add(key);
     keys.push(key);
   }
-  const hasSpecificDynamic =
-    keys.includes("doomscroll") || keys.includes("touch_grass");
   const out: string[] = [];
   for (const key of keys) {
-    if (key === "dynamic" && hasSpecificDynamic) continue;
+    if (key === "dynamic") continue;
     out.push(BREAK_TYPE_LABELS[key] ?? key.replace(/_/g, " "));
   }
   return out;
 }
 
-/** Prefer specific choice ids; used for receipt break duration labels. */
+export function breakReceiptLabel(
+  typeId: BreakTypeId | string,
+  liveLabel?: (key: string) => string,
+): string {
+  const key = `break.receipt.${typeId}`;
+  if (liveLabel) {
+    const translated = liveLabel(key);
+    if (translated !== key) return translated;
+  }
+  const def = getBreakType(typeId);
+  return def?.receiptLabelEn ?? "Break: rested for";
+}
+
+/** Live break status label only (e.g. "Snacking" / "Atıştırıyor"). Timer shows duration. */
+export function buildBreakLiveLabel(
+  typeId: BreakTypeId,
+  _elapsedMs: number,
+  liveLabel?: (key: string, params?: Record<string, string | number>) => string,
+): string {
+  const key = `break.live.${typeId}`;
+  if (liveLabel && liveLabel(key) !== key) return liveLabel(key);
+  return getBreakType(typeId)?.liveLabelEn ?? "On break";
+}
+
+/** Legacy fallback for sessions without break_history. */
 export function breakDurationLabel(raw: unknown): string {
-  const keys = new Set<string>();
   if (Array.isArray(raw)) {
     for (const item of raw) {
       const key = String(item ?? "").trim().toLowerCase();
-      if (key) keys.add(key);
+      const def = getBreakType(key);
+      if (def) return def.receiptLabelEn;
     }
   }
-  if (keys.has("doomscroll")) return "Break: doomscrolled for";
-  if (keys.has("touch_grass")) return "Break: touched grass for";
   return "Break: rested for";
+}
+
+export function breakHistoryFromLegacy(
+  breakTypesUsed: unknown,
+  breakMs: number,
+): BreakSegment[] {
+  if (!Array.isArray(breakTypesUsed) || breakMs <= 0) return [];
+  for (let i = breakTypesUsed.length - 1; i >= 0; i--) {
+    const key = String(breakTypesUsed[i] ?? "").trim().toLowerCase();
+    const def = getBreakType(key);
+    if (def) {
+      return [{ typeId: def.id, durationMs: breakMs, openEnded: true }];
+    }
+  }
+  return [];
 }
 
 /** Total hours label for lifetime stats (e.g. "12.5h"). */
@@ -485,7 +477,7 @@ export function receiptOutcomeLabel(
 ): string {
   if (prBroken || outcome === "pr") return "NEW PR";
   if (outcome === "tapout" || outcome === "tapped_out" || outcome === "left_early") {
-    return "TAP OUT";
+    return "Finish";
   }
   if (outcome === "break") return "BREAK";
   return "LOCKED IN";

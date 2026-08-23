@@ -7,56 +7,50 @@ import { FollowButton } from "@/components/social/FollowButton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { RoomWallClock } from "@/components/rooms/RoomWallClock";
+import { getBreakType } from "@/features/session/break-types";
 import { formatMs } from "@/features/session/format";
 import type { RoomPresenceMember } from "@/features/rooms/types";
+import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import { getFollowRelation } from "@/features/social/api";
 import type { FollowRelationStatus } from "@/features/social/types";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 function shortBreakLabel(
-  breakType?: string | null,
-  breakLabel?: string | null,
+  breakType: string | null | undefined,
+  t: (key: string) => string,
 ): string | null {
-  const typeMap: Record<string, string> = {
-    hydration: "Hydration",
-    doomscroll: "Doomscroll",
-    touch_grass: "Touch Grass",
-    smart_alignment: "Smart alignment",
-    dynamic: "Dynamic",
-    pomodoro: "Pomodoro",
-  };
-  if (breakType && typeMap[breakType]) return typeMap[breakType];
-  if (breakLabel?.trim()) {
-    const raw = breakLabel.trim();
-    if (/hydration/i.test(raw)) return "Hydration";
-    if (/doomscroll/i.test(raw)) return "Doomscroll";
-    if (/touch grass/i.test(raw)) return "Touch Grass";
-    if (/smart alignment/i.test(raw)) return "Smart alignment";
-    if (/pomodoro/i.test(raw)) return "Pomodoro";
-    if (/shared/i.test(raw)) return "Shared";
-    return raw.length > 18 ? `${raw.slice(0, 16)}…` : raw;
+  if (breakType) {
+    const liveKey = `break.live.${breakType}`;
+    const translated = t(liveKey);
+    if (translated !== liveKey) return translated;
+    const def = getBreakType(breakType);
+    if (def) return def.liveLabelEn;
+    if (breakType === "pomodoro") return t("room.pomodoro");
   }
   return null;
 }
 
-function statusBadge(member: RoomPresenceMember) {
+function statusBadge(
+  member: RoomPresenceMember,
+  t: (key: string) => string,
+) {
   switch (member.status) {
     case "LOCKED_IN":
       return {
-        label: "LOCKED IN",
+        label: t("timer.lockedIn"),
         className: "bg-emerald-50 text-emerald-700 border-emerald-200",
       };
     case "BREAK": {
-      const kind = shortBreakLabel(member.breakType, member.breakLabel);
+      const kind = shortBreakLabel(member.breakType, t);
       return {
-        label: kind ? `BREAK · ${kind}` : "BREAK",
+        label: kind ? `${t("timer.break")} · ${kind}` : t("timer.onBreak"),
         className: "bg-amber-50 text-amber-700 border-amber-200",
       };
     }
     case "LACKING":
       return {
-        label: "Lacking",
+        label: t("room.lacking"),
         className: "bg-slate-100 text-slate-500 border-slate-200",
       };
     default:
@@ -76,6 +70,7 @@ export function RoomPresencePane({
   seats?: number;
   selfUserId?: string | null;
 }) {
+  const { t } = useTranslation();
   const slots = Array.from({ length: Math.min(6, Math.max(2, seats)) }, (_, i) => {
     return members.find((m) => m.seat === i + 1) ?? null;
   });
@@ -126,15 +121,15 @@ export function RoomPresencePane({
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="font-display text-sm font-bold text-slate-900">
-            Attendance
+            {t("room.attendance")}
           </p>
-          <p className="text-xs text-slate-500">2–6 seats</p>
+          <p className="text-xs text-slate-500">{t("room.seats")}</p>
         </div>
         <RoomWallClock className="shrink-0 self-center" />
       </div>
       <div className="flex flex-col gap-2">
         {slots.map((m, i) => {
-          const badge = m ? statusBadge(m) : null;
+          const badge = m ? statusBadge(m, t) : null;
           const isSelf = Boolean(m && selfUserId && m.userId === selfUserId);
           const relation = m ? relations[m.userId] : undefined;
           return (
@@ -194,7 +189,7 @@ export function RoomPresencePane({
                   </div>
                 </div>
               ) : (
-                <p className="text-xs text-slate-400">Open seat</p>
+                <p className="text-xs text-slate-400">{t("room.openSeat")}</p>
               )}
             </motion.div>
           );

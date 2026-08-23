@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import { AuthProvider } from "@/components/auth/AuthProvider";
+import { LocaleProvider } from "@/lib/i18n/LocaleProvider";
+import { getServerLocale } from "@/lib/i18n/get-locale";
 import { Toaster } from "@/components/ui/sonner";
 import { SwRegister } from "@/app/sw-register";
 import "./globals.css";
@@ -46,15 +48,17 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const locale = await getServerLocale();
+
   return (
     <html
-      lang="en"
+      lang={locale}
       className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-slate-50 font-sans text-slate-900">
         <AuthProvider>
-          {children}
+          <LocaleProvider initialLocale={locale}>{children}</LocaleProvider>
           <Toaster position="top-center" richColors closeButton />
           <SwRegister />
         </AuthProvider>
