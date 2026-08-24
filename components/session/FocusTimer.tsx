@@ -170,7 +170,7 @@ export function FocusTimer({
 
         <div
           className={cn(
-            "relative mx-auto flex w-full items-center justify-center overflow-visible rounded-2xl border px-2 sm:px-8 md:px-10",
+            "relative mx-auto flex min-w-0 w-full items-center justify-center overflow-visible rounded-2xl border px-2 sm:px-8 md:px-10",
             isActiveFocus
               ? "mb-3 min-h-[120px] py-3 sm:mb-4 sm:min-h-[200px] sm:py-6 md:min-h-[220px] lg:min-h-[240px]"
               : "mb-4 min-h-[140px] py-4 sm:mb-6 sm:min-h-[280px] sm:py-10 md:min-h-[320px] lg:min-h-[360px]",
@@ -192,7 +192,7 @@ export function FocusTimer({
             />
           )}
 
-          <div className="relative z-10 w-full text-center">
+          <div className="relative z-10 w-full min-w-0 text-center">
             <AnimatePresence mode="wait">
               {state === "BREAK_DONE" ? (
                 <motion.div

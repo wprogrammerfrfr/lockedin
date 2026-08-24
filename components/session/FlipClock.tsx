@@ -1,10 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 
 import { formatCentiseconds, formatMs } from "@/features/session/format";
 import { cn } from "@/lib/utils";
+
+/**
+ * Use layoutEffect when available (browser) so scale is applied before paint,
+ * falling back to useEffect on the server (SSR/tests).
+ */
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 /** Crisp mechanical flip — high damping avoids 3D overshoot/ghosting. */
 const flipTopTransition = { duration: 0.3, ease: [0.4, 0, 0.6, 1] as const };
@@ -263,8 +270,25 @@ export function FlipClock({
   muted?: boolean;
   size?: FlipClockSize;
 }) {
+  /** Outer container — measured to get the available width. */
   const wrapRef = useRef<HTMLDivElement>(null);
+  /** Inner flex row — we read its natural (unscaled) scroll width. */
+  const rowRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
+  const [scale, setScale] = useState(1);
+  const [rowHeight, setRowHeight] = useState<number | null>(null);
+
+  const measured = width > 0;
+  const isMobile = measured && width < 640;
+  const compact = size === "sm" || size === "xs";
+  const elapsed = ms ?? 0;
+  // On narrow mobile widths, prefer MM:SS until the timer passes one hour.
+  const effectiveForceHours = isMobile ? false : forceHours;
+  const showHours = Boolean(value)
+    ? false
+    : effectiveForceHours || elapsed >= HOUR_MS;
+  const showCs = !value && size === "default" && measured && width >= 400;
+  const text = value ?? formatMs(elapsed, showHours);
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -277,68 +301,95 @@ export function FlipClock({
     return () => ro.disconnect();
   }, []);
 
-  const measured = width > 0;
-  const compact = size === "sm" || size === "xs";
-  const elapsed = ms ?? 0;
-  // forceHours: always HH:MM:SS so resize never changes digit count/roles
-  const showHours = Boolean(value)
-    ? false
-    : forceHours || elapsed >= HOUR_MS;
-  const showCs = !value && size === "default" && measured && width >= 400;
-  const text = value ?? formatMs(elapsed, showHours);
+  useIsomorphicLayoutEffect(() => {
+    const row = rowRef.current;
+    if (!row || width === 0) return;
+    // scrollWidth gives the natural (pre-transform) width
+    const naturalW = row.scrollWidth;
+    const naturalH = row.offsetHeight;
+    const s = naturalW > 0 ? Math.min(1, width / naturalW) : 1;
+    // Only update state when values actually change to avoid re-render loops
+    setScale((prev) => (Math.abs(prev - s) < 0.001 ? prev : s));
+    setRowHeight((prev) => (prev === naturalH ? prev : naturalH));
+  }, [width, text]);
   const cs = formatCentiseconds(elapsed);
 
   const chars = text.split("");
   const useRoleKeys = !value && showHours && chars.length === 8;
 
+  const gapClass =
+    size === "xs"
+      ? "gap-0.5"
+      : compact
+        ? "gap-1 sm:gap-1.5 md:gap-2"
+        : "gap-1 sm:gap-2 md:gap-2.5";
+
   return (
+    /*
+     * Outer: fills available width, reports it via ResizeObserver, and acts as
+     * the height container — collapses to the scaled row height so no dead
+     * space sits below the status label.
+     */
     <div
       ref={wrapRef}
-      className={cn(
-        "flex w-full min-w-0 items-end justify-center",
-        size === "xs"
-          ? "gap-0.5"
-          : compact
-            ? "gap-1 sm:gap-1.5 md:gap-2"
-            : "gap-1 sm:gap-2 md:gap-2.5",
-        className,
-      )}
+      className={cn("w-full min-w-0", className)}
       aria-label={showCs ? `${text}:${cs}` : text}
-      style={{ perspective: 1200 }}
+      style={
+        rowHeight != null
+          ? { height: rowHeight * scale }
+          : undefined
+      }
     >
-      {chars.map((ch, i) =>
-        ch === ":" ? (
+      {/*
+       * Inner: natural (unscaled) flex row. Scale origin is top-center so
+       * the digit tops stay flush with the outline top-padding.
+       */}
+      <div
+        ref={rowRef}
+        className={cn(
+          "flex items-end justify-center",
+          gapClass,
+        )}
+        style={{
+          transformOrigin: "top center",
+          transform: scale < 1 ? `scale(${scale})` : undefined,
+          perspective: 1200,
+        }}
+      >
+        {chars.map((ch, i) =>
+          ch === ":" ? (
+            <span
+              key={useRoleKeys ? TIME_KEYS[i] : `colon-${i}`}
+              className={cn(
+                "flex shrink-0 items-center justify-center font-mono font-bold opacity-45",
+                COLON_BOX[size],
+                muted ? "text-red-400" : "text-slate-500",
+              )}
+            >
+              :
+            </span>
+          ) : (
+            <FlipDigit
+              key={useRoleKeys ? TIME_KEYS[i] : `pos-${i}`}
+              digit={ch}
+              muted={muted}
+              size={size}
+            />
+          ),
+        )}
+        {showCs && (
           <span
-            key={useRoleKeys ? TIME_KEYS[i] : `colon-${i}`}
             className={cn(
-              "flex shrink-0 items-center justify-center font-mono font-bold opacity-45",
-              COLON_BOX[size],
-              muted ? "text-red-400" : "text-slate-500",
+              "mb-1 flex shrink-0 items-baseline gap-0.5 font-mono font-bold tabular-nums sm:mb-1.5 md:mb-2",
+              "text-lg sm:text-xl md:text-2xl lg:text-3xl",
+              muted ? "text-red-400/70" : "text-slate-400",
             )}
           >
-            :
+            <span className="opacity-45">:</span>
+            {cs}
           </span>
-        ) : (
-          <FlipDigit
-            key={useRoleKeys ? TIME_KEYS[i] : `pos-${i}`}
-            digit={ch}
-            muted={muted}
-            size={size}
-          />
-        ),
-      )}
-      {showCs && (
-        <span
-          className={cn(
-            "mb-1 flex shrink-0 items-baseline gap-0.5 font-mono font-bold tabular-nums sm:mb-1.5 md:mb-2",
-            "text-lg sm:text-xl md:text-2xl lg:text-3xl",
-            muted ? "text-red-400/70" : "text-slate-400",
-          )}
-        >
-          <span className="opacity-45">:</span>
-          {cs}
-        </span>
-      )}
+        )}
+      </div>
     </div>
   );
 }
