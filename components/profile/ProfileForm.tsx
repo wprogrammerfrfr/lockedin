@@ -119,7 +119,7 @@ export function ProfileForm({ profile, disabled, onSave }: ProfileFormProps) {
           ))}
         </select>
       </div>
-      <Button type="submit" disabled={disabled || saving} className="rounded-xl">
+      <Button type="submit" disabled={disabled || saving} className="rounded-xl bg-lime-500 text-slate-900 hover:bg-lime-400">
         {saving ? t("profile.saving") : t("profile.saveProfile")}
       </Button>
       {message && <p className="text-xs text-slate-500">{message}</p>}

@@ -201,8 +201,7 @@ export function ProfileSettings({
         </select>
         <Button
           type="button"
-          variant="outline"
-          className="rounded-xl border-slate-200"
+          className="rounded-xl bg-lime-500 text-slate-900 hover:bg-lime-400"
           disabled={prefsSaving}
           onClick={() => void handleSavePreferences()}
         >

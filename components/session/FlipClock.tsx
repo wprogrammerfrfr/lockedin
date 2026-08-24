@@ -26,20 +26,20 @@ export type FlipClockSize = "default" | "sm" | "xs";
 
 const DIGIT_GLYPH: Record<FlipClockSize, string> = {
   default:
-    "text-[4.5rem] sm:text-[5.25rem] md:text-[6.75rem] lg:text-[7.5rem]",
+    "text-[3.5rem] sm:text-[5.25rem] md:text-[6.75rem] lg:text-[7.5rem]",
   sm: "text-[2.25rem] sm:text-[2.75rem] md:text-[3.25rem]",
   xs: "text-lg font-bold",
 };
 
 const DIGIT_BOX: Record<FlipClockSize, string> = {
-  default: "h-24 w-[4.5rem] sm:h-28 sm:w-20 md:h-36 md:w-24 lg:h-40 lg:w-28",
+  default: "h-20 w-14 sm:h-28 sm:w-20 md:h-36 md:w-24 lg:h-40 lg:w-28",
   sm: "h-14 w-10 sm:h-16 sm:w-12 md:h-[4.5rem] md:w-14",
   xs: "h-10 w-7 rounded-lg",
 };
 
 const COLON_BOX: Record<FlipClockSize, string> = {
   default:
-    "h-24 w-3 sm:h-28 md:h-36 md:w-3.5 lg:h-40 text-2xl sm:text-3xl md:text-4xl lg:text-5xl",
+    "h-20 w-2.5 sm:h-28 md:h-36 md:w-3.5 lg:h-40 text-xl sm:text-3xl md:text-4xl lg:text-5xl",
   sm: "h-14 w-2 sm:h-16 md:h-[4.5rem] md:w-2.5 text-lg sm:text-xl md:text-2xl",
   xs: "h-10 w-1.5 text-sm",
 };
@@ -300,7 +300,7 @@ export function FlipClock({
           ? "gap-0.5"
           : compact
             ? "gap-1 sm:gap-1.5 md:gap-2"
-            : "gap-1.5 sm:gap-2 md:gap-2.5",
+            : "gap-1 sm:gap-2 md:gap-2.5",
         className,
       )}
       aria-label={showCs ? `${text}:${cs}` : text}
