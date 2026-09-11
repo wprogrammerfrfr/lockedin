@@ -18,6 +18,11 @@ import { userFacingError } from "@/lib/supabase/errors";
 
 const TOUCH_MS = 10_000;
 
+/** Presence track payload: nested melt config is stringified on the wire. */
+type PresenceTrackPayload = Omit<RoomPresenceMember, "meltConfig"> & {
+  meltConfig?: unknown;
+};
+
 function parsePresenceMeltConfig(raw: unknown): MeltConfig | null {
   if (raw == null) return null;
   let value: unknown = raw;
@@ -42,7 +47,7 @@ function parsePresenceMeltConfig(raw: unknown): MeltConfig | null {
 }
 
 function normalizePresenceMember(
-  meta: RoomPresenceMember & { meltConfig?: unknown },
+  meta: PresenceTrackPayload,
   key: string,
 ): RoomPresenceMember {
   const userId = meta.userId || key;
@@ -271,7 +276,7 @@ export function useRoomChannel(
     const meltActive =
       (s.status === "LOCKED_IN" || s.status === "BREAK") && Boolean(s.meltConfig);
     const clockSyncedAt = Date.now();
-    const payload: RoomPresenceMember & { meltConfig?: unknown } = {
+    const payload: PresenceTrackPayload = {
       userId: s.userId,
       username: s.username,
       displayName: s.displayName,
