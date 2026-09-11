@@ -3,13 +3,14 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Cloud, Code2, Target, Users } from "lucide-react";
+import { Cloud, Code2, IceCreamCone, Target, Users } from "lucide-react";
 import { LockedInLogo } from "@/components/brand/LockedInLogo";
 import { WelcomeCtas } from "@/components/welcome/WelcomeCtas";
 import { WelcomeDevShowcase } from "@/components/welcome/WelcomeDevShowcase";
 import { WelcomeFeatures } from "@/components/welcome/WelcomeFeatures";
 import { WelcomeHeroEquation } from "@/components/welcome/WelcomeHeroEquation";
 import { WelcomeHowTo } from "@/components/welcome/WelcomeHowTo";
+import { WelcomeMeltShowcase } from "@/components/welcome/WelcomeMeltShowcase";
 import { WelcomeRoomsShowcase } from "@/components/welcome/WelcomeRoomsShowcase";
 import { WelcomeTimerPreview } from "@/components/welcome/WelcomeTimerPreview";
 import { springSoft } from "@/components/session/state-accent";
@@ -114,6 +115,23 @@ export function WelcomeLanding() {
           </p>
           <div className="mt-6">
             <WelcomeRoomsShowcase />
+          </div>
+        </WelcomeSection>
+
+        <WelcomeSection>
+          <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-amber-600">
+            Melt It
+          </p>
+          <h2 className="mt-2 flex items-center gap-2 font-display text-3xl font-bold tracking-tight text-foreground">
+            <IceCreamCone className="h-7 w-7 text-amber-600" />
+            Design it. Watch it melt.
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+            Try the making board here, then MELT IT — in rooms, everyone&apos;s
+            dessert sits on one shared table. No account needed for this demo.
+          </p>
+          <div className="mt-6">
+            <WelcomeMeltShowcase />
           </div>
         </WelcomeSection>
 
