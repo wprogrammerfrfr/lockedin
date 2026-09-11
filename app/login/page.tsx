@@ -17,10 +17,35 @@ import { cn } from "@/lib/utils";
 
 type AuthMode = "login" | "signup";
 
-function friendlyAuthError(message: string, fallback: string): string {
+function isUnconfirmedAuthError(message: string, code?: string): boolean {
   const m = message.toLowerCase();
-  if (m.includes("invalid login credentials")) {
-    return "Email or password is incorrect.";
+  return (
+    code === "email_not_confirmed" ||
+    m.includes("email not confirmed") ||
+    m.includes("email_not_confirmed")
+  );
+}
+
+function isInvalidCredentialsError(message: string, code?: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    code === "invalid_credentials" ||
+    m.includes("invalid login credentials") ||
+    m.includes("invalid_credentials")
+  );
+}
+
+function friendlyAuthError(
+  message: string,
+  fallback: string,
+  code?: string,
+): string {
+  const m = message.toLowerCase();
+  if (isUnconfirmedAuthError(message, code)) {
+    return "Confirm your email before signing in. Check your inbox, or resend the confirmation email below.";
+  }
+  if (isInvalidCredentialsError(message, code)) {
+    return "Email or password is incorrect. If you just signed up, confirm your email first — or sign in with Google/GitHub if you used those.";
   }
   if (
     m.includes("already registered") ||
@@ -28,9 +53,6 @@ function friendlyAuthError(message: string, fallback: string): string {
     m.includes("already been registered")
   ) {
     return "An account with this email already exists. Sign in instead.";
-  }
-  if (m.includes("email not confirmed")) {
-    return "Confirm your email before signing in. Check your inbox.";
   }
   if (m.includes("password") && m.includes("at least")) {
     return "Password must be at least 6 characters.";
@@ -80,6 +102,8 @@ function LoginPageContent() {
   const [signupSent, setSignupSent] = useState(false);
   const [forgotMode, setForgotMode] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  /** Highlight resend confirmation after login failures that often mean unconfirmed email. */
+  const [suggestResendConfirm, setSuggestResendConfirm] = useState(false);
   const [error, setError] = useState<string | null>(
     callbackError && !confirmed
       ? "Authentication failed. Please try again."
@@ -96,6 +120,7 @@ function LoginPageContent() {
   function clearFormNoise() {
     setError(null);
     setMessage(null);
+    setSuggestResendConfirm(false);
   }
 
   function handleModeChange(value: string) {
@@ -217,17 +242,40 @@ function LoginPageContent() {
       setError("Accept the Terms and Privacy Policy to create an account.");
       return;
     }
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) {
+      setError("Enter your email address.");
+      return;
+    }
+    if (normalizedEmail !== email) {
+      setEmail(normalizedEmail);
+    }
     setLoading("email");
 
     try {
       if (mode === "login") {
         const { error: signInError } = await createClient().auth.signInWithPassword({
-          email,
+          email: normalizedEmail,
           password,
         });
         if (signInError) {
+          if (process.env.NODE_ENV === "development") {
+            console.error("[auth] signInWithPassword failed", {
+              message: signInError.message,
+              code: signInError.code,
+              status: signInError.status,
+            });
+          }
+          const hintResend =
+            isUnconfirmedAuthError(signInError.message, signInError.code) ||
+            isInvalidCredentialsError(signInError.message, signInError.code);
+          setSuggestResendConfirm(hintResend);
           setError(
-            friendlyAuthError(signInError.message, "Email auth failed."),
+            friendlyAuthError(
+              signInError.message,
+              "Email auth failed.",
+              signInError.code,
+            ),
           );
           return;
         }
@@ -236,14 +284,27 @@ function LoginPageContent() {
       }
 
       const { data, error: signUpError } = await createClient().auth.signUp({
-        email,
+        email: normalizedEmail,
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/login?confirmed=1")}`,
         },
       });
       if (signUpError) {
-        setError(friendlyAuthError(signUpError.message, "Email auth failed."));
+        if (process.env.NODE_ENV === "development") {
+          console.error("[auth] signUp failed", {
+            message: signUpError.message,
+            code: signUpError.code,
+            status: signUpError.status,
+          });
+        }
+        setError(
+          friendlyAuthError(
+            signUpError.message,
+            "Email auth failed.",
+            signUpError.code,
+          ),
+        );
         return;
       }
       if ((data.user?.identities?.length ?? 0) === 0) {
@@ -252,6 +313,9 @@ function LoginPageContent() {
       }
       setSignupSent(true);
     } catch (err) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("[auth] email submit failed", err);
+      }
       setError(
         friendlyAuthError(
           err instanceof Error ? err.message : "",
@@ -264,7 +328,7 @@ function LoginPageContent() {
   }
 
   const inputClass =
-    "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-slate-300 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60";
+    "w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none transition focus:border-border focus:ring-2 focus:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-60";
 
   const oauthBlock = (
     <div className="space-y-3">
@@ -272,7 +336,7 @@ function LoginPageContent() {
         type="button"
         size="lg"
         variant="outline"
-        className="h-12 w-full justify-center rounded-xl border-slate-200 text-base font-semibold text-slate-900"
+        className="h-12 w-full justify-center rounded-xl border-border text-base font-semibold text-foreground"
         disabled={busy}
         onClick={() => signInWithOAuth("google")}
       >
@@ -287,7 +351,7 @@ function LoginPageContent() {
         type="button"
         size="lg"
         variant="outline"
-        className="h-12 w-full justify-center rounded-xl border-slate-200 text-base font-semibold text-slate-900"
+        className="h-12 w-full justify-center rounded-xl border-border text-base font-semibold text-foreground"
         disabled={busy}
         onClick={() => signInWithOAuth("github")}
       >
@@ -304,7 +368,7 @@ function LoginPageContent() {
   const emailForm = (
     <form className="space-y-3" onSubmit={handleEmailSubmit}>
       <label className="block">
-        <span className="mb-1.5 block text-[10px] uppercase tracking-[0.14em] text-slate-400">
+        <span className="mb-1.5 block text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
           Email
         </span>
         <input
@@ -319,7 +383,7 @@ function LoginPageContent() {
         />
       </label>
       <label className="block">
-        <span className="mb-1.5 block text-[10px] uppercase tracking-[0.14em] text-slate-400">
+        <span className="mb-1.5 block text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
           Password
         </span>
         <input
@@ -343,7 +407,7 @@ function LoginPageContent() {
         {mode === "login" ? "Log In with Email" : "Create Account"}
       </Button>
       {mode === "signup" ? (
-        <label className="flex items-start gap-2 text-left text-xs text-slate-500">
+        <label className="flex items-start gap-2 text-left text-xs text-muted-foreground">
           <input
             type="checkbox"
             checked={acceptedTerms}
@@ -363,46 +427,67 @@ function LoginPageContent() {
           </span>
         </label>
       ) : (
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-          <button
-            type="button"
-            className="text-slate-500 underline-offset-2 hover:underline"
-            onClick={() => {
-              setForgotMode(true);
-              clearFormNoise();
-            }}
-          >
-            Forgot password?
-          </button>
-          <button
-            type="button"
-            className="text-slate-500 underline-offset-2 hover:underline"
-            onClick={() => void handleResendConfirm()}
-            disabled={busy}
-          >
-            Resend confirmation
-          </button>
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <button
+              type="button"
+              className="text-muted-foreground underline-offset-2 hover:underline"
+              onClick={() => {
+                setForgotMode(true);
+                clearFormNoise();
+              }}
+            >
+              Forgot password?
+            </button>
+            <button
+              type="button"
+              className={cn(
+                "underline-offset-2 hover:underline",
+                suggestResendConfirm
+                  ? "font-semibold text-foreground underline"
+                  : "text-muted-foreground",
+              )}
+              onClick={() => void handleResendConfirm()}
+              disabled={busy}
+            >
+              {loading === "resend" ? "Sending…" : "Resend confirmation"}
+            </button>
+          </div>
+          {suggestResendConfirm ? (
+            <p className="rounded-lg border border-amber-200/80 bg-amber-50 px-2.5 py-2 text-left text-[11px] leading-snug text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
+              Still can&apos;t get in? Confirm your email with{" "}
+              <button
+                type="button"
+                className="font-semibold underline underline-offset-2"
+                onClick={() => void handleResendConfirm()}
+                disabled={busy}
+              >
+                Resend confirmation
+              </button>
+              , or try Google / GitHub if you signed up that way.
+            </p>
+          ) : null}
         </div>
       )}
     </form>
   );
 
   return (
-    <div className="flex min-h-full flex-1 items-center justify-center bg-slate-50 px-4 py-10">
-      <Card className="w-full max-w-md rounded-2xl border-slate-200 bg-white shadow-soft">
+    <div className="flex min-h-full flex-1 items-center justify-center bg-background px-4 py-10">
+      <Card className="w-full max-w-md rounded-2xl border-border bg-card shadow-soft">
         {signupSent ? (
           <>
             <CardHeader className="space-y-2 text-center">
               <LockedInLogo as="p" className="text-sm tracking-tight" />
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
                 <Mail className="h-5 w-5" aria-hidden />
               </div>
-              <CardTitle className="font-display text-2xl font-bold text-slate-900">
+              <CardTitle className="font-display text-2xl font-bold text-foreground">
                 Check your email
               </CardTitle>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-muted-foreground">
                 We sent a confirmation link to{" "}
-                <strong className="font-semibold text-slate-800">{email}</strong>
+                <strong className="font-semibold text-foreground">{email}</strong>
                 .
               </p>
             </CardHeader>
@@ -410,7 +495,7 @@ function LoginPageContent() {
               <Button
                 type="button"
                 variant="outline"
-                className="w-full rounded-xl border-slate-200"
+                className="w-full rounded-xl border-border"
                 onClick={backToSignIn}
               >
                 Back to Sign In
@@ -428,7 +513,7 @@ function LoginPageContent() {
                   "Resend confirmation email"
                 )}
               </Button>
-              <p className="mt-6 text-center text-xs text-slate-400">
+              <p className="mt-6 text-center text-xs text-muted-foreground">
                 <a href="/lockin" className="underline-offset-2 hover:underline">
                   Back to Solo
                 </a>
@@ -439,10 +524,10 @@ function LoginPageContent() {
           <>
             <CardHeader className="space-y-2 text-center">
               <LockedInLogo as="p" className="text-sm tracking-tight" />
-              <CardTitle className="font-display text-2xl font-bold text-slate-900">
+              <CardTitle className="font-display text-2xl font-bold text-foreground">
                 Reset password
               </CardTitle>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-muted-foreground">
                 We&apos;ll email you a link to choose a new password.
               </p>
             </CardHeader>
@@ -452,8 +537,8 @@ function LoginPageContent() {
                   className={cn(
                     "mb-4 rounded-xl border px-3 py-2 text-sm",
                     error
-                      ? "border-red-200 bg-red-50 text-red-700"
-                      : "border-emerald-200 bg-emerald-50 text-emerald-700",
+                      ? "border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300"
+                      : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300",
                   )}
                   role={error ? "alert" : "status"}
                 >
@@ -462,7 +547,7 @@ function LoginPageContent() {
               )}
               <form className="space-y-3" onSubmit={handleForgotPassword}>
                 <label className="block">
-                  <span className="mb-1.5 block text-[10px] uppercase tracking-[0.14em] text-slate-400">
+                  <span className="mb-1.5 block text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                     Email
                   </span>
                   <input
@@ -501,10 +586,10 @@ function LoginPageContent() {
           <>
             <CardHeader className="space-y-2 text-center">
               <LockedInLogo as="p" className="text-sm tracking-tight" />
-              <CardTitle className="font-display text-2xl font-bold text-slate-900">
+              <CardTitle className="font-display text-2xl font-bold text-foreground">
                 {mode === "login" ? "Log In" : "Sign Up"}
               </CardTitle>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-muted-foreground">
                 Sync sessions, join Rooms, and keep your streak cloud-backed.
               </p>
             </CardHeader>
@@ -514,8 +599,8 @@ function LoginPageContent() {
                   className={cn(
                     "mb-4 rounded-xl border px-3 py-2 text-sm",
                     error
-                      ? "border-red-200 bg-red-50 text-red-700"
-                      : "border-emerald-200 bg-emerald-50 text-emerald-700",
+                      ? "border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300"
+                      : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300",
                   )}
                   role={error ? "alert" : "status"}
                 >
@@ -524,16 +609,16 @@ function LoginPageContent() {
               )}
 
               <Tabs value={mode} onValueChange={handleModeChange}>
-                <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 text-slate-500">
+                <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-xl bg-muted p-1 text-muted-foreground">
                   <TabsTrigger
                     value="login"
-                    className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-soft"
+                    className="rounded-lg data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-soft"
                   >
                     Log In
                   </TabsTrigger>
                   <TabsTrigger
                     value="signup"
-                    className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-soft"
+                    className="rounded-lg data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-soft"
                   >
                     Sign Up
                   </TabsTrigger>
@@ -543,10 +628,10 @@ function LoginPageContent() {
                   {oauthBlock}
                   <div className="relative">
                     <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-slate-200" />
+                      <div className="w-full border-t border-border" />
                     </div>
                     <div className="relative flex justify-center text-[10px] uppercase tracking-[0.14em]">
-                      <span className="bg-white px-3 text-slate-400">
+                      <span className="bg-card px-3 text-muted-foreground">
                         or email
                       </span>
                     </div>
@@ -558,10 +643,10 @@ function LoginPageContent() {
                   {oauthBlock}
                   <div className="relative">
                     <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-slate-200" />
+                      <div className="w-full border-t border-border" />
                     </div>
                     <div className="relative flex justify-center text-[10px] uppercase tracking-[0.14em]">
-                      <span className="bg-white px-3 text-slate-400">
+                      <span className="bg-card px-3 text-muted-foreground">
                         or email
                       </span>
                     </div>
@@ -570,7 +655,7 @@ function LoginPageContent() {
                 </TabsContent>
               </Tabs>
 
-              <p className="mt-6 text-center text-xs text-slate-400">
+              <p className="mt-6 text-center text-xs text-muted-foreground">
                 <a href="/lockin" className="underline-offset-2 hover:underline">
                   Back to Solo
                 </a>
@@ -595,7 +680,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-full flex-1 items-center justify-center bg-slate-50 text-sm text-slate-500">
+        <div className="flex min-h-full flex-1 items-center justify-center bg-background text-sm text-muted-foreground">
           Loading…
         </div>
       }

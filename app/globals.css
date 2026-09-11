@@ -1,11 +1,42 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Class-based dark mode so dark: matches ThemeProvider (.dark on <html>), not OS. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;
   --card: #ffffff;
+  --card-elevated: #ffffff;
+  --popover: #ffffff;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
   --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #cbd5e1;
+  --destructive: #dc2626;
+  --lime: #84cc16;
+  --emerald: #10b981;
+  --amber: #f59e0b;
+  --gold: #eab308;
+  --tap-lavender: #9ca3af;
+  --tap-dust: #a8a3b5;
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #09090b;
+  --foreground: #fafafa;
+  --card: #09090b;
+  --card-elevated: #18181b;
+  --popover: #18181b;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.12);
+  --ring: #52525b;
+  --destructive: #ef4444;
   --lime: #84cc16;
   --emerald: #10b981;
   --amber: #f59e0b;
@@ -17,6 +48,15 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-elevated: var(--card-elevated);
+  --color-popover: var(--popover);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
   --color-lime: var(--lime);
   --color-emerald: var(--emerald);
   --color-amber: var(--amber);
@@ -26,6 +66,7 @@
   --font-sans: var(--font-inter);
   --font-display: var(--font-space-grotesk);
   --font-mono: var(--font-jetbrains-mono);
+  --font-flip: var(--font-geist-mono);
 }
 
 body {
@@ -54,6 +95,11 @@ a,
   font-family: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
 }
 
+/* FlipClock digits — Geist Mono has empty zeros (no dotted-zero glyph). */
+.font-flip {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+}
+
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
@@ -63,4 +109,36 @@ a,
   box-shadow:
     0 1px 2px rgb(15 23 42 / 0.04),
     0 4px 16px rgb(15 23 42 / 0.04);
+}
+
+.dark .shadow-soft {
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.04);
+}
+
+/* FlipClock lime neon — dark mode, non-muted digits only */
+@keyframes flip-neon-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.88;
+  }
+}
+
+.dark .flip-neon {
+  color: #bef264;
+  text-shadow:
+    0 0 4px rgba(190, 242, 100, 0.95),
+    0 0 12px rgba(132, 204, 22, 0.65),
+    0 0 28px rgba(132, 204, 22, 0.4);
+  animation: flip-neon-pulse 3.2s ease-in-out infinite;
+}
+
+.dark .flip-neon-sm {
+  color: #bef264;
+  text-shadow:
+    0 0 3px rgba(190, 242, 100, 0.9),
+    0 0 10px rgba(132, 204, 22, 0.5);
+  animation: flip-neon-pulse 3.2s ease-in-out infinite;
 }

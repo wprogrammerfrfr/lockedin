@@ -38,19 +38,19 @@ export function WelcomeFeatures() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="mb-4 text-sm leading-relaxed text-slate-600">
+            <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
               Today totals, personal records, streaks, and lifetime session
               counts live on the dashboard. Numbers count up — they don’t snap.
             </p>
             <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-                <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
+              <div className="rounded-xl border border-border bg-background px-3 py-3">
+                <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                   Today
                 </p>
                 <CountUp
                   value={72}
                   format={(n) => formatHoursMinutes(Math.round(n) * 60_000)}
-                  className="mt-1 block text-sm font-semibold text-slate-900"
+                  className="mt-1 block text-sm font-semibold text-foreground"
                 />
               </div>
               <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-3">
@@ -86,7 +86,7 @@ export function WelcomeFeatures() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm leading-relaxed text-slate-600">
+            <p className="text-sm leading-relaxed text-muted-foreground">
               Screenshot-ready receipts show lock-in time, breaks, and outcome.
               Win state if you broke a PR.
             </p>
@@ -147,7 +147,7 @@ export function WelcomeFeatures() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm leading-relaxed text-slate-600">
+            <p className="text-sm leading-relaxed text-muted-foreground">
               Profiles are public by default. Session activity never auto-posts —
               Explore only shows sessions you explicitly share. Badges tell you
               how hours were verified.

@@ -14,6 +14,9 @@ import {
   shareCardChrome,
   type TranslateFn,
 } from "@/features/session/format";
+import { MeltScene } from "@/components/session/MeltScene";
+import { meltSummaryLine } from "@/features/session/melt-utils";
+import type { DessertMetadata } from "@/features/session/melt-catalog";
 import type { OutcomeKind } from "@/features/session/types";
 import type {
   ProfileDaySession,
@@ -47,6 +50,7 @@ export type SessionReceiptData = {
   prBroken?: boolean;
   participants?: ReceiptParticipant[];
   flavorCaption?: string | null;
+  dessertMetadata?: DessertMetadata | null;
 };
 
 function formatClock(iso: string | null | undefined, timeZone: string): string {
@@ -280,6 +284,7 @@ export function sessionToReceiptData(
     prBroken: s.pr_broken,
     participants: isRoom ? participants : undefined,
     flavorCaption: opts?.flavorCaption,
+    dessertMetadata: (s.dessert_metadata as SessionReceiptData["dessertMetadata"]) ?? null,
   };
 }
 
@@ -384,6 +389,59 @@ export const SessionReceiptCard = forwardRef<
             )}
           >
             {data.flavorCaption}
+          </p>
+        ) : null}
+
+        {data.dessertMetadata?.active?.config ? (
+          <div
+            className={cn(
+              "mt-3 flex items-center gap-3 rounded-xl border border-amber-700/20 bg-amber-50/40 p-2",
+              story && "mt-6 gap-6 p-4",
+            )}
+          >
+            <MeltScene
+              config={data.dessertMetadata.active.config}
+              progress={data.dessertMetadata.active.meltProgress}
+              size={story ? "md" : "sm"}
+              animated={false}
+            />
+            <div className="min-w-0">
+              <p
+                className={cn(
+                  "font-medium text-amber-900",
+                  story ? "text-2xl" : "text-sm",
+                )}
+              >
+                {data.dessertMetadata.active.config.displayName}
+              </p>
+              <p
+                className={cn(
+                  "text-amber-700/90",
+                  story ? "text-xl" : "text-xs",
+                )}
+              >
+                {meltSummaryLine(
+                  data.dessertMetadata.active.config,
+                  data.dessertMetadata.active.meltComplete,
+                  t,
+                )}
+              </p>
+              <p
+                className={cn(
+                  "font-mono tabular-nums text-amber-800/70",
+                  story ? "text-lg" : "text-[10px]",
+                )}
+              >
+                {Math.round(data.dessertMetadata.active.meltProgress * 100)}%
+              </p>
+            </div>
+          </div>
+        ) : null}
+        {data.dessertMetadata?.history && data.dessertMetadata.history.length > 0 ? (
+          <p className={cn("mt-1 text-slate-500", story ? "text-lg" : "text-[10px]")}>
+            {t("melt.receipt.historyCount", {
+              count: data.dessertMetadata.history.length,
+            })}
           </p>
         ) : null}
 

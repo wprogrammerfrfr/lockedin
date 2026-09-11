@@ -72,13 +72,17 @@ export function AppShell({
   return (
     <div
       className={cn(
-        "flex flex-1 flex-col bg-slate-50",
-        layoutMode === "solo-focus" ? "h-svh overflow-hidden" : "min-h-full",
+        "flex flex-1 flex-col bg-background",
+          layoutMode === "solo-focus"
+            ? "h-svh overflow-hidden"
+            : layoutMode === "room-focus"
+              ? "h-dvh overflow-hidden overscroll-none"
+              : "min-h-full",
       )}
     >
       {showSidebar && (
         <header
-          className="sticky top-0 z-40 flex items-center gap-2 border-b border-slate-200 bg-white px-3 py-2 lg:hidden"
+          className="sticky top-0 z-40 flex items-center gap-2 border-b border-border bg-card px-3 py-2 lg:hidden"
           style={{
             paddingTop: "max(0.5rem, env(safe-area-inset-top))",
             paddingLeft: "max(0.75rem, env(safe-area-inset-left))",
@@ -93,7 +97,7 @@ export function AppShell({
             onClick={() => setNavOpen(true)}
             aria-label="Open navigation"
           >
-            <Menu className="h-5 w-5 text-slate-700" />
+            <Menu className="h-5 w-5 text-foreground" />
           </Button>
           <Link
             href="/lockin"
@@ -144,7 +148,8 @@ export function AppShell({
       <div
         className={cn(
           "flex min-h-0 flex-1",
-          layoutMode === "solo-focus" && "overflow-hidden",
+          (layoutMode === "solo-focus" || layoutMode === "room-focus") &&
+            "overflow-hidden",
         )}
       >
         <AnimatePresence initial={false}>
@@ -170,7 +175,7 @@ export function AppShell({
           {showPresence && (
             <motion.div
               key="presence"
-              className="sticky top-0 hidden h-svh w-64 shrink-0 border-r border-slate-200 bg-white lg:block lg:w-72"
+              className="sticky top-0 hidden h-dvh w-64 shrink-0 border-r border-border bg-card lg:block lg:w-72"
               initial={{ opacity: 0, x: -24 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -40 }}
@@ -183,10 +188,12 @@ export function AppShell({
 
         <main
           className={cn(
-            "min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8",
+            "min-w-0 flex-1",
             layoutMode === "solo-focus"
-              ? "flex min-h-0 items-center justify-center overflow-hidden px-3 py-4 sm:px-6"
-              : "overflow-y-auto",
+              ? "flex min-h-0 items-start justify-center overflow-y-auto px-3 py-4 sm:items-center sm:px-6"
+              : layoutMode === "room-focus"
+                ? "flex min-h-0 flex-col overflow-y-auto overscroll-none px-0 py-0"
+                : "overflow-y-auto px-4 py-6 sm:px-6 lg:px-8 lg:py-8",
           )}
           style={
             layoutMode === "solo-focus"
@@ -194,6 +201,16 @@ export function AppShell({
                   paddingTop: "max(1rem, env(safe-area-inset-top))",
                   paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
                 }
+              : layoutMode === "room-focus"
+                ? {
+                    paddingTop: "max(0.75rem, env(safe-area-inset-top))",
+                    paddingBottom:
+                      "max(1rem, env(safe-area-inset-bottom))",
+                    paddingLeft:
+                      "max(1rem, env(safe-area-inset-left))",
+                    paddingRight:
+                      "max(1rem, env(safe-area-inset-right))",
+                  }
               : undefined
           }
         >
@@ -202,18 +219,22 @@ export function AppShell({
             transition={springSoft}
             className={cn(
               "mx-auto w-full",
-              layoutMode === "solo-focus" ? "max-w-6xl scale-100" : "max-w-6xl",
+              layoutMode === "solo-focus"
+                ? "max-w-6xl scale-100"
+                : layoutMode === "room-focus"
+                  ? "flex min-h-0 w-full max-w-6xl flex-1 flex-col"
+                  : "max-w-6xl",
             )}
           >
             {showPresence && (
               <button
                 type="button"
-                className="mb-4 w-full lg:hidden"
+                className="mb-3 w-full shrink-0 lg:hidden"
                 onClick={() => setPresenceOpen(true)}
                 aria-label="Open attendance"
               >
                 {presenceStrip ?? (
-                  <span className="block rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-600">
+                  <span className="block rounded-xl border border-border bg-card px-3 py-2.5 text-left text-sm font-medium text-muted-foreground">
                     Attendance
                   </span>
                 )}
@@ -227,7 +248,7 @@ export function AppShell({
           {showIdleLeft && (
             <motion.aside
               key="idle-right"
-              className="hidden w-72 shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-4 lg:block"
+              className="hidden w-72 shrink-0 overflow-y-auto border-l border-border bg-card p-4 lg:block"
               initial={{ opacity: 0, x: 16 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 24 }}

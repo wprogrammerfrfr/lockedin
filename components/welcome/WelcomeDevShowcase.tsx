@@ -20,17 +20,17 @@ function money(n: number) {
 
 export function WelcomeDevShowcase() {
   return (
-    <Card className="border-slate-300">
+    <Card className="border-border">
       <CardHeader className="space-y-3">
         <CardTitle className="flex items-center gap-2 text-xl">
           <Code2 className="h-5 w-5 text-emerald-600" />
           Developer Mode
         </CardTitle>
         <div>
-          <p className="font-display text-lg font-bold tracking-tight text-slate-900">
+          <p className="font-display text-lg font-bold tracking-tight text-foreground">
             Track the cost and time of building software.
           </p>
-          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600">
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
             Connect GitHub, lock in hours, and see Project Cost (hours × hourly
             rate) next to commits and lines of code — plus the value you set
             for the project.
@@ -38,22 +38,22 @@ export function WelcomeDevShowcase() {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft sm:p-6">
-          <p className="font-display text-base font-semibold text-slate-900">
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-soft sm:p-6">
+          <p className="font-display text-base font-semibold text-foreground">
             <LockedInLogo className="text-base" /> web
           </p>
-          <p className="font-mono text-xs text-slate-400">acme/lockedin</p>
+          <p className="font-mono text-xs text-muted-foreground">acme/lockedin</p>
 
           <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
-            <div className="rounded-xl bg-slate-50 p-3">
-              <p className="text-slate-400">Commits</p>
+            <div className="rounded-xl bg-background p-3">
+              <p className="text-muted-foreground">Commits</p>
               <CountUp
                 value={47}
-                className="mt-1 block font-mono text-sm tabular-nums text-slate-800"
+                className="mt-1 block font-mono text-sm tabular-nums text-foreground"
               />
             </div>
-            <div className="rounded-xl bg-slate-50 p-3">
-              <p className="text-slate-400">+LOC</p>
+            <div className="rounded-xl bg-background p-3">
+              <p className="text-muted-foreground">+LOC</p>
               <CountUp
                 value={1284}
                 format={(n) =>
@@ -62,8 +62,8 @@ export function WelcomeDevShowcase() {
                 className="mt-1 block font-mono text-sm tabular-nums text-emerald-700"
               />
             </div>
-            <div className="rounded-xl bg-slate-50 p-3">
-              <p className="text-slate-400">−LOC</p>
+            <div className="rounded-xl bg-background p-3">
+              <p className="text-muted-foreground">−LOC</p>
               <CountUp
                 value={312}
                 className="mt-1 block font-mono text-sm tabular-nums text-rose-600"
@@ -71,7 +71,7 @@ export function WelcomeDevShowcase() {
             </div>
           </div>
 
-          <p className="mt-4 text-xs text-slate-500">
+          <p className="mt-4 text-xs text-muted-foreground">
             Hours locked in:{" "}
             <span className="font-mono tabular-nums">
               {formatMs(DEMO_HOURS_MS, true)}
@@ -79,29 +79,29 @@ export function WelcomeDevShowcase() {
           </p>
 
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            <div className="rounded-xl border border-border bg-background p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Project Cost
               </p>
               <CountUp
                 value={DEMO_COST}
                 format={(n) => money(Math.round(n))}
-                className="mt-1 block font-display text-xl font-bold text-slate-900"
+                className="mt-1 block font-display text-xl font-bold text-foreground"
               />
-              <p className="mt-1 text-[11px] text-slate-400">
+              <p className="mt-1 text-[11px] text-muted-foreground">
                 hours × hourly rate
               </p>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            <div className="rounded-xl border border-border bg-background p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Project Value
               </p>
               <CountUp
                 value={DEMO_VALUE}
                 format={(n) => money(Math.round(n))}
-                className="mt-1 block font-display text-xl font-bold text-slate-900"
+                className="mt-1 block font-display text-xl font-bold text-foreground"
               />
-              <p className="mt-1 text-[11px] text-slate-400">
+              <p className="mt-1 text-[11px] text-muted-foreground">
                 manual worth / revenue
               </p>
             </div>

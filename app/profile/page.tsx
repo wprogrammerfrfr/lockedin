@@ -115,10 +115,10 @@ export default function ProfilePage() {
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="font-display text-2xl font-bold text-slate-900">
+            <h1 className="font-display text-2xl font-bold text-foreground">
               {t("profile.title")}
             </h1>
-            <p className="mt-1 text-sm text-slate-500">{t("profile.subtitle")}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{t("profile.subtitle")}</p>
           </div>
           {isAuthenticated && user ? (
             <Button
@@ -127,17 +127,17 @@ export default function ProfilePage() {
               className="h-11 shrink-0 gap-2 rounded-xl px-4"
               onClick={() => setSettingsOpen(true)}
             >
-              <Settings className="h-5 w-5 text-slate-700" />
+              <Settings className="h-5 w-5 text-foreground" />
               {t("profile.settings")}
             </Button>
           ) : null}
         </div>
 
         {status === "loading" ? (
-          <p className="text-sm text-slate-400">{t("profile.loading")}</p>
+          <p className="text-sm text-muted-foreground">{t("profile.loading")}</p>
         ) : isAuthenticated && user ? (
           <>
-            <Card className="border-slate-200 bg-white">
+            <Card className="border-border bg-card">
               <CardContent className="flex flex-col gap-5 p-6 sm:flex-row sm:items-start">
                 <ProfileHeroAvatar
                   name={name}
@@ -147,21 +147,21 @@ export default function ProfilePage() {
                 />
                 <div className="min-w-0 flex-1 space-y-3">
                   <div>
-                    <p className="font-display text-xl font-bold text-slate-900">
+                    <p className="font-display text-xl font-bold text-foreground">
                       {name}
                     </p>
                     {profile?.username ? (
-                      <p className="text-sm text-slate-500">
+                      <p className="text-sm text-muted-foreground">
                         @{profile.username}
                       </p>
                     ) : null}
                     {profile?.bio ? (
-                      <p className="mt-2 text-sm text-slate-600">{profile.bio}</p>
+                      <p className="mt-2 text-sm text-muted-foreground">{profile.bio}</p>
                     ) : null}
                     {connectedVia ? (
                       <Badge
                         variant="outline"
-                        className="mt-2 border-slate-200 text-[10px] font-medium text-slate-500"
+                        className="mt-2 border-border text-[10px] font-medium text-muted-foreground"
                       >
                         Connected via {connectedVia}
                       </Badge>
@@ -172,13 +172,13 @@ export default function ProfilePage() {
               </CardContent>
             </Card>
 
-            <Card className="border-slate-200 bg-white">
+            <Card className="border-border bg-card">
               <CardHeader>
                 <CardTitle className="text-base">{t("profile.editProfile")}</CardTitle>
               </CardHeader>
               <CardContent>
                 {!profileReady ? (
-                  <p className="text-sm text-slate-400">{t("profile.loadingProfile")}</p>
+                  <p className="text-sm text-muted-foreground">{t("profile.loadingProfile")}</p>
                 ) : (
                   <ProfileForm
                     key={
@@ -210,7 +210,7 @@ export default function ProfilePage() {
             </Card>
 
             <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-              <DialogContent className="max-h-[min(90vh,40rem)] w-[calc(100%-2rem)] max-w-md overflow-y-auto rounded-2xl border-slate-200 bg-white p-6">
+              <DialogContent className="max-h-[min(90vh,40rem)] w-[calc(100%-2rem)] max-w-md overflow-y-auto rounded-2xl border-border bg-card p-6">
                 <DialogHeader>
                   <DialogTitle>{t("profile.settings")}</DialogTitle>
                   <DialogDescription>{t("profile.settingsDesc")}</DialogDescription>
@@ -221,18 +221,19 @@ export default function ProfilePage() {
                     userId={user.id}
                     initialLocale={profile?.locale}
                     initialBreakTimerMinutes={profile?.break_timer_minutes}
+                    initialTheme={profile?.theme}
                   />
                 </div>
               </DialogContent>
             </Dialog>
           </>
         ) : (
-          <Card className="border-slate-200 bg-white">
+          <Card className="border-border bg-card">
             <CardHeader>
               <CardTitle className="text-base">{t("profile.guestSession")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-sm text-slate-500">{t("profile.guestDesc")}</p>
+              <p className="text-sm text-muted-foreground">{t("profile.guestDesc")}</p>
               <Button asChild className="rounded-xl">
                 <Link href="/login">{t("auth.logIn")}</Link>
               </Button>

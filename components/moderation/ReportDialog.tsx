@@ -63,7 +63,7 @@ export function ReportDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm rounded-2xl border-slate-200 bg-white">
+      <DialogContent className="max-w-sm rounded-2xl border-border bg-card">
         <DialogHeader>
           <DialogTitle>Report</DialogTitle>
           <DialogDescription>
@@ -80,7 +80,7 @@ export function ReportDialog({
               onChange={(e) =>
                 setReason(e.target.value as (typeof REASONS)[number])
               }
-              className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+              className="mt-1 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"
             >
               {REASONS.map((r) => (
                 <option key={r} value={r}>

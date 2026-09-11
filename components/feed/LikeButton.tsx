@@ -52,10 +52,10 @@ export function LikeButton({
       <Heart
         className={cn(
           "h-4 w-4",
-          on ? "fill-rose-500 text-rose-500" : "text-slate-400",
+          on ? "fill-rose-500 text-rose-500" : "text-muted-foreground",
         )}
       />
-      <span className="font-mono text-xs tabular-nums text-slate-500">
+      <span className="font-mono text-xs tabular-nums text-muted-foreground">
         {n > 0 ? n : on ? "Liked" : "Like"}
       </span>
     </Button>

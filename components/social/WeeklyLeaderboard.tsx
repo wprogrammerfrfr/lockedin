@@ -63,28 +63,28 @@ export function WeeklyLeaderboard({
     <div
       className={
         compact
-          ? "rounded-xl border border-slate-200 bg-white p-3"
-          : "rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4"
+          ? "rounded-xl border border-border bg-card p-3"
+          : "rounded-2xl border border-dashed border-border bg-background p-4"
       }
     >
-      <p className="font-display text-sm font-semibold text-slate-800">
+      <p className="font-display text-sm font-semibold text-foreground">
         {t("leaderboard.title")}
       </p>
 
       {needsAuth && (
-        <p className="mt-3 text-xs text-slate-400">{t("auth.loginRequired")}</p>
+        <p className="mt-3 text-xs text-muted-foreground">{t("auth.loginRequired")}</p>
       )}
 
       {!needsAuth && error && (
-        <p className="mt-3 text-xs text-slate-400">
+        <p className="mt-3 text-xs text-muted-foreground">
           {t("leaderboard.unavailable")}
         </p>
       )}
 
       {!needsAuth && !error && rows.length === 0 && (
-        <p className="mt-3 text-xs text-slate-400">
+        <p className="mt-3 text-xs text-muted-foreground">
           {t("leaderboard.empty")}{" "}
-          <Link href="/lockin" className="font-medium text-slate-700 underline">
+          <Link href="/lockin" className="font-medium text-foreground underline">
             {t("nav.lockin")}
           </Link>{" "}
           {t("leaderboard.emptyCta")}
@@ -92,9 +92,9 @@ export function WeeklyLeaderboard({
       )}
 
       {alone && rows.length === 1 ? (
-        <p className="mt-3 text-xs text-slate-500">
+        <p className="mt-3 text-xs text-muted-foreground">
           {t("leaderboard.alone")}{" "}
-          <Link href="/explore" className="font-medium text-slate-800 underline">
+          <Link href="/explore" className="font-medium text-foreground underline">
             {t("leaderboard.exploreLink")}
           </Link>
           .
@@ -109,21 +109,21 @@ export function WeeklyLeaderboard({
               <li key={r.user_id}>
                 <Link
                   href={`/u/${r.username}`}
-                  className="flex items-center gap-2 rounded-xl bg-white px-2 py-1.5 hover:bg-slate-50"
+                  className="flex items-center gap-2 rounded-xl bg-card px-2 py-1.5 hover:bg-background"
                 >
                   <span className="w-5 font-mono text-xs tabular-nums text-amber-600">
                     {r.rank}
                   </span>
                   <Avatar className="h-7 w-7 rounded-lg">
                     {url ? <AvatarImage src={url} alt="" /> : null}
-                    <AvatarFallback className="rounded-lg bg-slate-100 text-[10px]">
+                    <AvatarFallback className="rounded-lg bg-muted text-[10px]">
                       {r.username.slice(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="min-w-0 flex-1 truncate text-sm text-slate-800">
+                  <span className="min-w-0 flex-1 truncate text-sm text-foreground">
                     {r.username}
                   </span>
-                  <span className="font-mono text-[11px] tabular-nums text-slate-500">
+                  <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
                     {formatMs(r.active_ms, true)}
                   </span>
                 </Link>

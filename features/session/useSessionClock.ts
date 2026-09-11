@@ -4,13 +4,12 @@ import { useEffect, useRef } from "react";
 import type { Dispatch } from "react";
 import type { Action, AppState, SessionState } from "@/features/session/types";
 import {
-  endSessionKeepalive,
   heartbeatSession,
+  heartbeatSessionKeepalive,
 } from "@/features/session/sync";
 import { enqueueOfflineOp } from "@/features/session/offlineQueue";
 import {
   clearActiveSessionDraft,
-  finalizeActiveSessionDraft,
   saveActiveSessionDraft,
 } from "@/lib/auth/merge";
 import { createClient } from "@/lib/supabase/client";
@@ -29,8 +28,8 @@ function isFocusSession(session: SessionState): boolean {
 
 /**
  * Focus + break tick intervals, plus a 15s heartbeat when `remoteSessionId` is set.
- * On pagehide/beforeunload: auto-end authenticated sessions (keepalive) and
- * finalize guest mid-session drafts.
+ * On pagehide/beforeunload: keepalive heartbeat (never end_session) and persist
+ * guest mid-session drafts so the next visit can resume.
  */
 export function useSessionClock(
   state: AppState,
@@ -44,7 +43,6 @@ export function useSessionClock(
   const stateRef = useRef(state);
   stateRef.current = state;
   const accessTokenRef = useRef<string | null>(null);
-  const endedRemoteIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!enabled || state.session !== "LOCKED_IN") {
@@ -52,18 +50,27 @@ export function useSessionClock(
       return;
     }
 
-    const id = window.setInterval(() => {
-      const now = performance.now();
+    lastFocusTick.current = Date.now();
+    const tick = () => {
+      const now = Date.now();
       if (lastFocusTick.current == null) {
         lastFocusTick.current = now;
         return;
       }
       const delta = now - lastFocusTick.current;
       lastFocusTick.current = now;
-      dispatch({ type: "TICK", delta });
-    }, 50);
+      if (delta > 0) dispatch({ type: "TICK", delta });
+    };
+    const id = window.setInterval(tick, 50);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
 
-    return () => window.clearInterval(id);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [dispatch, enabled, state.session]);
 
   useEffect(() => {
@@ -72,18 +79,27 @@ export function useSessionClock(
       return;
     }
 
-    const id = window.setInterval(() => {
-      const now = performance.now();
+    lastBreakTick.current = Date.now();
+    const tick = () => {
+      const now = Date.now();
       if (lastBreakTick.current == null) {
         lastBreakTick.current = now;
         return;
       }
       const delta = now - lastBreakTick.current;
       lastBreakTick.current = now;
-      dispatch({ type: "BREAK_TICK", delta });
-    }, 50);
+      if (delta > 0) dispatch({ type: "BREAK_TICK", delta });
+    };
+    const id = window.setInterval(tick, 50);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
 
-    return () => window.clearInterval(id);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [dispatch, enabled, state.session]);
 
   useEffect(() => {
@@ -171,90 +187,61 @@ export function useSessionClock(
     };
   }, [enabled, isAuthenticated, state.session]);
 
-  // Unexpected close → auto-end (authenticated keepalive + guest finalize)
+  // Unexpected close → persist progress only (heartbeat / guest draft). Never end.
   useEffect(() => {
     if (!enabled) return;
 
-    const finalizeUnexpected = () => {
+    const persistProgress = () => {
       const s = stateRef.current;
       if (!isFocusSession(s.session)) return;
 
       if (s.remoteSessionId) {
-        if (endedRemoteIdsRef.current.has(s.remoteSessionId)) return;
-        endedRemoteIdsRef.current.add(s.remoteSessionId);
-
-        const payload = {
-          id: s.remoteSessionId,
+        const status =
+          s.session === "ON_BREAK" ||
+          s.session === "CHOOSING_BREAK" ||
+          s.session === "BREAK_DONE"
+            ? ("on_break" as const)
+            : ("active" as const);
+        void enqueueOfflineOp({
+          kind: "heartbeat",
+          sessionId: s.remoteSessionId,
           activeMs: s.elapsedMs,
           breakMs: s.breakMs,
           breakTypes: s.breakTypesUsed,
-          outcome: s.didBreakPR ? "pr" : "solid",
-          prBroken: s.didBreakPR,
-        };
-
-        void enqueueOfflineOp({
-          kind: "end",
-          sessionId: payload.id,
-          activeMs: payload.activeMs,
-          breakMs: payload.breakMs,
-          breakTypes: payload.breakTypes,
-          outcome: payload.outcome,
-          prBroken: payload.prBroken,
+          status,
           at: Date.now(),
         });
-
-        endSessionKeepalive(payload, accessTokenRef.current);
+        heartbeatSessionKeepalive(
+          {
+            id: s.remoteSessionId,
+            activeMs: s.elapsedMs,
+            breakMs: s.breakMs,
+            breakTypes: s.breakTypesUsed,
+            status,
+          },
+          accessTokenRef.current,
+        );
         return;
       }
 
       if (!isAuthenticated) {
-        finalizeActiveSessionDraft(
-          s.didBreakPR ? "pr" : "solid",
-          s.didBreakPR,
-        );
+        saveActiveSessionDraft({
+          sessionName: s.sessionName,
+          elapsedMs: s.elapsedMs,
+          breakMs: s.breakMs,
+          breakTypesUsed: s.breakTypesUsed,
+          personalRecordMs: s.personalRecordMs,
+          didBreakPR: s.didBreakPR,
+        });
       }
     };
 
-    const onPageHide = (event: PageTransitionEvent) => {
-      // bfcache: page may come back — only persist progress, don't finalize
-      if (event.persisted) {
-        const s = stateRef.current;
-        if (s.remoteSessionId && isFocusSession(s.session)) {
-          void enqueueOfflineOp({
-            kind: "heartbeat",
-            sessionId: s.remoteSessionId,
-            activeMs: s.elapsedMs,
-            breakMs: s.breakMs,
-            breakTypes: s.breakTypesUsed,
-            status:
-              s.session === "ON_BREAK" ||
-              s.session === "CHOOSING_BREAK" ||
-              s.session === "BREAK_DONE"
-                ? "on_break"
-                : "active",
-            at: Date.now(),
-          });
-        } else if (!isAuthenticated && isFocusSession(s.session)) {
-          saveActiveSessionDraft({
-            sessionName: s.sessionName,
-            elapsedMs: s.elapsedMs,
-            breakMs: s.breakMs,
-            breakTypesUsed: s.breakTypesUsed,
-            personalRecordMs: s.personalRecordMs,
-            didBreakPR: s.didBreakPR,
-          });
-        }
-        return;
-      }
-      finalizeUnexpected();
-    };
-
-    window.addEventListener("pagehide", onPageHide);
-    window.addEventListener("beforeunload", finalizeUnexpected);
+    window.addEventListener("pagehide", persistProgress);
+    window.addEventListener("beforeunload", persistProgress);
 
     return () => {
-      window.removeEventListener("pagehide", onPageHide);
-      window.removeEventListener("beforeunload", finalizeUnexpected);
+      window.removeEventListener("pagehide", persistProgress);
+      window.removeEventListener("beforeunload", persistProgress);
     };
   }, [enabled, isAuthenticated]);
 }

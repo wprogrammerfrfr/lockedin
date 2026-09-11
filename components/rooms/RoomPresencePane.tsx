@@ -7,6 +7,11 @@ import { FollowButton } from "@/components/social/FollowButton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { RoomWallClock } from "@/components/rooms/RoomWallClock";
+import {
+  memberDisplayClock,
+  useNow,
+  type SelfLiveClock,
+} from "@/features/rooms/live-member-clock";
 import { getBreakType } from "@/features/session/break-types";
 import { formatMs } from "@/features/session/format";
 import type { RoomPresenceMember } from "@/features/rooms/types";
@@ -43,20 +48,26 @@ function statusBadge(
       };
     case "BREAK": {
       const kind = shortBreakLabel(member.breakType, t);
+      const emoji = getBreakType(member.breakType)?.emoji;
       return {
-        label: kind ? `${t("timer.break")} · ${kind}` : t("timer.onBreak"),
+        label: kind ? `${emoji ? `${emoji} ` : ""}${kind}` : t("timer.onBreak"),
         className: "bg-amber-50 text-amber-700 border-amber-200",
       };
     }
     case "LACKING":
       return {
         label: t("room.lacking"),
-        className: "bg-slate-100 text-slate-500 border-slate-200",
+        className: "bg-muted text-muted-foreground border-border",
+      };
+    case "CUSTOMIZING":
+      return {
+        label: member.meltStatusLabel ?? t("melt.room.customizing"),
+        className: "bg-pink-50 text-pink-700 border-pink-200",
       };
     default:
       return {
         label: member.status,
-        className: "bg-slate-50 text-slate-600 border-slate-200",
+        className: "bg-background text-muted-foreground border-border",
       };
   }
 }
@@ -65,12 +76,16 @@ export function RoomPresencePane({
   members,
   seats = 6,
   selfUserId = null,
+  selfLive = null,
 }: {
   members: RoomPresenceMember[];
   seats?: number;
   selfUserId?: string | null;
+  /** Local session clock — bypasses presence lag for the current user. */
+  selfLive?: SelfLiveClock | null;
 }) {
   const { t } = useTranslation();
+  const now = useNow(1_000);
   const slots = Array.from({ length: Math.min(6, Math.max(2, seats)) }, (_, i) => {
     return members.find((m) => m.seat === i + 1) ?? null;
   });
@@ -120,10 +135,10 @@ export function RoomPresencePane({
     <div className="flex h-full flex-col gap-3 overflow-y-auto p-4">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="font-display text-sm font-bold text-slate-900">
+          <p className="font-display text-sm font-bold text-foreground">
             {t("room.attendance")}
           </p>
-          <p className="text-xs text-slate-500">{t("room.seats")}</p>
+          <p className="text-xs text-muted-foreground">{t("room.seats")}</p>
         </div>
         <RoomWallClock className="shrink-0 self-center" />
       </div>
@@ -132,14 +147,15 @@ export function RoomPresencePane({
           const badge = m ? statusBadge(m, t) : null;
           const isSelf = Boolean(m && selfUserId && m.userId === selfUserId);
           const relation = m ? relations[m.userId] : undefined;
+          const clock = m ? memberDisplayClock(m, now, selfLive) : null;
           return (
             <motion.div
               key={m?.userId ?? `empty-${i}`}
               layout
               transition={springSoft}
               className={cn(
-                "rounded-xl border border-slate-200 bg-white p-3",
-                !m && "border-dashed bg-slate-50",
+                "rounded-xl border border-border bg-card p-3",
+                !m && "border-dashed bg-background",
               )}
             >
               {m ? (
@@ -148,48 +164,46 @@ export function RoomPresencePane({
                     {m.avatarPath ? (
                       <AvatarImage src={m.avatarPath} alt="" />
                     ) : null}
-                    <AvatarFallback className="rounded-xl bg-slate-100 text-xs font-semibold text-slate-600">
+                    <AvatarFallback className="rounded-xl bg-muted text-xs font-semibold text-muted-foreground">
                       {(m.username || "?").slice(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
+                  {!isSelf && relation != null && (
+                    <FollowButton
+                      targetUserId={m.userId}
+                      initialStatus={relation}
+                      compact
+                      onStatusChange={(next) =>
+                        setRelations((prev) => ({
+                          ...prev,
+                          [m.userId]: next,
+                        }))
+                      }
+                    />
+                  )}
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-display text-sm font-semibold text-slate-800">
+                    <p className="truncate font-display text-sm font-semibold text-foreground">
                       {m.username}
                     </p>
-                    <p className="font-mono text-[11px] tabular-nums text-slate-400">
-                      {formatMs(m.elapsedMs)}
+                    <p className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                      {formatMs(clock?.displayMs ?? 0)}
                     </p>
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    {badge && (
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "max-w-[9.5rem] truncate rounded-lg text-[10px]",
-                          badge.className,
-                        )}
-                        title={badge.label}
-                      >
-                        {badge.label}
-                      </Badge>
-                    )}
-                    {!isSelf && relation != null && (
-                      <FollowButton
-                        targetUserId={m.userId}
-                        initialStatus={relation}
-                        compact
-                        onStatusChange={(next) =>
-                          setRelations((prev) => ({
-                            ...prev,
-                            [m.userId]: next,
-                          }))
-                        }
-                      />
-                    )}
-                  </div>
+                  {badge && (
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "max-w-[9.5rem] shrink-0 truncate rounded-lg text-[10px]",
+                        badge.className,
+                      )}
+                      title={badge.label}
+                    >
+                      {badge.label}
+                    </Badge>
+                  )}
                 </div>
               ) : (
-                <p className="text-xs text-slate-400">{t("room.openSeat")}</p>
+                <p className="text-xs text-muted-foreground">{t("room.openSeat")}</p>
               )}
             </motion.div>
           );

@@ -45,16 +45,16 @@ export function SessionCardViewToggle({
       className={cn("w-full", className)}
     >
       <div className="flex justify-center">
-        <TabsList className="h-9 bg-slate-100 text-slate-500">
+        <TabsList className="h-9 bg-muted text-muted-foreground">
           <TabsTrigger
             value="summary"
-            className="rounded-md data-[state=active]:bg-white data-[state=active]:text-slate-900"
+            className="rounded-md data-[state=active]:bg-card data-[state=active]:text-foreground"
           >
             {t("share.summary")}
           </TabsTrigger>
           <TabsTrigger
             value="receipt"
-            className="rounded-md data-[state=active]:bg-white data-[state=active]:text-slate-900"
+            className="rounded-md data-[state=active]:bg-card data-[state=active]:text-foreground"
           >
             {t("share.receipt")}
           </TabsTrigger>

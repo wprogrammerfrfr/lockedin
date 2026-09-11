@@ -25,12 +25,12 @@ function SidebarAuthCard({
     return (
       <div
         className={cn(
-          "rounded-xl border border-slate-200 bg-slate-50 px-2 py-2",
+          "rounded-xl border border-border bg-muted px-2 py-2",
           !compact && "lg:px-3",
         )}
       >
         {!compact && (
-          <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
             Session
           </p>
         )}
@@ -45,25 +45,25 @@ function SidebarAuthCard({
         href="/profile"
         onClick={onNavigate}
         className={cn(
-          "flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white p-2",
+          "flex items-center justify-center gap-2 rounded-xl border border-border bg-card p-2",
           !compact && "items-start p-3",
         )}
       >
         <Avatar className="h-8 w-8 shrink-0 rounded-lg">
           {avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}
-          <AvatarFallback className="rounded-lg bg-slate-100 text-[10px]">
+          <AvatarFallback className="rounded-lg bg-muted text-[10px]">
             {initials}
           </AvatarFallback>
         </Avatar>
         {!compact && (
           <div className="min-w-0 flex-1">
-            <p className="truncate font-display text-xs font-semibold text-slate-800">
+            <p className="truncate font-display text-xs font-semibold text-foreground">
               {profileLabel}
             </p>
             {connectedVia && (
               <Badge
                 variant="outline"
-                className="mt-1 border-slate-200 px-1.5 py-0 text-[10px] font-medium text-slate-500"
+                className="mt-1 border-border px-1.5 py-0 text-[10px] font-medium text-muted-foreground"
               >
                 Connected via {connectedVia}
               </Badge>
@@ -77,12 +77,12 @@ function SidebarAuthCard({
   return (
     <div
       className={cn(
-        "flex flex-col items-center gap-2 rounded-xl border border-slate-200 bg-white p-2",
+        "flex flex-col items-center gap-2 rounded-xl border border-border bg-card p-2",
         !compact && "items-stretch p-3",
       )}
     >
       {!compact && (
-        <p className="font-display text-xs font-semibold text-slate-700">
+        <p className="font-display text-xs font-semibold text-foreground">
           Guest Session
         </p>
       )}
@@ -124,7 +124,7 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "flex h-full shrink-0 flex-col border-r border-slate-200 bg-white",
+        "flex h-full shrink-0 flex-col border-r border-border bg-card",
         variant === "drawer" ? "w-full border-r-0 overflow-y-auto" : compact ? "w-16" : "w-56",
       )}
     >
@@ -150,7 +150,7 @@ export function Sidebar({
             onClick={onToggleCollapse}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            <PanelLeftClose className="h-4 w-4 text-slate-500" />
+            <PanelLeftClose className="h-4 w-4 text-muted-foreground" />
           </Button>
         )}
       </div>
@@ -165,7 +165,7 @@ export function Sidebar({
             onClick={onToggleCollapse}
             aria-label="Expand sidebar"
           >
-            <PanelLeft className="h-4 w-4 text-slate-500" />
+            <PanelLeft className="h-4 w-4 text-muted-foreground" />
           </Button>
         </div>
       )}
@@ -184,8 +184,8 @@ export function Sidebar({
                 "flex items-center gap-3 rounded-xl px-3 py-3 font-display text-sm font-semibold transition-colors",
                 compact ? "justify-center" : "justify-start",
                 active
-                  ? "bg-slate-50 text-emerald-700 shadow-soft"
-                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-700",
+                  ? "bg-muted text-emerald-700 shadow-soft dark:text-lime-400"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
               aria-current={active ? "page" : undefined}
               title={compact ? label : undefined}
@@ -193,7 +193,9 @@ export function Sidebar({
               <Icon
                 className={cn(
                   "h-5 w-5 shrink-0",
-                  active ? "text-emerald-600" : "text-slate-400",
+                  active
+                    ? "text-emerald-600 dark:text-lime-400"
+                    : "text-muted-foreground",
                 )}
               />
               {!compact && <span>{label}</span>}
@@ -202,7 +204,7 @@ export function Sidebar({
         })}
       </nav>
 
-      <div className="space-y-2 border-t border-slate-200 p-3">
+      <div className="space-y-2 border-t border-border p-3">
         <SidebarAuthCard compact={compact} onNavigate={onNavigate} />
         {footer}
       </div>

@@ -22,6 +22,7 @@ export type SessionRow = {
   active_ms: number;
   break_ms: number;
   break_types_used: string[] | unknown;
+  dessert_metadata?: unknown;
   break_history?: unknown;
   is_shared: boolean;
   outcome: string | null;
@@ -63,6 +64,10 @@ export type RoomMemberRow = {
   focus_status?: string | null;
   elapsed_ms?: number | null;
   break_label?: string | null;
+  melt_config?: Record<string, unknown> | null;
+  melt_anim_offset_ms?: number | null;
+  melt_board_x?: number | null;
+  melt_board_z?: number | null;
 };
 
 export type FollowStatus = "pending" | "accepted" | "rejected";

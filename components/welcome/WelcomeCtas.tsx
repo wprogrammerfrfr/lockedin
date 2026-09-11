@@ -40,7 +40,7 @@ export function WelcomeCtas({
           variant="outline"
           size={size === "xl" ? "lg" : compact ? "sm" : size}
           className={cn(
-            "border-slate-200 bg-white",
+            "border-border bg-card",
             stack && "w-full sm:w-auto",
             size === "xl" && "h-14 rounded-2xl px-8 text-base",
           )}

@@ -84,27 +84,27 @@ export function SessionListRow({
       type="button"
       onClick={onClick}
       className={cn(
-        "w-full rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 text-left transition-colors",
-        "hover:border-slate-200 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50",
+        "w-full rounded-xl border border-slate-100 bg-background px-3 py-2.5 text-left transition-colors",
+        "hover:border-border hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50",
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate font-medium text-slate-800">
+          <p className="truncate font-medium text-foreground">
             {session.session_name?.trim() ||
               session.room_name?.trim() ||
               t("dash.untitled")}
-            <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+            <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               {isRoom ? t("receipt.room") : t("receipt.solo")}
             </span>
           </p>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mt-0.5 text-xs text-muted-foreground">
             {youLockedInForLabel(session.active_ms ?? 0)}
             {(session.break_ms ?? 0) > 0
               ? ` · break ${formatMs(session.break_ms ?? 0)}`
               : ""}
           </p>
-          <p className="mt-0.5 font-mono text-[11px] tabular-nums text-slate-400">
+          <p className="mt-0.5 font-mono text-[11px] tabular-nums text-muted-foreground">
             {showDate ? (
               <>
                 {formatListDate(session.started_at, timeZone)}
@@ -116,7 +116,7 @@ export function SessionListRow({
             {formatClock(session.ended_at, timeZone)}
           </p>
         </div>
-        <span className="shrink-0 font-mono text-xs tabular-nums text-slate-500">
+        <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
           {formatMs(session.active_ms ?? 0, true)}
         </span>
       </div>
@@ -180,7 +180,7 @@ export function SessionDetailDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="flex max-h-[min(90dvh,52rem)] max-w-md flex-col gap-3 overflow-hidden border-slate-200 bg-white">
+        <DialogContent className="flex max-h-[min(90dvh,52rem)] max-w-md flex-col gap-3 overflow-hidden border-border bg-card">
           <DialogHeader className="shrink-0">
             <DialogTitle>
               {cardView === "summary"
@@ -237,7 +237,7 @@ export function SessionDetailDialog({
               ) : null}
             </div>
           ) : (
-            <p className="py-4 text-sm text-slate-400">
+            <p className="py-4 text-sm text-muted-foreground">
               {t("dash.noSessionSelected")}
             </p>
           )}
@@ -296,7 +296,7 @@ export function DaySessionsDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-md border-slate-200 bg-white">
+        <DialogContent className="max-w-md border-border bg-card">
           <DialogHeader>
             <DialogTitle className="font-mono tabular-nums">
               {day ?? t("dash.daySessions")}
@@ -310,7 +310,7 @@ export function DaySessionsDialog({
 
           {locked ? (
             <div className="space-y-3 py-2">
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-muted-foreground">
                 {t("dash.followUnlockList")}
               </p>
               <Button asChild className="rounded-xl">
@@ -318,12 +318,12 @@ export function DaySessionsDialog({
               </Button>
             </div>
           ) : loading ? (
-            <p className="py-4 text-sm text-slate-400">{t("dash.loadingSessions")}</p>
+            <p className="py-4 text-sm text-muted-foreground">{t("dash.loadingSessions")}</p>
           ) : error ? (
-            <p className="py-4 text-sm text-slate-500">{error}</p>
+            <p className="py-4 text-sm text-muted-foreground">{error}</p>
           ) : sessions.length === 0 ? (
             <div className="space-y-3 py-2">
-              <p className="text-sm text-slate-400">{t("dash.noSessionsDay")}</p>
+              <p className="text-sm text-muted-foreground">{t("dash.noSessionsDay")}</p>
               {canShare ? (
                 <Button asChild variant="outline" className="rounded-xl">
                   <Link href="/lockin">{t("nav.lockin")}</Link>

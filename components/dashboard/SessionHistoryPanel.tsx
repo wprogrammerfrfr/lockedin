@@ -261,7 +261,7 @@ export function SessionHistoryPanel({
 
   return (
     <>
-      <Card className="border-slate-200 bg-white">
+      <Card className="border-border bg-card">
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -272,7 +272,7 @@ export function SessionHistoryPanel({
                   <MyLockInsTitle className="text-base" />
                 </CardTitle>
               )}
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-muted-foreground">
                 {subtitle ?? t("dash.historySubtitle")}
               </p>
             </div>
@@ -286,17 +286,17 @@ export function SessionHistoryPanel({
             }
           >
             <div className="mb-4 flex justify-end">
-              <TabsList className="h-9 bg-slate-100 text-slate-500">
+              <TabsList className="h-9 bg-muted text-muted-foreground">
                 <TabsTrigger
                   value="calendar"
-                  className="gap-1.5 rounded-md data-[state=active]:bg-white data-[state=active]:text-slate-900"
+                  className="gap-1.5 rounded-md data-[state=active]:bg-card data-[state=active]:text-foreground"
                 >
                   <CalendarDays className="h-3.5 w-3.5" />
                   {t("dash.calendar")}
                 </TabsTrigger>
                 <TabsTrigger
                   value="list"
-                  className="gap-1.5 rounded-md data-[state=active]:bg-white data-[state=active]:text-slate-900"
+                  className="gap-1.5 rounded-md data-[state=active]:bg-card data-[state=active]:text-foreground"
                 >
                   <List className="h-3.5 w-3.5" />
                   {t("dash.list")}
@@ -305,15 +305,15 @@ export function SessionHistoryPanel({
             </div>
 
             {unavailable ? (
-              <p className="mb-3 text-sm text-slate-400">
+              <p className="mb-3 text-sm text-muted-foreground">
                 {t("dash.statsUnavailable")}
               </p>
             ) : null}
 
             {!username ? (
-              <p className="text-sm text-slate-400">{t("dash.setUsername")}</p>
+              <p className="text-sm text-muted-foreground">{t("dash.setUsername")}</p>
             ) : locked && view === "list" ? (
-              <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-400">
+              <p className="rounded-xl border border-dashed border-border bg-background px-4 py-8 text-center text-sm text-muted-foreground">
                 {t("dash.followToUnlock")}
               </p>
             ) : (
@@ -336,15 +336,15 @@ export function SessionHistoryPanel({
                 </TabsContent>
                 <TabsContent value="list" className="mt-0">
                   {listLoading && listSessions.length === 0 ? (
-                    <p className="py-8 text-center text-sm text-slate-400">
+                    <p className="py-8 text-center text-sm text-muted-foreground">
                       {t("dash.loadingSessions")}
                     </p>
                   ) : listError ? (
-                    <p className="py-8 text-center text-sm text-slate-500">
+                    <p className="py-8 text-center text-sm text-muted-foreground">
                       {listError}
                     </p>
                   ) : listSessions.length === 0 ? (
-                    <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-400">
+                    <p className="rounded-xl border border-dashed border-border bg-background px-4 py-8 text-center text-sm text-muted-foreground">
                       {t("dash.noSessions")}
                     </p>
                   ) : (

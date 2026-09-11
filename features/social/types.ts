@@ -63,5 +63,6 @@ export type ProfileDaySession = {
   room_name?: string | null;
   room_code?: string | null;
   kind?: "solo" | "room" | string;
+  dessert_metadata?: unknown;
   participants?: ProfileDaySessionParticipant[];
 };

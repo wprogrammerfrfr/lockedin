@@ -49,7 +49,7 @@ export function AuthGateModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md border-slate-200 bg-white">
+      <DialogContent className="max-w-md border-border bg-card">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">
             {t("auth.accountRequired")}

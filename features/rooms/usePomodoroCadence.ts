@@ -1,10 +1,21 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { pomodoroTick } from "@/features/rooms/api";
 import type { RoomSummary } from "@/features/rooms/types";
+
+function phaseRemainingMs(room: RoomSummary | null, isPomodoro: boolean): number {
+  if (!isPomodoro || !room?.phaseStartedAt) return 0;
+  const started = new Date(room.phaseStartedAt).getTime();
+  if (!Number.isFinite(started)) return 0;
+  const duration =
+    room.phase === "break"
+      ? room.breakMs ?? 10 * 60_000
+      : room.workMs ?? 50 * 60_000;
+  return Math.max(0, duration - (Date.now() - started));
+}
 
 /**
  * For pomodoro rooms: poll pomodoro_tick and expose remaining ms in the
@@ -15,16 +26,20 @@ export function usePomodoroCadence(
   onPhase?: (phase: "work" | "break", remainingMs: number) => void,
 ) {
   const isPomodoro = room?.kind === "pomodoro" && room.status === "live";
+  const [tick, setTick] = useState(0);
 
-  const remainingMs = useMemo(() => {
-    if (!isPomodoro || !room?.phaseStartedAt) return 0;
-    const started = new Date(room.phaseStartedAt).getTime();
-    const duration =
-      room.phase === "break"
-        ? room.breakMs ?? 10 * 60_000
-        : room.workMs ?? 50 * 60_000;
-    return Math.max(0, duration - (Date.now() - started));
-  }, [isPomodoro, room]);
+  useEffect(() => {
+    if (!isPomodoro) return;
+    const id = window.setInterval(() => setTick((n) => n + 1), 1_000);
+    return () => window.clearInterval(id);
+  }, [isPomodoro, room?.phaseStartedAt, room?.phase]);
+
+  const remainingMs = useMemo(
+    () => phaseRemainingMs(room, isPomodoro),
+    // tick forces recompute every second from wall-clock
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
+    [isPomodoro, room, tick],
+  );
 
   useEffect(() => {
     if (!isPomodoro || !room?.id) return;

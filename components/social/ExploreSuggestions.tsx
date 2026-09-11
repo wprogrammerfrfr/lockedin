@@ -27,8 +27,10 @@ async function suggestProfiles(
 
 export function ExploreSuggestions({
   profileUsername,
+  usernameClaimed = true,
 }: {
   profileUsername?: string | null;
+  usernameClaimed?: boolean;
 }) {
   const [hits, setHits] = useState<ProfileSearchHit[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,12 +59,20 @@ export function ExploreSuggestions({
 
   async function copyInvite() {
     const origin = window.location.origin;
-    const path = profileUsername
+    const canShareProfile =
+      usernameClaimed &&
+      Boolean(profileUsername) &&
+      !/^u_[a-f0-9]{8,}$/i.test(profileUsername ?? "");
+    const path = canShareProfile
       ? `${origin}/u/${profileUsername}`
       : `${origin}/login`;
     try {
       await navigator.clipboard.writeText(path);
-      toast.success("Invite link copied");
+      toast.success(
+        canShareProfile
+          ? "Invite link copied"
+          : "Login link copied — claim a username to share your profile",
+      );
     } catch {
       toast.error("Could not copy link");
     }
@@ -70,11 +80,11 @@ export function ExploreSuggestions({
 
   return (
     <div className="space-y-4 text-left">
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
-        <p className="font-display text-sm font-semibold text-slate-800">
+      <div className="rounded-xl border border-border bg-card p-4">
+        <p className="font-display text-sm font-semibold text-foreground">
           Invite friends
         </p>
-        <p className="mt-1 text-xs text-slate-500">
+        <p className="mt-1 text-xs text-muted-foreground">
           LockedIn is better with mutuals. Share your profile link to get your
           first follows.
         </p>
@@ -84,44 +94,45 @@ export function ExploreSuggestions({
           className="mt-3 rounded-xl"
           onClick={() => void copyInvite()}
         >
-          <Copy className="mr-1.5 h-4 w-4" />
-          Copy invite link
+          <Copy className="h-4 w-4" />
+          Copy invite
         </Button>
       </div>
 
-      {loading ? (
-        <p className="text-xs text-slate-400">Finding students…</p>
-      ) : hits.length > 0 ? (
-        <div className="space-y-2">
-          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-            <UserPlus className="h-3.5 w-3.5" />
-            Suggested
-          </p>
+      <div>
+        <p className="mb-2 font-display text-sm font-semibold text-foreground">
+          People to follow
+        </p>
+        {loading ? (
+          <p className="text-xs text-muted-foreground">Loading…</p>
+        ) : hits.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No suggestions yet.</p>
+        ) : (
           <ul className="space-y-2">
-            {hits.map((h) => {
-              const url = publicAvatarUrl(h.avatar_path);
-              return (
-                <li key={h.id}>
-                  <Link
-                    href={`/u/${h.username}`}
-                    className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 hover:bg-slate-50"
-                  >
-                    <Avatar className="h-8 w-8 rounded-lg">
-                      {url ? <AvatarImage src={url} alt="" /> : null}
-                      <AvatarFallback className="rounded-lg bg-slate-100 text-[10px]">
-                        {h.username.slice(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="truncate text-sm font-medium text-slate-800">
-                      @{h.username}
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
+            {hits.map((h) => (
+              <li key={h.id}>
+                <Link
+                  href={`/u/${h.username}`}
+                  className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-2 hover:bg-muted/40"
+                >
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage
+                      src={publicAvatarUrl(h.avatar_path) ?? undefined}
+                    />
+                    <AvatarFallback>
+                      {(h.username ?? "?").slice(0, 1).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                    @{h.username}
+                  </span>
+                  <UserPlus className="h-4 w-4 text-muted-foreground" />
+                </Link>
+              </li>
+            ))}
           </ul>
-        </div>
-      ) : null}
+        )}
+      </div>
     </div>
   );
 }

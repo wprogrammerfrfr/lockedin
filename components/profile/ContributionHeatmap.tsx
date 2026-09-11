@@ -17,11 +17,11 @@ function levelFromMs(ms: number): 0 | 1 | 2 | 3 | 4 {
 }
 
 const LEVEL_CLASS = [
-  "bg-slate-100 text-slate-500",
-  "bg-emerald-100 text-emerald-800",
-  "bg-emerald-300 text-emerald-950",
-  "bg-emerald-500 text-white",
-  "bg-emerald-600 text-white",
+  "bg-muted text-muted-foreground",
+  "bg-emerald-100 text-emerald-800 dark:bg-emerald-400/20 dark:text-emerald-200",
+  "bg-emerald-300 text-emerald-950 dark:bg-emerald-400/40 dark:text-emerald-50",
+  "bg-emerald-500 text-white dark:bg-emerald-500 dark:text-white",
+  "bg-emerald-600 text-white dark:bg-emerald-400 dark:text-zinc-950",
 ] as const;
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"] as const;
@@ -146,9 +146,9 @@ export function ContributionHeatmap({
   return (
     <div className="w-full">
       {emptyHint && totalMs <= 0 ? (
-        <p className="mb-3 text-sm text-slate-400">
+        <p className="mb-3 text-sm text-muted-foreground">
           No focus yet —{" "}
-          <Link href="/lockin" className="font-medium text-slate-700 underline">
+          <Link href="/lockin" className="font-medium text-foreground underline">
             LOCK IN
           </Link>{" "}
           to light up the calendar.
@@ -166,7 +166,7 @@ export function ContributionHeatmap({
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <p className="font-display text-sm font-semibold text-slate-800">
+        <p className="font-display text-sm font-semibold text-foreground">
           {monthLabel(cursor.year, cursor.month)}
         </p>
         <Button
@@ -185,7 +185,7 @@ export function ContributionHeatmap({
         {WEEKDAYS.map((label, i) => (
           <div
             key={`${label}-${i}`}
-            className="text-center text-[10px] font-medium uppercase tracking-[0.12em] text-slate-400"
+            className="text-center text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
           >
             {label}
           </div>
@@ -251,12 +251,12 @@ export function ContributionHeatmap({
       </div>
 
       {monthMs <= 0 && totalMs > 0 ? (
-        <p className="mt-3 text-xs text-slate-400">
+        <p className="mt-3 text-xs text-muted-foreground">
           No sessions this month — try another month.
         </p>
       ) : null}
 
-      <div className="mt-3 flex items-center gap-1.5 text-[10px] text-slate-400">
+      <div className="mt-3 flex items-center gap-1.5 text-[10px] text-muted-foreground">
         <span>Less</span>
         {LEVEL_CLASS.map((c, i) => (
           <span

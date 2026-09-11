@@ -9,6 +9,9 @@ import {
   shareCardChrome,
 } from "@/features/session/format";
 import type { OutcomeKind } from "@/features/session/types";
+import type { DessertMetadata } from "@/features/session/melt-catalog";
+import { MeltScene } from "@/components/session/MeltScene";
+import { meltSummaryLine } from "@/features/session/melt-utils";
 import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +26,7 @@ export type SessionSummaryCardProps = {
   variant?: "card" | "story";
   displayName?: string | null;
   avatarUrl?: string | null;
+  dessertMetadata?: DessertMetadata | null;
 };
 
 function asDisplayOutcome(outcome: OutcomeKind): OutcomeKind {
@@ -44,6 +48,7 @@ export const SessionSummaryCard = forwardRef<
     variant = "card",
     displayName,
     avatarUrl,
+    dessertMetadata,
   },
   ref,
 ) {
@@ -59,6 +64,7 @@ export const SessionSummaryCard = forwardRef<
   const durationWords = lockedInForWords(durationMs, t);
   const trimmedSessionName = (sessionName ?? "").trim();
   const story = variant === "story";
+  const melt = dessertMetadata?.active;
 
   if (story) {
     return (
@@ -100,10 +106,26 @@ export const SessionSummaryCard = forwardRef<
         </div>
 
         <div className="text-center">
-          <p className="text-[140px] leading-none">{chrome.emoji}</p>
+          {melt?.config ? (
+            <div className="mx-auto mb-8 flex justify-center">
+              <MeltScene
+                config={melt.config}
+                progress={melt.meltProgress}
+                size="md"
+                animated={false}
+              />
+            </div>
+          ) : (
+            <p className="text-[140px] leading-none">{chrome.emoji}</p>
+          )}
           <p className="mt-10 font-display text-5xl font-bold tracking-tight text-slate-900">
             {caption}
           </p>
+          {melt?.config ? (
+            <p className="mt-4 text-3xl text-amber-900/80">
+              {meltSummaryLine(melt.config, melt.meltComplete, t)}
+            </p>
+          ) : null}
           <p className="mt-8 text-4xl font-semibold leading-snug text-slate-800">
             {durationWords}
           </p>
@@ -120,7 +142,7 @@ export const SessionSummaryCard = forwardRef<
     <div
       ref={ref}
       className={cn(
-        "relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br p-6 text-slate-900 shadow-soft",
+        "relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br p-6 text-slate-900 shadow-soft [color-scheme:light]",
         chrome.gradient,
         className,
       )}
@@ -131,7 +153,21 @@ export const SessionSummaryCard = forwardRef<
           {trimmedSessionName}
         </p>
       ) : null}
-      <p className="mt-4 text-5xl leading-none">{chrome.emoji}</p>
+      {melt?.config ? (
+        <div className="mt-4 flex items-center gap-3">
+          <MeltScene
+            config={melt.config}
+            progress={melt.meltProgress}
+            size="sm"
+            animated={false}
+          />
+          <p className="text-sm text-amber-900/90">
+            {meltSummaryLine(melt.config, melt.meltComplete, t)}
+          </p>
+        </div>
+      ) : (
+        <p className="mt-4 text-5xl leading-none">{chrome.emoji}</p>
+      )}
       <p className="mt-4 font-display text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
         {caption}
       </p>

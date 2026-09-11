@@ -11,7 +11,7 @@ import { useTranslation } from "@/lib/i18n/LocaleProvider";
 
 export default function ExplorePage() {
   const { t } = useTranslation();
-  const { status, isAuthenticated, profile } = useAuth();
+  const { status, isAuthenticated, profile, needsUsernameClaim } = useAuth();
   const [gateOpen, setGateOpen] = useState(false);
 
   useEffect(() => {
@@ -23,33 +23,36 @@ export default function ExplorePage() {
     <ChromePage>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
         <div>
-          <h1 className="font-display text-2xl font-bold text-slate-900">
+          <h1 className="font-display text-2xl font-bold text-foreground">
             {t("nav.explore")}
           </h1>
-          <p className="mt-1 text-sm text-slate-500">{t("explore.subtitle")}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{t("explore.subtitle")}</p>
         </div>
 
         <section className="space-y-3">
-          <h2 className="font-display text-sm font-semibold text-slate-700">
+          <h2 className="font-display text-sm font-semibold text-foreground">
             {t("explore.search")}
           </h2>
           <ProfileSearch />
         </section>
 
         <section className="space-y-3">
-          <h2 className="font-display text-sm font-semibold text-slate-700">
+          <h2 className="font-display text-sm font-semibold text-foreground">
             {t("explore.followingFeed")}
           </h2>
           {status === "loading" ? (
-            <p className="text-sm text-slate-400">{t("common.loading")}</p>
+            <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
           ) : isAuthenticated ? (
             <FeedList
               emptyExtra={
-                <ExploreSuggestions profileUsername={profile?.username} />
+                <ExploreSuggestions
+                  profileUsername={profile?.username}
+                  usernameClaimed={!needsUsernameClaim}
+                />
               }
             />
           ) : (
-            <p className="text-sm text-slate-400">{t("explore.signInFeed")}</p>
+            <p className="text-sm text-muted-foreground">{t("explore.signInFeed")}</p>
           )}
         </section>
       </div>

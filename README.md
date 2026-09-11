@@ -22,7 +22,7 @@ Fill in:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `NEXT_PUBLIC_SITE_URL` (production canonical origin, e.g. `https://your-domain.com`)
 
-2. Apply all SQL migrations in `supabase/migrations/` to your Supabase project (SQL editor or CLI), in order (`00001` … `00036`).
+2. Apply all SQL migrations in `supabase/migrations/` to your Supabase project (SQL editor or CLI), in order (`00001` … `00043`).
 
 3. Enable Auth providers in the Supabase dashboard:
 

@@ -41,9 +41,9 @@ function WelcomeSection({
 
 export function WelcomeLanding() {
   return (
-    <div className="flex min-h-full min-w-0 flex-1 flex-col overflow-x-hidden bg-slate-50">
+    <div className="flex min-h-full min-w-0 flex-1 flex-col overflow-x-hidden bg-background">
       <header
-        className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur-sm"
+        className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur-sm"
         style={{
           paddingTop: "env(safe-area-inset-top)",
         }}
@@ -68,7 +68,7 @@ export function WelcomeLanding() {
             transition={springSoft}
           >
             <WelcomeHeroEquation />
-            <p className="mt-4 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
+            <p className="mt-4 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
               Lock in, join Rooms, and keep deep work streaks. Solo sessions
               work without an account. Sign in to sync hours, sit with 2–6
               people, and share the card.
@@ -86,13 +86,13 @@ export function WelcomeLanding() {
         </section>
 
         <WelcomeSection>
-          <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-slate-400">
+          <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-muted-foreground">
             How to use it
           </p>
-          <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-slate-900">
+          <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-foreground">
             LOCK IN → LOCKED IN → BREAK → TAP OUT
           </h2>
-          <p className="mt-2 max-w-2xl text-sm text-slate-500">
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
             Hover or tap a step. Same buttons and state colors you’ll see in
             the app.
           </p>
@@ -105,11 +105,11 @@ export function WelcomeLanding() {
           <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-emerald-600">
             Rooms
           </p>
-          <h2 className="mt-2 flex items-center gap-2 font-display text-3xl font-bold tracking-tight text-slate-900">
+          <h2 className="mt-2 flex items-center gap-2 font-display text-3xl font-bold tracking-tight text-foreground">
             <Users className="h-7 w-7 text-emerald-600" />
             Lock in with friends.
           </h2>
-          <p className="mt-2 max-w-2xl text-sm text-slate-500">
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
             Shared rooms, presence, and Bet / Nah break votes.
           </p>
           <div className="mt-6">
@@ -118,14 +118,14 @@ export function WelcomeLanding() {
         </WelcomeSection>
 
         <WelcomeSection>
-          <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-slate-500">
+          <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-muted-foreground">
             Developer Mode
           </p>
-          <h2 className="mt-2 flex items-center gap-2 font-display text-3xl font-bold tracking-tight text-slate-900">
-            <Code2 className="h-7 w-7 text-slate-700" />
+          <h2 className="mt-2 flex items-center gap-2 font-display text-3xl font-bold tracking-tight text-foreground">
+            <Code2 className="h-7 w-7 text-foreground" />
             Price the build.
           </h2>
-          <p className="mt-2 max-w-2xl text-sm text-slate-500">
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
             Connect GitHub. Track hours, cost, commits, and lines of code.
           </p>
           <div className="mt-6">
@@ -134,13 +134,13 @@ export function WelcomeLanding() {
         </WelcomeSection>
 
         <WelcomeSection>
-          <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-slate-400">
+          <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-muted-foreground">
             Also in the app
           </p>
-          <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-slate-900">
+          <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-foreground">
             Streaks, share cards, proof.
           </h2>
-          <p className="mt-2 max-w-2xl text-sm text-slate-500">
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
             Dashboard stats, screenshot cards, and verification badges.
           </p>
           <div className="mt-6">
@@ -149,26 +149,26 @@ export function WelcomeLanding() {
         </WelcomeSection>
 
         <WelcomeSection>
-          <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-slate-400">
+          <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-muted-foreground">
             Guest or account
           </p>
-          <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-slate-900">
+          <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-foreground">
             Try it now. Save it later.
           </h2>
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
-                  <Target className="h-4 w-4 text-slate-500" />
+                  <Target className="h-4 w-4 text-muted-foreground" />
                   Guest
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <p className="text-sm leading-relaxed text-slate-600">
+                <p className="text-sm leading-relaxed text-muted-foreground">
                   Solo focus stays on this device. LOCK IN, BREAK, and TAP OUT
                   all work. Sessions wait in local drafts until you log in.
                 </p>
-                <ul className="space-y-1.5 text-sm text-slate-600">
+                <ul className="space-y-1.5 text-sm text-muted-foreground">
                   <li>Solo timer, no account</li>
                   <li>Drafts merge after you sign in</li>
                   <li>Rooms and social stay gated</li>
@@ -183,11 +183,11 @@ export function WelcomeLanding() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <p className="text-sm leading-relaxed text-slate-600">
+                <p className="text-sm leading-relaxed text-muted-foreground">
                   Cloud-backed hours, Rooms, Explore, and streaks. Connect
                   GitHub if you want hours verified against real work.
                 </p>
-                <ul className="space-y-1.5 text-sm text-slate-600">
+                <ul className="space-y-1.5 text-sm text-muted-foreground">
                   <li className="flex items-center gap-2">
                     <Users className="h-3.5 w-3.5 text-emerald-600" />
                     Rooms, feed, follows
@@ -202,14 +202,14 @@ export function WelcomeLanding() {
         </WelcomeSection>
       </main>
 
-      <footer className="border-t border-slate-200 bg-white">
+      <footer className="border-t border-border bg-card">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div>
             <LockedInLogo
               as="p"
               className="text-lg tracking-tight"
             />
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-muted-foreground">
               LockedIn — deep work, tracked.
             </p>
           </div>

@@ -1,11 +1,13 @@
 import type { RoomKind, RoomPhase, RoomStatus } from "@/types/database";
+import type { MeltConfig } from "@/features/session/melt-catalog";
 
 export type RoomPresenceStatus =
   | "LOCKED_IN"
   | "BREAK"
   | "LACKING"
   | "IDLE"
-  | "WAITING";
+  | "WAITING"
+  | "CUSTOMIZING";
 
 export type RoomPresenceMember = {
   userId: string;
@@ -14,11 +16,32 @@ export type RoomPresenceMember = {
   avatarPath: string | null;
   status: RoomPresenceStatus;
   elapsedMs: number;
+  /**
+   * Client wall-clock when this snapshot was taken (presence track or DB fetch).
+   * Used to extrapolate live timers between sync events.
+   */
+  clockSyncedAt?: number;
   seat?: number | null;
   /** Live break label, e.g. "15-minute Hydration Break" or "Quick Doomscroll". */
   breakLabel?: string | null;
   /** Choice id / coarse type for badges: hydration, doomscroll, pomodoro, etc. */
   breakType?: string | null;
+  /** Time already spent in the current break. */
+  breakElapsedMs?: number;
+  /** Time left in a countdown break. */
+  breakRemainingMs?: number;
+  /** Whether the current break counts upward instead of down. */
+  breakOpenEnded?: boolean;
+  /** MELT IT live config for shared melt board */
+  meltConfig?: MeltConfig | null;
+  meltAnimOffsetMs?: number;
+  meltAnimSpeed?: number;
+  meltCustomizing?: boolean;
+  meltStatusLabel?: string | null;
+  /** Normalized table seat 0–1 left→right; null = auto-spread. */
+  meltBoardX?: number | null;
+  /** Normalized table depth 0–1 front→back; null = auto-spread. */
+  meltBoardZ?: number | null;
 };
 
 export type RoomSummary = {

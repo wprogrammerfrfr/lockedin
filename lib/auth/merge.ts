@@ -1,15 +1,20 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { BreakTypeStored } from "@/features/session/types";
+import { STALE_SESSION_MS } from "@/features/session/sync";
 
 const LOCAL_DRAFTS_KEY = "lockedin.sessionDrafts";
 const ACTIVE_DRAFT_KEY = "lockedin.activeSessionDraft";
+const MERGE_LOCK_KEY = "lockedin.mergeLock";
 
 export type SessionDraft = {
   id: string;
   sessionName: string | null;
   elapsedMs: number;
+  breakMs?: number;
   outcome: string;
   breakTypesUsed: BreakTypeStored[];
+  /** ISO start; when missing, derived as endedAt - elapsedMs. */
+  startedAt?: string;
   endedAt: string;
   source: "local" | "anonymous";
 };
@@ -44,15 +49,28 @@ export function loadLocalSessionDrafts(): SessionDraft[] {
 
 /** Persist a finished local session for later merge after signup. */
 export function saveLocalSessionDraft(
-  draft: Omit<SessionDraft, "id" | "endedAt" | "source">,
+  draft: Omit<SessionDraft, "id" | "endedAt" | "source"> & {
+    endedAt?: string;
+    startedAt?: string;
+  },
 ): SessionDraft {
+  const endedAt = draft.endedAt || new Date().toISOString();
+  const activeMs = Math.max(0, Math.round(draft.elapsedMs));
+  const startedAt =
+    draft.startedAt ||
+    new Date(new Date(endedAt).getTime() - activeMs).toISOString();
   const entry: SessionDraft = {
-    ...draft,
+    sessionName: draft.sessionName,
+    elapsedMs: draft.elapsedMs,
+    breakMs: draft.breakMs ?? 0,
+    outcome: draft.outcome,
+    breakTypesUsed: draft.breakTypesUsed,
+    startedAt,
+    endedAt,
     id:
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
         : `draft_${Date.now()}`,
-    endedAt: new Date().toISOString(),
     source: "local",
   };
 
@@ -101,6 +119,16 @@ export function clearActiveSessionDraft() {
   localStorage.removeItem(ACTIVE_DRAFT_KEY);
 }
 
+export function isActiveSessionDraftStale(
+  draft: ActiveSessionDraft,
+  now = Date.now(),
+  staleMs = STALE_SESSION_MS,
+): boolean {
+  const updated = new Date(draft.updatedAt).getTime();
+  if (!Number.isFinite(updated)) return true;
+  return now - updated > staleMs;
+}
+
 /**
  * Promote in-progress guest draft to a finished local draft (unexpected close).
  * Returns the finished draft, or null if nothing to finalize.
@@ -120,13 +148,15 @@ export function finalizeActiveSessionDraft(
     didBreakPROverride ??
     (active.didBreakPR ||
       (active.personalRecordMs > 0 &&
-        active.elapsedMs > active.personalRecordMs));
+        active.elapsedMs > active.personalRecordMs) ||
+      (active.personalRecordMs === 0 && active.elapsedMs > 0));
   const outcome =
     outcomeOverride ?? (didBreakPR ? "pr" : "solid");
 
   const finished = saveLocalSessionDraft({
     sessionName: active.sessionName,
     elapsedMs: active.elapsedMs,
+    breakMs: active.breakMs ?? 0,
     outcome,
     breakTypesUsed: active.breakTypesUsed ?? [],
   });
@@ -156,6 +186,31 @@ export async function ensureAnonymousSession(supabase: SupabaseClient) {
   };
 }
 
+function tryAcquireMergeLock(): boolean {
+  if (!canUseLocalStorage()) return true;
+  try {
+    const raw = localStorage.getItem(MERGE_LOCK_KEY);
+    const now = Date.now();
+    if (raw) {
+      const ts = Number(raw);
+      if (Number.isFinite(ts) && now - ts < 15_000) return false;
+    }
+    localStorage.setItem(MERGE_LOCK_KEY, String(now));
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+function releaseMergeLock() {
+  if (!canUseLocalStorage()) return;
+  try {
+    localStorage.removeItem(MERGE_LOCK_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 /**
  * Insert ended local drafts into `sessions` for the authenticated user.
  * Never uses the service role key. Does not call signInAnonymously.
@@ -181,38 +236,53 @@ export async function mergeLocalSessionsIntoUser(
     return { ok: true as const, merged: 0, error: null };
   }
 
-  const rows = drafts.map((d) => {
-    const endedAt = d.endedAt || new Date().toISOString();
-    const activeMs = Math.max(0, Math.round(d.elapsedMs));
-    const startedAt = new Date(
-      new Date(endedAt).getTime() - activeMs,
-    ).toISOString();
-    const status =
-      d.outcome === "tapout" || d.outcome === "tapped_out"
-        ? "tapped_out"
-        : "ended";
-
-    return {
-      user_id: user.id,
-      session_name: d.sessionName,
-      started_at: startedAt,
-      ended_at: endedAt,
-      status,
-      active_ms: activeMs,
-      break_ms: 0,
-      break_types_used: d.breakTypesUsed ?? [],
-      is_shared: false,
-      outcome: d.outcome || "solid",
-      pr_broken: d.outcome === "pr",
-    };
-  });
-
-  const { error } = await supabase.from("sessions").insert(rows);
-
-  if (error) {
-    return { ok: false as const, merged: 0, error: error.message };
+  if (!tryAcquireMergeLock()) {
+    return { ok: true as const, merged: 0, error: null };
   }
 
-  clearLocalSessionDrafts();
-  return { ok: true as const, merged: drafts.length, error: null };
+  try {
+    // Clear before insert so a concurrent tab cannot duplicate the same drafts.
+    clearLocalSessionDrafts();
+
+    const rows = drafts.map((d) => {
+      const endedAt = d.endedAt || new Date().toISOString();
+      const activeMs = Math.max(0, Math.round(d.elapsedMs));
+      const breakMs = Math.max(0, Math.round(d.breakMs ?? 0));
+      const startedAt =
+        d.startedAt ||
+        new Date(new Date(endedAt).getTime() - activeMs).toISOString();
+      const status =
+        d.outcome === "tapout" || d.outcome === "tapped_out"
+          ? "tapped_out"
+          : "ended";
+
+      return {
+        user_id: user.id,
+        session_name: d.sessionName,
+        started_at: startedAt,
+        ended_at: endedAt,
+        status,
+        active_ms: activeMs,
+        break_ms: breakMs,
+        break_types_used: d.breakTypesUsed ?? [],
+        is_shared: false,
+        outcome: d.outcome || "solid",
+        pr_broken: d.outcome === "pr",
+      };
+    });
+
+    const { error } = await supabase.from("sessions").insert(rows);
+
+    if (error) {
+      // Put drafts back so a later retry can succeed.
+      if (canUseLocalStorage()) {
+        localStorage.setItem(LOCAL_DRAFTS_KEY, JSON.stringify(drafts));
+      }
+      return { ok: false as const, merged: 0, error: error.message };
+    }
+
+    return { ok: true as const, merged: drafts.length, error: null };
+  } finally {
+    releaseMergeLock();
+  }
 }

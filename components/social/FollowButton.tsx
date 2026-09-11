@@ -92,7 +92,7 @@ export function FollowButton({
       <Button
         variant="outline"
         size={compact ? "sm" : "default"}
-        className={cn(chipClass, compact && "text-slate-500")}
+        className={cn(chipClass, compact && "text-muted-foreground")}
         disabled={busy}
         onClick={() =>
           run(() => unfollow(supabase(), targetUserId), "none")

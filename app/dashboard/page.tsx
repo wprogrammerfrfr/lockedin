@@ -5,6 +5,7 @@ import { ChromePage } from "@/components/layout/ChromePage";
 import { AuthGateModal } from "@/components/auth/AuthGateModal";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { SessionHistoryPanel } from "@/components/dashboard/SessionHistoryPanel";
+import { MeltedCreationsPanel } from "@/components/dashboard/MeltedCreationsPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CountUp } from "@/components/ui/count-up";
 import { formatMs, formatTotalHours } from "@/features/session/format";
@@ -144,17 +145,17 @@ export default function DashboardPage() {
     <ChromePage>
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
         <div>
-          <h1 className="font-display text-2xl font-bold text-slate-900">
+          <h1 className="font-display text-2xl font-bold text-foreground">
             {t("dash.title")}
           </h1>
-          <p className="mt-1 text-sm text-slate-500">{t("dash.subtitle")}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{t("dash.subtitle")}</p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-3">
           {primaryStats.map((s) => (
-            <Card key={s.label} className="border-slate-200 bg-white">
+            <Card key={s.label} className="border-border bg-card">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-slate-500">
+                <CardTitle className="text-sm text-muted-foreground">
                   {s.label}
                 </CardTitle>
               </CardHeader>
@@ -163,10 +164,10 @@ export default function DashboardPage() {
                   <CountUp
                     value={s.value}
                     format={s.format}
-                    className="text-2xl font-semibold text-slate-900"
+                    className="text-2xl font-semibold text-foreground"
                   />
                 ) : (
-                  <p className="font-mono text-2xl font-semibold tabular-nums text-slate-900">
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-foreground">
                     —
                   </p>
                 )}
@@ -177,9 +178,9 @@ export default function DashboardPage() {
 
         <div className="grid gap-4 sm:grid-cols-3">
           {lifetimeStats.map((s) => (
-            <Card key={s.label} className="border-slate-200 bg-white">
+            <Card key={s.label} className="border-border bg-card">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-slate-500">
+                <CardTitle className="text-sm text-muted-foreground">
                   {s.label}
                 </CardTitle>
               </CardHeader>
@@ -188,10 +189,10 @@ export default function DashboardPage() {
                   <CountUp
                     value={s.value}
                     format={s.format}
-                    className="text-2xl font-semibold text-slate-900"
+                    className="text-2xl font-semibold text-foreground"
                   />
                 ) : (
-                  <p className="font-mono text-2xl font-semibold tabular-nums text-slate-900">
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-foreground">
                     —
                   </p>
                 )}
@@ -201,7 +202,9 @@ export default function DashboardPage() {
         </div>
 
         {isAuthenticated ? (
-          <SessionHistoryPanel
+          <>
+            <MeltedCreationsPanel userId={userId} />
+            <SessionHistoryPanel
             username={username}
             timezone={timeZone}
             heatmapDays={heatmapDays}
@@ -209,9 +212,10 @@ export default function DashboardPage() {
             emptyHint
             unavailable={unavailable}
           />
+          </>
         ) : (
-          <Card className="border-slate-200 bg-white">
-            <CardContent className="py-8 text-center text-sm text-slate-400">
+          <Card className="border-border bg-card">
+            <CardContent className="py-8 text-center text-sm text-muted-foreground">
               Sign in to see your session history.
             </CardContent>
           </Card>

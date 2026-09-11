@@ -55,10 +55,10 @@ export function ProfileSocialStats({
               userId && "cursor-pointer hover:opacity-80",
             )}
           >
-            <p className="font-mono text-base font-semibold tabular-nums text-slate-900">
+            <p className="font-mono text-base font-semibold tabular-nums text-foreground">
               {item.value}
             </p>
-            <p className="text-[11px] uppercase tracking-[0.12em] text-slate-400">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
               {item.label}
             </p>
           </button>
@@ -127,14 +127,14 @@ function SocialListDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[min(80vh,28rem)] max-w-sm overflow-y-auto rounded-2xl border-slate-200 bg-white">
+      <DialogContent className="max-h-[min(80vh,28rem)] max-w-sm overflow-y-auto rounded-2xl border-border bg-card">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         {loading ? (
-          <p className="text-sm text-slate-400">{t("common.loading")}</p>
+          <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
         ) : rows.length === 0 ? (
-          <p className="text-sm text-slate-400">{t("profile.noOneHere")}</p>
+          <p className="text-sm text-muted-foreground">{t("profile.noOneHere")}</p>
         ) : (
           <ul className="space-y-2">
             {rows.map((h) => {
@@ -144,15 +144,15 @@ function SocialListDialog({
                   <Link
                     href={`/u/${h.username}`}
                     onClick={() => onOpenChange(false)}
-                    className="flex items-center gap-3 rounded-xl border border-slate-100 px-3 py-2 hover:bg-slate-50"
+                    className="flex items-center gap-3 rounded-xl border border-slate-100 px-3 py-2 hover:bg-background"
                   >
                     <Avatar className="h-8 w-8 rounded-lg">
                       {url ? <AvatarImage src={url} alt="" /> : null}
-                      <AvatarFallback className="rounded-lg bg-slate-100 text-[10px]">
+                      <AvatarFallback className="rounded-lg bg-muted text-[10px]">
                         {h.username.slice(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="truncate text-sm font-medium text-slate-800">
+                    <span className="truncate text-sm font-medium text-foreground">
                       @{h.username}
                     </span>
                   </Link>
@@ -192,7 +192,7 @@ export function ProfileHeroAvatar({
     >
       <Avatar className={cn("rounded-2xl", dim)}>
         {avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}
-        <AvatarFallback className="rounded-2xl bg-slate-100 text-lg font-semibold text-slate-600">
+        <AvatarFallback className="rounded-2xl bg-muted text-lg font-semibold text-muted-foreground">
           {name.slice(0, 2).toUpperCase()}
         </AvatarFallback>
       </Avatar>
@@ -227,7 +227,7 @@ export function ProfileUsernameLink({
   return (
     <Link
       href={`/u/${username}`}
-      className={cn("text-sm text-slate-500 hover:text-slate-800", className)}
+      className={cn("text-sm text-muted-foreground hover:text-foreground", className)}
     >
       @{username}
     </Link>

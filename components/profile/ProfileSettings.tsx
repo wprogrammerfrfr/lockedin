@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { toast } from "sonner";
 import { deleteOwnAccount, updateProfile } from "@/features/profile/api";
 import {
   BREAK_TIMER_PRESETS,
@@ -28,22 +29,33 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { userFacingError } from "@/lib/supabase/errors";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useTheme } from "@/lib/theme/ThemeProvider";
+import {
+  normalizeTheme,
+  type ThemePreference,
+} from "@/lib/theme/theme";
 
 const DELETE_CONFIRM = "DELETE";
+
+const SELECT_CLASS =
+  "h-10 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/40";
 
 export function ProfileSettings({
   email,
   userId,
   initialLocale,
   initialBreakTimerMinutes,
+  initialTheme,
 }: {
   email?: string | null;
   userId?: string | null;
   initialLocale?: string | null;
   initialBreakTimerMinutes?: number | null;
+  initialTheme?: string | null;
 }) {
   const router = useRouter();
   const { t, locale, setLocale } = useTranslation();
+  const { theme, setTheme } = useTheme();
   const { refreshProfile } = useAuth();
   const [resetEmail, setResetEmail] = useState(email ?? "");
   const [message, setMessage] = useState<string | null>(null);
@@ -52,6 +64,9 @@ export function ProfileSettings({
 
   const [language, setLanguage] = useState<Locale>(
     normalizeLocale(initialLocale ?? locale),
+  );
+  const [appearance, setAppearance] = useState<ThemePreference>(
+    normalizeTheme(initialTheme ?? theme),
   );
   const [breakMinutes, setBreakMinutes] = useState(
     initialBreakTimerMinutes && initialBreakTimerMinutes >= 1
@@ -71,6 +86,10 @@ export function ProfileSettings({
   useEffect(() => {
     if (initialLocale) setLanguage(normalizeLocale(initialLocale));
   }, [initialLocale]);
+
+  useEffect(() => {
+    if (initialTheme) setAppearance(normalizeTheme(initialTheme));
+  }, [initialTheme]);
 
   useEffect(() => {
     if (initialBreakTimerMinutes && initialBreakTimerMinutes >= 1) {
@@ -112,11 +131,13 @@ export function ProfileSettings({
     setPrefsSaving(true);
     try {
       setLocale(language);
+      setTheme(appearance);
       saveBreakTimerMinutes(breakMinutes);
       if (userId) {
         await updateProfile(createClient(), userId, {
           locale: language,
           break_timer_minutes: breakMinutes,
+          theme: appearance,
         });
         await refreshProfile();
       }
@@ -169,13 +190,44 @@ export function ProfileSettings({
   return (
     <div className="space-y-6">
       <div className="space-y-3">
-        <h3 className="font-display text-sm font-semibold text-slate-900">
+        <h3 className="font-display text-sm font-semibold text-foreground">
+          {t("profile.appearance")}
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          {t("profile.appearanceDesc")}
+        </p>
+        <select
+          value={appearance}
+          onChange={(e) => {
+            const next = normalizeTheme(e.target.value);
+            setAppearance(next);
+            setTheme(next);
+            if (userId) {
+              void updateProfile(createClient(), userId, { theme: next })
+                .then(() => refreshProfile())
+                .catch((err) =>
+                  toast.error(
+                    userFacingError(err, t("common.saveFailed")),
+                  ),
+                );
+            }
+          }}
+          className={SELECT_CLASS}
+        >
+          <option value="light">{t("profile.theme.light")}</option>
+          <option value="dark">{t("profile.theme.dark")}</option>
+          <option value="system">{t("profile.theme.system")}</option>
+        </select>
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="font-display text-sm font-semibold text-foreground">
           {t("profile.language")}
         </h3>
         <select
           value={language}
           onChange={(e) => setLanguage(normalizeLocale(e.target.value))}
-          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
+          className={SELECT_CLASS}
         >
           <option value="en">{t("profile.lang.en")}</option>
           <option value="tr">{t("profile.lang.tr")}</option>
@@ -184,14 +236,16 @@ export function ProfileSettings({
       </div>
 
       <div className="space-y-3">
-        <h3 className="font-display text-sm font-semibold text-slate-900">
+        <h3 className="font-display text-sm font-semibold text-foreground">
           {t("break.timerSetting")}
         </h3>
-        <p className="text-xs text-slate-500">{t("break.timerSettingDesc")}</p>
+        <p className="text-xs text-muted-foreground">
+          {t("break.timerSettingDesc")}
+        </p>
         <select
           value={breakMinutes}
           onChange={(e) => setBreakMinutes(Number(e.target.value))}
-          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
+          className={SELECT_CLASS}
         >
           {BREAK_TIMER_PRESETS.map((m) => (
             <option key={m} value={m}>
@@ -208,23 +262,25 @@ export function ProfileSettings({
           {prefsSaving ? t("profile.saving") : t("profile.saveProfile")}
         </Button>
         {prefsMessage ? (
-          <p className="text-xs text-slate-500" role="status">
+          <p className="text-xs text-muted-foreground" role="status">
             {prefsMessage}
           </p>
         ) : null}
       </div>
 
-      <div className="space-y-3 border-t border-slate-200 pt-4">
-        <h3 className="font-display text-sm font-semibold text-slate-900">
+      <div className="space-y-3 border-t border-border pt-4">
+        <h3 className="font-display text-sm font-semibold text-foreground">
           {t("settings.passwordReset")}
         </h3>
         {email ? (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted-foreground">
             {t("settings.sendResetLink", { email })}
           </p>
         ) : (
           <>
-            <p className="text-xs text-slate-500">{t("settings.oauthNoEmail")}</p>
+            <p className="text-xs text-muted-foreground">
+              {t("settings.oauthNoEmail")}
+            </p>
             <div>
               <Label htmlFor="reset-email">{t("settings.email")}</Label>
               <Input
@@ -240,7 +296,7 @@ export function ProfileSettings({
         <Button
           type="button"
           variant="outline"
-          className="rounded-xl border-slate-200"
+          className="rounded-xl"
           disabled={busy}
           onClick={handlePasswordReset}
         >
@@ -248,22 +304,22 @@ export function ProfileSettings({
           {t("settings.sendResetEmail")}
         </Button>
         {message && (
-          <p className="text-xs text-emerald-600" role="status">
+          <p className="text-xs text-emerald-600 dark:text-emerald-400" role="status">
             {message}
           </p>
         )}
         {error && (
-          <p className="text-xs text-red-600" role="alert">
+          <p className="text-xs text-red-600 dark:text-red-400" role="alert">
             {error}
           </p>
         )}
       </div>
 
-      <div className="border-t border-slate-200 pt-4">
+      <div className="border-t border-border pt-4">
         <Button
           type="button"
           variant="outline"
-          className="w-full rounded-xl border-slate-200 text-slate-700"
+          className="w-full rounded-xl text-foreground"
           onClick={handleLogout}
         >
           <LogOut className="h-4 w-4" />
@@ -271,11 +327,13 @@ export function ProfileSettings({
         </Button>
       </div>
 
-      <div className="space-y-3 border-t border-slate-200 pt-4">
-        <h3 className="font-display text-sm font-semibold text-red-700">
+      <div className="space-y-3 border-t border-border pt-4">
+        <h3 className="font-display text-sm font-semibold text-red-700 dark:text-red-400">
           {t("settings.dangerZone")}
         </h3>
-        <p className="text-xs text-slate-500">{t("settings.deleteWarning")}</p>
+        <p className="text-xs text-muted-foreground">
+          {t("settings.deleteWarning")}
+        </p>
         <Button
           type="button"
           variant="destructive"
@@ -308,7 +366,7 @@ export function ProfileSettings({
 
           {deleteError && (
             <p
-              className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+              className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300"
               role="alert"
             >
               {deleteError}

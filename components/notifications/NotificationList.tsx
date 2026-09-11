@@ -160,7 +160,7 @@ export function NotificationList({
   return (
     <div className="max-h-[inherit] overflow-y-auto">
       <div className="mb-2 flex items-center justify-between px-1">
-        <p className="font-display text-xs font-semibold text-slate-700">
+        <p className="font-display text-xs font-semibold text-foreground">
           Notifications
         </p>
         <Button
@@ -176,14 +176,14 @@ export function NotificationList({
 
       {pendingRequests.length > 0 || followBackQueue.length > 0 ? (
         <div className="mb-3 space-y-1 border-b border-slate-100 pb-3">
-          <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+          <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             Follow requests
           </p>
           <ul className="space-y-1">
             {pendingRequests.map((req) => (
               <li
                 key={req.follower_id}
-                className="flex items-center justify-between gap-2 rounded-lg px-2 py-2 hover:bg-slate-50"
+                className="flex items-center justify-between gap-2 rounded-lg px-2 py-2 hover:bg-background"
               >
                 <Link
                   href={
@@ -191,7 +191,7 @@ export function NotificationList({
                       ? `/u/${req.profile.username}`
                       : "#"
                   }
-                  className="min-w-0 truncate text-xs font-medium text-slate-800"
+                  className="min-w-0 truncate text-xs font-medium text-foreground"
                 >
                   {req.profile?.username
                     ? `@${req.profile.username}`
@@ -226,16 +226,16 @@ export function NotificationList({
             {followBackQueue.map((entry) => (
               <li
                 key={`fb-${entry.userId}`}
-                className="flex items-center justify-between gap-2 rounded-lg px-2 py-2 hover:bg-slate-50"
+                className="flex items-center justify-between gap-2 rounded-lg px-2 py-2 hover:bg-background"
               >
                 <div className="min-w-0">
                   <Link
                     href={entry.username ? `/u/${entry.username}` : "#"}
-                    className="block truncate text-xs font-medium text-slate-800"
+                    className="block truncate text-xs font-medium text-foreground"
                   >
                     {entry.username ? `@${entry.username}` : "Accepted"}
                   </Link>
-                  <p className="text-[10px] text-slate-400">Just accepted</p>
+                  <p className="text-[10px] text-muted-foreground">Just accepted</p>
                 </div>
                 {entry.status === "friends" ? (
                   <Button
@@ -265,7 +265,7 @@ export function NotificationList({
       {items.length === 0 &&
         pendingRequests.length === 0 &&
         followBackQueue.length === 0 && (
-          <p className="px-2 py-4 text-xs text-slate-400">
+          <p className="px-2 py-4 text-xs text-muted-foreground">
             You&apos;re caught up.
           </p>
         )}
@@ -296,18 +296,18 @@ export function NotificationList({
 
           return (
             <li key={n.id}>
-              <div className="rounded-lg px-2 py-2 hover:bg-slate-50">
+              <div className="rounded-lg px-2 py-2 hover:bg-background">
                 {(() => {
                   const href = hrefForNotification(n);
                   const body = (
                     <>
-                      <p className="text-xs font-medium text-slate-800">
+                      <p className="text-xs font-medium text-foreground">
                         {labelFor(n)}
                         {!n.read_at && (
                           <span className="ml-2 inline-block h-1.5 w-1.5 rounded-full bg-lime-500 align-middle" />
                         )}
                       </p>
-                      <p className="mt-0.5 text-[10px] text-slate-400">
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">
                         {new Date(n.created_at).toLocaleString()}
                       </p>
                     </>

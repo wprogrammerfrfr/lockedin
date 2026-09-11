@@ -48,7 +48,7 @@ export function ProjectRateForm({
   }
 
   return (
-    <form onSubmit={submit} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+    <form onSubmit={submit} className="space-y-3 rounded-xl border border-border bg-card p-4">
       <div>
         <Label htmlFor="proj-name">Internal project name</Label>
         <Input

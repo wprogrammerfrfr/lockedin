@@ -1,6 +1,13 @@
 /* LockedIn service worker — app shell cache; never cache Supabase auth. */
-const CACHE = "lockedin-shell-v2";
-const SHELL = ["/", "/manifest.webmanifest"];
+const CACHE = "lockedin-shell-v5";
+const SHELL = [
+  "/",
+  "/lockin",
+  "/manifest.webmanifest",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/apple-touch-icon.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -19,10 +26,24 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
+  // Cross-origin images (including OAuth avatars) must stay under the
+  // browser's normal image-loading rules. Safari PWA fetch interception can
+  // otherwise turn opaque no-cors responses into failed requests.
+  if (url.origin !== self.location.origin) return;
+
   if (
     url.hostname.includes("supabase") ||
     url.pathname.includes("/auth/") ||
     url.pathname.startsWith("/api/")
+  ) {
+    return;
+  }
+
+  // Never intercept Next/Turbopack bundles — cache-first here causes
+  // "module factory is not available" after HMR / rebuilds.
+  if (
+    url.pathname.startsWith("/_next/") ||
+    url.pathname.includes("hot-update")
   ) {
     return;
   }

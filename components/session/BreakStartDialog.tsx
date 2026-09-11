@@ -40,7 +40,7 @@ export function BreakStartDialog({
       }}
     >
       <DialogContent
-        className="max-w-md border-slate-200 bg-white"
+        className="max-w-md border-border bg-card"
         onPointerDownOutside={required ? (e) => e.preventDefault() : undefined}
         onEscapeKeyDown={required ? (e) => e.preventDefault() : undefined}
       >
@@ -60,10 +60,10 @@ export function BreakStartDialog({
           >
             <Timer className="h-5 w-5 shrink-0 text-amber-600" />
             <span>
-              <span className="block font-display text-sm font-semibold text-slate-900">
+              <span className="block font-display text-sm font-semibold text-foreground">
                 {t("break.startCountUp")}
               </span>
-              <span className="mt-0.5 block text-xs text-slate-500">
+              <span className="mt-0.5 block text-xs text-muted-foreground">
                 {t("break.startCountUpHint")}
               </span>
             </span>
@@ -76,10 +76,10 @@ export function BreakStartDialog({
           >
             <Hourglass className="h-5 w-5 shrink-0 text-sky-600" />
             <span>
-              <span className="block font-display text-sm font-semibold text-slate-900">
+              <span className="block font-display text-sm font-semibold text-foreground">
                 {t("break.startCountDown")}
               </span>
-              <span className="mt-0.5 block text-xs text-slate-500">
+              <span className="mt-0.5 block text-xs text-muted-foreground">
                 {t("break.startCountDownHint", { n: breakTimerMinutes })}
               </span>
             </span>

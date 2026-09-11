@@ -8,7 +8,7 @@ import { WelcomeLanding } from "@/components/welcome/WelcomeLanding";
 
 function WelcomeSplash() {
   return (
-    <div className="flex min-h-svh flex-1 items-center justify-center bg-slate-50">
+    <div className="flex min-h-svh flex-1 items-center justify-center bg-background">
       <motion.div
         className="h-12 w-12 rounded-2xl border-2 border-lime-400"
         animate={{ scale: [1, 1.06, 1], opacity: [0.5, 1, 0.5] }}

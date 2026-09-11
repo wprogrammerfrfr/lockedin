@@ -1,8 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import { Geist_Mono, Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { LocaleProvider } from "@/lib/i18n/LocaleProvider";
 import { getServerLocale } from "@/lib/i18n/get-locale";
+import { ThemeProvider } from "@/lib/theme/ThemeProvider";
+import { getServerTheme } from "@/lib/theme/get-theme";
+import { ThemeSyncFromProfile } from "@/components/theme/ThemeSyncFromProfile";
 import { Toaster } from "@/components/ui/sonner";
 import { SwRegister } from "@/app/sw-register";
 import "./globals.css";
@@ -22,9 +25,15 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
 });
 
+/** Empty zeros for flip-clock digits (JetBrains Mono uses a dotted zero). */
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://lockedtin.vercel.app",
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://lockedin.vercel.app",
   ),
   title: "LockedIn — Focus Tracking for Students",
   description:
@@ -50,16 +59,23 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const locale = await getServerLocale();
+  const theme = await getServerTheme();
+  // Resolve on the server from the cookie so we don't need an inline <script>
+  // (React 19 rejects script tags rendered from components).
+  const htmlClass =
+    theme === "dark"
+      ? `${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} ${geistMono.variable} dark h-full antialiased`
+      : `${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} ${geistMono.variable} h-full antialiased`;
 
   return (
-    <html
-      lang={locale}
-      className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col bg-slate-50 font-sans text-slate-900">
+    <html lang={locale} suppressHydrationWarning className={htmlClass}>
+      <body className="flex min-h-full flex-col bg-background font-sans text-foreground">
         <AuthProvider>
-          <LocaleProvider initialLocale={locale}>{children}</LocaleProvider>
-          <Toaster position="top-center" richColors closeButton />
+          <ThemeProvider initialTheme={theme}>
+            <LocaleProvider initialLocale={locale}>{children}</LocaleProvider>
+            <ThemeSyncFromProfile />
+            <Toaster position="top-center" richColors closeButton />
+          </ThemeProvider>
           <SwRegister />
         </AuthProvider>
       </body>

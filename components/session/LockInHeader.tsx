@@ -32,24 +32,33 @@ export function LockInHeader({
           className={cn(
             "flex items-center gap-1.5 rounded-xl border px-3 py-1.5",
             muted
-              ? "border-red-200/70 bg-red-50/70"
-              : "border-amber-200 bg-amber-50"
+              ? "border-red-200/70 bg-red-50/70 dark:border-red-400/30 dark:bg-red-500/10"
+              : "border-amber-200 bg-amber-50 dark:border-amber-400/30 dark:bg-amber-400/10",
           )}
         >
           <Flame
-            className={cn("h-4 w-4", muted ? "text-red-400" : "text-amber-500")}
+            className={cn(
+              "h-4 w-4",
+              muted
+                ? "text-red-400"
+                : "text-amber-500 dark:text-amber-400",
+            )}
           />
           <CountUp
             value={streak}
             className={cn(
               "text-sm font-semibold",
-              muted ? "text-red-600/80" : "text-amber-700"
+              muted
+                ? "text-red-600/80 dark:text-red-300/90"
+                : "text-amber-700 dark:text-amber-400",
             )}
           />
           <span
             className={cn(
               "text-xs",
-              muted ? "text-red-500/70" : "text-amber-600/80"
+              muted
+                ? "text-red-500/70 dark:text-red-400/70"
+                : "text-amber-600/80 dark:text-amber-400/80",
             )}
           >
             streak

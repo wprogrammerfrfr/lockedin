@@ -7,7 +7,9 @@ import {
   fetchRoomMembers,
   touchRoomPresence,
 } from "@/features/rooms/api";
+import { pickNewerClockFields } from "@/features/rooms/live-member-clock";
 import type { RoomPresenceMember } from "@/features/rooms/types";
+import type { MeltConfig } from "@/features/session/melt-catalog";
 import {
   getFollowRelation,
   requestFollow,
@@ -16,7 +18,49 @@ import { userFacingError } from "@/lib/supabase/errors";
 
 const TOUCH_MS = 10_000;
 
-function mergeMembers(
+function parsePresenceMeltConfig(raw: unknown): MeltConfig | null {
+  if (raw == null) return null;
+  let value: unknown = raw;
+  if (typeof raw === "string") {
+    try {
+      value = JSON.parse(raw) as unknown;
+    } catch {
+      return null;
+    }
+  }
+  if (!value || typeof value !== "object") return null;
+  const cfg = value as Partial<MeltConfig>;
+  if (
+    (cfg.kind !== "iceCream" && cfg.kind !== "ice") ||
+    typeof cfg.containerId !== "string" ||
+    typeof cfg.meltDurationMs !== "number" ||
+    typeof cfg.displayName !== "string"
+  ) {
+    return null;
+  }
+  return cfg as MeltConfig;
+}
+
+function normalizePresenceMember(
+  meta: RoomPresenceMember & { meltConfig?: unknown },
+  key: string,
+): RoomPresenceMember {
+  const userId = meta.userId || key;
+  const clamp01 = (v: unknown): number | null => {
+    if (typeof v !== "number" || !Number.isFinite(v)) return null;
+    return Math.min(1, Math.max(0, v));
+  };
+  return {
+    ...meta,
+    userId,
+    meltConfig: parsePresenceMeltConfig(meta.meltConfig),
+    meltBoardX: clamp01(meta.meltBoardX),
+    meltBoardZ: clamp01(meta.meltBoardZ),
+  };
+}
+
+/** Exported for unit tests — prefer newer clockSyncedAt over stale presence. */
+export function mergeMembers(
   table: RoomPresenceMember[],
   presence: Map<string, RoomPresenceMember>,
 ): RoomPresenceMember[] {
@@ -26,22 +70,54 @@ function mergeMembers(
   for (const m of table) {
     const live = presence.get(m.userId);
     const next: RoomPresenceMember = live
-      ? {
-          ...m,
-          status: m.status !== "WAITING" ? m.status : live.status,
-          elapsedMs: live.elapsedMs || m.elapsedMs,
-          username: live.username || m.username,
-          displayName: live.displayName || m.displayName,
-          avatarPath: live.avatarPath || m.avatarPath,
-          breakLabel:
-            live.status === "BREAK" || m.status === "BREAK"
+      ? (() => {
+          // Prefer DB status when it already left WAITING so a stale presence
+          // snapshot cannot erase a persisted melt_config / board seat.
+          const effectiveStatus =
+            m.status !== "WAITING" ? m.status : live.status;
+          const inMeltFocus =
+            effectiveStatus === "LOCKED_IN" || effectiveStatus === "BREAK";
+          const customizing = inMeltFocus
+            ? false
+            : (live.meltCustomizing ?? m.meltCustomizing ?? false);
+          const clocks = pickNewerClockFields(live, m);
+          const onBreak =
+            effectiveStatus === "BREAK" ||
+            live.status === "BREAK" ||
+            m.status === "BREAK";
+          return {
+            ...m,
+            status: effectiveStatus,
+            elapsedMs: clocks.elapsedMs,
+            clockSyncedAt: clocks.clockSyncedAt,
+            username: live.username || m.username,
+            displayName: live.displayName || m.displayName,
+            avatarPath: live.avatarPath || m.avatarPath,
+            breakLabel: onBreak
               ? live.breakLabel || m.breakLabel || null
               : null,
-          breakType:
-            live.status === "BREAK" || m.status === "BREAK"
+            breakType: onBreak
               ? live.breakType || m.breakType || null
               : null,
-        }
+            breakElapsedMs: onBreak ? clocks.breakElapsedMs ?? 0 : 0,
+            breakRemainingMs: onBreak ? clocks.breakRemainingMs ?? 0 : 0,
+            breakOpenEnded: onBreak ? clocks.breakOpenEnded ?? false : false,
+            meltConfig:
+              inMeltFocus || customizing
+                ? live.meltConfig ?? m.meltConfig ?? null
+                : null,
+            meltAnimOffsetMs: live.meltAnimOffsetMs ?? m.meltAnimOffsetMs ?? 0,
+            meltAnimSpeed: live.meltAnimSpeed ?? m.meltAnimSpeed ?? 1,
+            meltCustomizing: customizing,
+            meltStatusLabel: live.meltStatusLabel ?? m.meltStatusLabel ?? null,
+            meltBoardX: inMeltFocus
+              ? live.meltBoardX ?? m.meltBoardX ?? null
+              : null,
+            meltBoardZ: inMeltFocus
+              ? live.meltBoardZ ?? m.meltBoardZ ?? null
+              : null,
+          };
+        })()
       : m;
     if (typeof next.seat === "number" && next.seat >= 1) {
       bySeat.set(next.seat, next);
@@ -192,19 +268,61 @@ export function useRoomChannel(
     const channel = channelRef.current;
     const s = selfRef.current;
     if (!channel || !s.userId) return;
-    void channel
-      .track({
-        userId: s.userId,
-        username: s.username,
-        displayName: s.displayName,
-        avatarPath: s.avatarPath,
-        status: s.status,
-        elapsedMs: s.elapsedMs,
-        seat: s.seat,
-        breakLabel: s.status === "BREAK" ? s.breakLabel ?? null : null,
-        breakType: s.status === "BREAK" ? s.breakType ?? null : null,
-      })
-      .catch(() => undefined);
+    const meltActive =
+      (s.status === "LOCKED_IN" || s.status === "BREAK") && Boolean(s.meltConfig);
+    const clockSyncedAt = Date.now();
+    const payload: RoomPresenceMember & { meltConfig?: unknown } = {
+      userId: s.userId,
+      username: s.username,
+      displayName: s.displayName,
+      avatarPath: s.avatarPath,
+      status: s.status,
+      elapsedMs: s.elapsedMs,
+      clockSyncedAt,
+      seat: s.seat,
+      breakLabel: s.status === "BREAK" ? s.breakLabel ?? null : null,
+      breakType: s.status === "BREAK" ? s.breakType ?? null : null,
+      breakElapsedMs: s.status === "BREAK" ? s.breakElapsedMs ?? 0 : 0,
+      breakRemainingMs: s.status === "BREAK" ? s.breakRemainingMs ?? 0 : 0,
+      breakOpenEnded:
+        s.status === "BREAK" ? s.breakOpenEnded ?? false : false,
+      // Stringify nested melt config so Realtime presence does not drop it.
+      meltConfig: meltActive ? JSON.stringify(s.meltConfig) : null,
+      meltAnimOffsetMs: meltActive ? (s.meltAnimOffsetMs ?? 0) : 0,
+      meltAnimSpeed: s.meltAnimSpeed ?? 1,
+      meltCustomizing: s.meltCustomizing ?? false,
+      meltStatusLabel: s.meltStatusLabel ?? null,
+      meltBoardX: meltActive ? (s.meltBoardX ?? null) : null,
+      meltBoardZ: meltActive ? (s.meltBoardZ ?? null) : null,
+    };
+    // Optimistically update local presence so self timers move even when
+    // Realtime does not echo metadata-only track() updates.
+    setPresenceById((prev) => {
+      const next = new Map(prev);
+      next.set(
+        s.userId!,
+        normalizePresenceMember(payload, s.userId!),
+      );
+      return next;
+    });
+    void channel.track(payload).catch(() => undefined);
+  }, []);
+
+  const touchSelf = useCallback((roomIdArg: string) => {
+    const s = selfRef.current;
+    const meltActive =
+      (s.status === "LOCKED_IN" || s.status === "BREAK") && Boolean(s.meltConfig);
+    void touchRoomPresence(
+      createClient(),
+      roomIdArg,
+      s.status,
+      s.elapsedMs,
+      s.status === "BREAK" ? s.breakType ?? null : null,
+      meltActive ? (s.meltConfig ?? null) : null,
+      meltActive ? (s.meltAnimOffsetMs ?? 0) : 0,
+      meltActive ? (s.meltBoardX ?? null) : null,
+      meltActive ? (s.meltBoardZ ?? null) : null,
+    ).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -221,22 +339,45 @@ export function useRoomChannel(
       .on("presence", { event: "sync" }, () => {
         if (cancelled.current) return;
         const state = channel.presenceState() as Record<string, unknown[]>;
-        const next = new Map<string, RoomPresenceMember>();
+        const incoming = new Map<string, RoomPresenceMember>();
         for (const key of Object.keys(state)) {
           const metas = state[key] ?? [];
           for (const meta of metas) {
-            const m = meta as RoomPresenceMember;
-            const userId = m.userId || key;
-            next.set(userId, { ...m, userId });
+            const m = normalizePresenceMember(
+              meta as RoomPresenceMember & { meltConfig?: unknown },
+              key,
+            );
+            incoming.set(m.userId, m);
           }
         }
-        setPresenceById(next);
+        // Keep newer optimistic/local stamps when Realtime echoes stale metadata.
+        setPresenceById((prev) => {
+          const next = new Map<string, RoomPresenceMember>();
+          for (const [id, remote] of incoming) {
+            const local = prev.get(id);
+            if (!local) {
+              next.set(id, remote);
+              continue;
+            }
+            const clocks = pickNewerClockFields(remote, local);
+            next.set(id, {
+              ...remote,
+              elapsedMs: clocks.elapsedMs,
+              clockSyncedAt: clocks.clockSyncedAt,
+              breakElapsedMs: clocks.breakElapsedMs,
+              breakRemainingMs: clocks.breakRemainingMs,
+              breakOpenEnded: clocks.breakOpenEnded,
+            });
+          }
+          return next;
+        });
       })
       .subscribe((status) => {
         if (cancelled.current) return;
         if (status === "SUBSCRIBED") {
           setChannelStatus("joined");
           trackSelf();
+          touchSelf(roomId);
         } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
           setChannelStatus("error");
         } else if (status === "CLOSED") {
@@ -245,14 +386,7 @@ export function useRoomChannel(
       });
 
     const touchId = window.setInterval(() => {
-      const s = selfRef.current;
-      void touchRoomPresence(
-        supabase,
-        roomId,
-        s.status,
-        s.elapsedMs,
-        s.status === "BREAK" ? s.breakLabel ?? null : null,
-      ).catch(() => undefined);
+      touchSelf(roomId);
       trackSelf();
     }, TOUCH_MS);
 
@@ -262,30 +396,49 @@ export function useRoomChannel(
       channelRef.current = null;
       void supabase.removeChannel(channel);
     };
-  }, [code, roomId, self.userId, trackSelf]);
+  }, [code, roomId, self.userId, trackSelf, touchSelf]);
 
   const elapsedSec = Math.floor(self.elapsedMs / 1000);
+  const breakClockSec = Math.floor(
+    ((self.breakOpenEnded ? self.breakElapsedMs : self.breakRemainingMs) ?? 0) /
+      1000,
+  );
   useEffect(() => {
     trackSelf();
   }, [
+    self.avatarPath,
+    self.username,
     self.status,
     elapsedSec,
     self.seat,
     self.breakLabel,
     self.breakType,
+    breakClockSec,
+    self.breakOpenEnded,
+    self.meltConfig,
+    self.meltAnimOffsetMs,
+    self.meltAnimSpeed,
+    self.meltCustomizing,
+    self.meltStatusLabel,
+    self.meltBoardX,
+    self.meltBoardZ,
     trackSelf,
   ]);
 
   useEffect(() => {
     if (!roomId || !self.userId) return;
-    void touchRoomPresence(
-      createClient(),
-      roomId,
-      self.status,
-      self.elapsedMs,
-      self.status === "BREAK" ? self.breakLabel ?? null : null,
-    ).catch(() => undefined);
-  }, [self.status, self.breakLabel, roomId, self.userId]);
+    touchSelf(roomId);
+  }, [
+    self.status,
+    self.breakType,
+    self.meltConfig,
+    self.meltAnimOffsetMs,
+    self.meltBoardX,
+    self.meltBoardZ,
+    roomId,
+    self.userId,
+    touchSelf,
+  ]);
 
   return { members, channelStatus };
 }

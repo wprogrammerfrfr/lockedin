@@ -5,7 +5,22 @@ import type {
   RoomPresenceMember,
   RoomSummary,
 } from "@/features/rooms/types";
+import type { MeltConfig } from "@/features/session/melt-catalog";
 import { publicAvatarUrl } from "@/features/profile/api";
+
+function parseMeltConfig(raw: unknown): MeltConfig | null {
+  if (!raw || typeof raw !== "object") return null;
+  const cfg = raw as Partial<MeltConfig>;
+  if (
+    (cfg.kind !== "iceCream" && cfg.kind !== "ice") ||
+    typeof cfg.containerId !== "string" ||
+    typeof cfg.meltDurationMs !== "number" ||
+    typeof cfg.displayName !== "string"
+  ) {
+    return null;
+  }
+  return cfg as MeltConfig;
+}
 
 function mapRoom(row: RoomRow): RoomSummary {
   return {
@@ -148,6 +163,10 @@ export async function touchRoomPresence(
   status?: string | null,
   elapsedMs?: number | null,
   breakLabel?: string | null,
+  meltConfig?: MeltConfig | null,
+  meltAnimOffsetMs?: number | null,
+  meltBoardX?: number | null,
+  meltBoardZ?: number | null,
 ) {
   const { error } = await supabase.rpc("touch_room_presence", {
     p_room_id: roomId,
@@ -155,6 +174,17 @@ export async function touchRoomPresence(
     p_elapsed_ms:
       typeof elapsedMs === "number" ? Math.round(elapsedMs) : null,
     p_break_label: breakLabel?.trim() || null,
+    p_melt_config: meltConfig ?? null,
+    p_melt_anim_offset_ms:
+      typeof meltAnimOffsetMs === "number" ? Math.round(meltAnimOffsetMs) : 0,
+    p_melt_board_x:
+      typeof meltBoardX === "number" && Number.isFinite(meltBoardX)
+        ? Math.min(1, Math.max(0, meltBoardX))
+        : null,
+    p_melt_board_z:
+      typeof meltBoardZ === "number" && Number.isFinite(meltBoardZ)
+        ? Math.min(1, Math.max(0, meltBoardZ))
+        : null,
   });
   if (error) throw new Error(error.message);
 }
@@ -238,7 +268,7 @@ export async function fetchRoomMembers(
   const { data, error } = await supabase
     .from("room_members")
     .select(
-      "user_id, seat, focus_status, elapsed_ms, break_label, profiles(username, avatar_path)",
+      "user_id, seat, focus_status, elapsed_ms, break_label, melt_config, melt_anim_offset_ms, melt_board_x, melt_board_z, profiles(username, avatar_path)",
     )
     .eq("room_id", roomId)
     .order("seat", { ascending: true });
@@ -263,6 +293,19 @@ export async function fetchRoomMembers(
         : "WAITING";
     const breakLabel =
       (row as { break_label?: string | null }).break_label?.trim() || null;
+    const meltConfig = parseMeltConfig(
+      (row as { melt_config?: unknown }).melt_config,
+    );
+    const rawBoardX = (row as { melt_board_x?: number | null }).melt_board_x;
+    const rawBoardZ = (row as { melt_board_z?: number | null }).melt_board_z;
+    const meltBoardX =
+      typeof rawBoardX === "number" && Number.isFinite(rawBoardX)
+        ? Math.min(1, Math.max(0, rawBoardX))
+        : null;
+    const meltBoardZ =
+      typeof rawBoardZ === "number" && Number.isFinite(rawBoardZ)
+        ? Math.min(1, Math.max(0, rawBoardZ))
+        : null;
     return {
       userId: (row as { user_id: string }).user_id,
       username,
@@ -270,9 +313,19 @@ export async function fetchRoomMembers(
       avatarPath: publicAvatarUrl(profile?.avatar_path ?? null),
       status,
       elapsedMs: Number((row as { elapsed_ms?: number | null }).elapsed_ms) || 0,
+      // Stamp fetch time so clients can extrapolate until the next sync.
+      clockSyncedAt: Date.now(),
       seat: (row as { seat?: number | null }).seat ?? null,
       breakLabel,
-      breakType: null,
+      // break_label stores the stable break type id for table-only fallback.
+      breakType: breakLabel,
+      meltConfig,
+      meltAnimOffsetMs:
+        Number(
+          (row as { melt_anim_offset_ms?: number | null }).melt_anim_offset_ms,
+        ) || 0,
+      meltBoardX,
+      meltBoardZ,
     };
   });
 }

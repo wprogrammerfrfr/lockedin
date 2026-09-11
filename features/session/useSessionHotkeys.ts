@@ -59,10 +59,8 @@ export function useSessionHotkeys(session: SessionState, handlers: Handlers) {
         if (session === "LOCKED_IN") {
           event.preventDefault();
           handlers.onTapOut();
-        } else if (isOnBreak(session)) {
-          event.preventDefault();
-          handlers.onLockBackIn();
         }
+        // Escape during break is intentionally a no-op (lock-back-in is Space / Ctrl+Enter).
       }
     }
 

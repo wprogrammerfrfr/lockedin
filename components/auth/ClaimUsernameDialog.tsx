@@ -58,7 +58,7 @@ export function ClaimUsernameDialog() {
   return (
     <Dialog open={open} onOpenChange={() => undefined}>
       <DialogContent
-        className="max-w-md rounded-2xl border-slate-200 bg-white p-6 [&>button]:hidden"
+        className="max-w-md rounded-2xl border-border bg-card p-6 [&>button]:hidden"
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >

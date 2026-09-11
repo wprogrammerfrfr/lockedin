@@ -50,17 +50,17 @@ export function InstallAppButton() {
             </DialogDescription>
           </DialogHeader>
           {isIos ? (
-            <ol className="list-decimal space-y-2 pl-5 text-sm text-slate-600">
+            <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
               <li>
                 Tap Share
-                <Share className="mx-1 inline h-3.5 w-3.5 align-text-bottom text-slate-500" />
+                <Share className="mx-1 inline h-3.5 w-3.5 align-text-bottom text-muted-foreground" />
                 in Safari.
               </li>
               <li>Choose Add to Home Screen.</li>
               <li>Tap Add — LockedIn appears on your Home Screen.</li>
             </ol>
           ) : (
-            <ol className="list-decimal space-y-2 pl-5 text-sm text-slate-600">
+            <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
               <li>Open this site in Chrome or Edge on your phone.</li>
               <li>Open the browser menu and choose Install app / Add to Home screen.</li>
               <li>Confirm — LockedIn opens in its own window.</li>

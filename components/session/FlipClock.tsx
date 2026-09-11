@@ -1,17 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { motion } from "framer-motion";
 
 import { formatCentiseconds, formatMs } from "@/features/session/format";
 import { cn } from "@/lib/utils";
-
-/**
- * Use layoutEffect when available (browser) so scale is applied before paint,
- * falling back to useEffect on the server (SSR/tests).
- */
-const useIsomorphicLayoutEffect =
-  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 /** Crisp mechanical flip — high damping avoids 3D overshoot/ghosting. */
 const flipTopTransition = { duration: 0.3, ease: [0.4, 0, 0.6, 1] as const };
@@ -20,6 +20,9 @@ const flipBottomTransition = {
   ease: [0.4, 0, 0.6, 1] as const,
   delay: 0.3,
 };
+
+/** If onAnimationComplete never fires, unlock the digit after this. */
+const FLIP_WATCHDOG_MS = 800;
 
 /**
  * One half of a flip card. Parent MUST be exactly 50% of the full card height.
@@ -30,6 +33,46 @@ const flipBottomTransition = {
  * width, not height, which hides the bottom half of every digit.
  */
 export type FlipClockSize = "default" | "sm" | "xs";
+
+/** Visual tone for digit panels — idle is theme chrome, live is neon, stopped is red. */
+export type FlipClockTone = "live" | "idle" | "stopped";
+
+function resolveTone(tone?: FlipClockTone, muted?: boolean): FlipClockTone {
+  if (tone) return tone;
+  return muted ? "stopped" : "live";
+}
+
+const PANEL_BY_TONE: Record<FlipClockTone, string> = {
+  stopped:
+    "bg-red-100/90 text-red-700/80 border border-red-200/70 dark:bg-red-500/15 dark:text-red-300 dark:border-red-400/30",
+  idle: "bg-card text-foreground border border-border dark:bg-zinc-900 dark:text-zinc-100 dark:border-white/10",
+  live: "bg-slate-900 text-white border border-slate-700 dark:bg-zinc-950 dark:text-lime-300 dark:border-lime-400/20",
+};
+
+const XS_PANEL_BY_TONE: Record<FlipClockTone, string> = {
+  stopped:
+    "bg-red-100/90 text-red-700/80 dark:bg-red-500/15 dark:text-red-300",
+  idle: "bg-card text-foreground dark:bg-zinc-900 dark:text-zinc-100",
+  live: "bg-slate-900 text-white dark:bg-zinc-950 dark:text-lime-300",
+};
+
+const XS_BORDER_BY_TONE: Record<FlipClockTone, string> = {
+  stopped: "border border-red-200/70 dark:border-red-400/30",
+  idle: "border border-border dark:border-white/10",
+  live: "border border-slate-700 dark:border-lime-400/20",
+};
+
+const COLON_BY_TONE: Record<FlipClockTone, string> = {
+  stopped: "text-red-400",
+  idle: "text-muted-foreground",
+  live: "text-slate-500 flip-neon-sm dark:opacity-100",
+};
+
+const CS_BY_TONE: Record<FlipClockTone, string> = {
+  stopped: "text-red-400/70",
+  idle: "text-muted-foreground",
+  live: "text-slate-400 flip-neon-sm",
+};
 
 const DIGIT_GLYPH: Record<FlipClockSize, string> = {
   default:
@@ -56,11 +99,13 @@ export function DigitHalf({
   half,
   className,
   size = "default",
+  neon,
 }: {
   value: string;
   half: "top" | "bottom";
   className?: string;
   size?: FlipClockSize;
+  neon?: boolean;
 }) {
   return (
     <div
@@ -83,8 +128,9 @@ export function DigitHalf({
       >
         <span
           className={cn(
-            "flex select-none items-center justify-center font-mono font-bold leading-none tabular-nums",
+            "flex select-none items-center justify-center font-flip font-bold leading-none tabular-nums",
             DIGIT_GLYPH[size],
+            neon && "flip-neon",
           )}
         >
           {value}
@@ -94,75 +140,106 @@ export function DigitHalf({
   );
 }
 
-export function FlipDigit({
+function FlipDigitImpl({
   digit,
-  muted,
+  tone = "live",
   size = "default",
 }: {
   digit: string;
-  muted?: boolean;
+  tone?: FlipClockTone;
   size?: FlipClockSize;
 }) {
   const [active, setActive] = useState(digit);
   const [prev, setPrev] = useState(digit);
   const [flipping, setFlipping] = useState(false);
+  const [flipGen, setFlipGen] = useState(0);
   const busyRef = useRef(false);
   const pendingRef = useRef<string | null>(null);
   const activeRef = useRef(digit);
+  const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Current in-flight flip id — late completes from older flips are ignored. */
+  const flipGenRef = useRef(0);
 
   useEffect(() => {
     activeRef.current = active;
   }, [active]);
 
-  const beginFlip = useCallback((from: string, to: string) => {
-    if (from === to) {
-      busyRef.current = false;
-      return;
+  const clearWatchdog = useCallback(() => {
+    if (watchdogRef.current != null) {
+      clearTimeout(watchdogRef.current);
+      watchdogRef.current = null;
     }
-    busyRef.current = true;
-    setPrev(from);
-    setActive(to);
-    setFlipping(true);
   }, []);
 
   const finishFlip = useCallback(() => {
+    clearWatchdog();
+    if (!busyRef.current) return;
     setFlipping(false);
     busyRef.current = false;
     const pending = pendingRef.current;
     pendingRef.current = null;
     if (pending != null && pending !== activeRef.current) {
-      beginFlip(activeRef.current, pending);
+      beginFlipRef.current(activeRef.current, pending);
     }
-  }, [beginFlip]);
+  }, [clearWatchdog]);
+
+  const beginFlip = useCallback(
+    (from: string, to: string) => {
+      if (from === to) {
+        busyRef.current = false;
+        setFlipping(false);
+        clearWatchdog();
+        return;
+      }
+      const gen = flipGenRef.current + 1;
+      flipGenRef.current = gen;
+      busyRef.current = true;
+      setPrev(from);
+      setActive(to);
+      setFlipGen(gen);
+      setFlipping(true);
+      clearWatchdog();
+      watchdogRef.current = setTimeout(() => {
+        // Missed onAnimationComplete (tab throttle / nested 3D) — unlock.
+        if (busyRef.current && flipGenRef.current === gen) finishFlip();
+      }, FLIP_WATCHDOG_MS);
+    },
+    [clearWatchdog, finishFlip],
+  );
+
+  const beginFlipRef = useRef(beginFlip);
+  beginFlipRef.current = beginFlip;
 
   useEffect(() => {
-    if (digit === activeRef.current && !busyRef.current) return;
-    if (digit === activeRef.current) return;
+    return () => clearWatchdog();
+  }, [clearWatchdog]);
+
+  useEffect(() => {
+    if (digit === activeRef.current) {
+      // Mid-flip sets active to the destination immediately, so digit===active
+      // while busy is normal. Only unlock if busy but animation layers are gone.
+      if (busyRef.current && !flipping) finishFlip();
+      return;
+    }
     if (busyRef.current) {
       // Keep only the latest target so lagged seconds don't stack ghosts
       pendingRef.current = digit;
       return;
     }
     beginFlip(activeRef.current, digit);
-  }, [digit, beginFlip]);
+  }, [digit, beginFlip, finishFlip, flipping]);
 
-  const panel = muted
-    ? "bg-red-100/90 text-red-700/80 border border-red-200/70"
-    : "bg-slate-900 text-white border border-slate-700";
-  const xsPanel = muted
-    ? "bg-red-100/90 text-red-700/80"
-    : "bg-slate-900 text-white";
-  const digitPanel = size === "xs" ? xsPanel : panel;
+  const digitPanel =
+    size === "xs" ? XS_PANEL_BY_TONE[tone] : PANEL_BY_TONE[tone];
+  const neon = tone === "live";
+  const completeGen = flipGen;
 
   return (
     <div
       className={cn(
         "relative shrink-0 overflow-hidden",
         DIGIT_BOX[size],
-        size === "xs" &&
-          (muted
-            ? "border border-red-200/70"
-            : "border border-slate-700"),
+        size === "xs" && XS_BORDER_BY_TONE[tone],
       )}
       style={{ perspective: 900, transformStyle: "preserve-3d" }}
     >
@@ -172,6 +249,7 @@ export function FlipDigit({
           value={active}
           half="top"
           size={size}
+          neon={neon}
           className={cn(digitPanel, size !== "xs" && "border-b-0")}
         />
       </div>
@@ -182,19 +260,30 @@ export function FlipDigit({
           value={flipping ? prev : active}
           half="bottom"
           size={size}
+          neon={neon}
           className={cn(digitPanel, size !== "xs" && "border-t-0")}
         />
       </div>
 
       {/* Hinge — full-width, 1px, dead center (hidden on xs wall clock) */}
       {size !== "xs" && (
-        <div className="pointer-events-none absolute inset-x-0 top-1/2 z-40 h-[1px] -translate-y-1/2 bg-black/40" />
+        <div
+          className={cn(
+            "pointer-events-none absolute inset-x-0 top-1/2 z-40 h-[1px] -translate-y-1/2",
+            tone === "live"
+              ? "bg-black/40 dark:bg-lime-400/20"
+              : tone === "stopped"
+                ? "bg-red-900/20 dark:bg-red-400/20"
+                : "bg-black/20 dark:bg-white/15",
+          )}
+        />
       )}
 
       {flipping && (
         <>
           {/* Phase 1: old top folds down */}
           <motion.div
+            key={`flip-top-${completeGen}`}
             className="absolute inset-x-0 top-0 z-30 h-1/2 origin-bottom"
             style={{
               backfaceVisibility: "hidden",
@@ -208,6 +297,7 @@ export function FlipDigit({
               value={prev}
               half="top"
               size={size}
+              neon={neon}
               className={cn(
                 digitPanel,
                 size !== "xs" && "border-b-0 shadow-soft",
@@ -217,6 +307,7 @@ export function FlipDigit({
 
           {/* Phase 2: new bottom unfolds into place */}
           <motion.div
+            key={`flip-bottom-${completeGen}`}
             className="absolute inset-x-0 bottom-0 z-20 h-1/2 origin-top"
             style={{
               backfaceVisibility: "hidden",
@@ -225,12 +316,15 @@ export function FlipDigit({
             initial={{ rotateX: 90 }}
             animate={{ rotateX: 0 }}
             transition={flipBottomTransition}
-            onAnimationComplete={finishFlip}
+            onAnimationComplete={() => {
+              if (flipGenRef.current === completeGen) finishFlip();
+            }}
           >
             <DigitHalf
               value={active}
               half="bottom"
               size={size}
+              neon={neon}
               className={cn(digitPanel, size !== "xs" && "border-t-0")}
             />
           </motion.div>
@@ -239,6 +333,9 @@ export function FlipDigit({
     </div>
   );
 }
+
+/** Memo so centisecond parent ticks do not re-render unchanged digits. */
+export const FlipDigit = memo(FlipDigitImpl);
 
 const HOUR_MS = 3_600_000;
 
@@ -260,6 +357,7 @@ export function FlipClock({
   forceHours = true,
   className,
   muted,
+  tone,
   size = "default",
 }: {
   ms?: number;
@@ -267,9 +365,12 @@ export function FlipClock({
   value?: string;
   forceHours?: boolean;
   className?: string;
+  /** @deprecated Prefer `tone="stopped"`. Kept for solo TAP OUT call sites. */
   muted?: boolean;
+  tone?: FlipClockTone;
   size?: FlipClockSize;
 }) {
+  const resolvedTone = resolveTone(tone, muted);
   /** Outer container — measured to get the available width. */
   const wrapRef = useRef<HTMLDivElement>(null);
   /** Inner flex row — we read its natural (unscaled) scroll width. */
@@ -301,7 +402,7 @@ export function FlipClock({
     return () => ro.disconnect();
   }, []);
 
-  useIsomorphicLayoutEffect(() => {
+  useLayoutEffect(() => {
     const row = rowRef.current;
     if (!row || width === 0) return;
     // scrollWidth gives the natural (pre-transform) width
@@ -361,9 +462,9 @@ export function FlipClock({
             <span
               key={useRoleKeys ? TIME_KEYS[i] : `colon-${i}`}
               className={cn(
-                "flex shrink-0 items-center justify-center font-mono font-bold opacity-45",
+                "flex shrink-0 items-center justify-center font-flip font-bold opacity-45",
                 COLON_BOX[size],
-                muted ? "text-red-400" : "text-slate-500",
+                COLON_BY_TONE[resolvedTone],
               )}
             >
               :
@@ -372,7 +473,7 @@ export function FlipClock({
             <FlipDigit
               key={useRoleKeys ? TIME_KEYS[i] : `pos-${i}`}
               digit={ch}
-              muted={muted}
+              tone={resolvedTone}
               size={size}
             />
           ),
@@ -380,9 +481,9 @@ export function FlipClock({
         {showCs && (
           <span
             className={cn(
-              "mb-1 flex shrink-0 items-baseline gap-0.5 font-mono font-bold tabular-nums sm:mb-1.5 md:mb-2",
+              "mb-1 flex shrink-0 items-baseline gap-0.5 font-flip font-bold tabular-nums sm:mb-1.5 md:mb-2",
               "text-lg sm:text-xl md:text-2xl lg:text-3xl",
-              muted ? "text-red-400/70" : "text-slate-400",
+              CS_BY_TONE[resolvedTone],
             )}
           >
             <span className="opacity-45">:</span>
@@ -393,4 +494,3 @@ export function FlipClock({
     </div>
   );
 }
-

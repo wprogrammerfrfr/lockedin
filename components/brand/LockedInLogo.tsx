@@ -66,7 +66,7 @@ export function LockedInLogo({
   return (
     <Tag
       className={cn(
-        "inline-flex flex-col items-stretch font-display text-slate-900 font-bold leading-none tracking-tight",
+        "inline-flex flex-col items-stretch font-display text-foreground font-bold leading-none tracking-tight",
         className,
       )}
       aria-label={label}

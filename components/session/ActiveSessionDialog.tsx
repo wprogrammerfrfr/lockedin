@@ -30,7 +30,7 @@ export function ActiveSessionDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onCancel()}>
-      <DialogContent className="max-w-md border-slate-200 bg-white">
+      <DialogContent className="max-w-md border-border bg-card">
         <DialogHeader>
           <DialogTitle>Active session elsewhere</DialogTitle>
           <DialogDescription>
@@ -39,11 +39,11 @@ export function ActiveSessionDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-          <p className="font-display text-sm font-semibold text-slate-800">
+        <div className="rounded-xl border border-border bg-background px-4 py-3">
+          <p className="font-display text-sm font-semibold text-foreground">
             {name}
           </p>
-          <p className="mt-1 font-mono text-xs tabular-nums text-slate-500">
+          <p className="mt-1 font-mono text-xs tabular-nums text-muted-foreground">
             {formatMs(activeMs, true)} active · status{" "}
             {existing?.status ?? "active"}
           </p>
@@ -52,7 +52,7 @@ export function ActiveSessionDialog({
         <DialogFooter className="gap-2 sm:justify-between">
           <Button
             variant="outline"
-            className="rounded-xl border-slate-200"
+            className="rounded-xl border-border"
             onClick={onCancel}
           >
             Cancel

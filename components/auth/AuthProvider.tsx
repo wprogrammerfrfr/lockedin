@@ -14,6 +14,9 @@ import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { publicAvatarUrl } from "@/features/profile/api";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { needsUsernameClaim } from "@/lib/profile/username";
+import { mergeLocalSessionsIntoUser } from "@/lib/auth/merge";
+import { toast } from "sonner";
+import { userFacingError } from "@/lib/supabase/errors";
 
 export type AuthStatus = "loading" | "guest" | "authenticated";
 export type ConnectedVia = "GitHub" | "Google" | "Email" | null;
@@ -168,6 +171,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         data = first.data;
       }
 
+      if (!data.avatar_path) {
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser();
+        const metadataAvatar =
+          authUser?.id === userId ? avatarUrlFromUser(authUser) : null;
+        if (metadataAvatar) {
+          const { error: avatarError } = await supabase
+            .from("profiles")
+            .update({ avatar_path: metadataAvatar })
+            .eq("id", userId);
+          if (!avatarError) data = { ...data, avatar_path: metadataAvatar };
+        }
+      }
+
       const claimed =
         data.username_claimed_at ??
         // Pre-migration fallback: treat non-provisional usernames as claimed
@@ -245,6 +263,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     void loadProfile(user.id);
   }, [status, user?.id, loadProfile]);
+
+  // Merge guest localStorage drafts once on sign-in (any route).
+  useEffect(() => {
+    if (status !== "authenticated" || !user?.id) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const result = await mergeLocalSessionsIntoUser(createClient());
+        if (cancelled) return;
+        if (!result.ok && result.error) {
+          toast.error(
+            userFacingError(result.error, "Could not sync guest sessions"),
+          );
+        } else if (result.merged > 0) {
+          toast.success(
+            result.merged === 1
+              ? "Synced 1 guest session"
+              : `Synced ${result.merged} guest sessions`,
+          );
+        }
+      } catch (err) {
+        if (!cancelled) {
+          toast.error(userFacingError(err, "Could not sync guest sessions"));
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [status, user?.id]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

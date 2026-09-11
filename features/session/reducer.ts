@@ -6,6 +6,7 @@ import {
   type BreakTypeStored,
 } from "@/features/session/break-types";
 import type { Action, AppState } from "./types";
+import type { MeltRecord } from "@/features/session/melt-catalog";
 
 /** Short PR so the sandbox particle burst is easy to demo (~15s). */
 export const DEFAULT_PR_MS = 0;
@@ -47,6 +48,37 @@ export function projectBreakHistory(state: AppState): BreakSegment[] {
   return state.breakHistory;
 }
 
+function clearMeltFields(): Partial<AppState> {
+  return {
+    meltConfig: null,
+    meltAnimOffsetMs: 0,
+    meltComplete: false,
+    meltOutcomeAction: null,
+    meltAnimSpeed: 1,
+    meltBuilderOpen: false,
+    meltHistory: [],
+  };
+}
+
+function snapshotMeltRecord(state: AppState): MeltRecord | null {
+  if (!state.meltConfig) return null;
+  const progress = state.meltComplete
+    ? 1
+    : Math.min(
+        1,
+        Math.max(
+          0,
+          (state.elapsedMs - state.meltAnimOffsetMs) / state.meltConfig.meltDurationMs,
+        ),
+      );
+  return {
+    config: state.meltConfig,
+    meltProgress: progress,
+    meltComplete: state.meltComplete || progress >= 1,
+    outcomeAction: state.meltOutcomeAction,
+    completedAt: new Date().toISOString(),
+  };
+}
 function clearBreakFields(): Partial<AppState> {
   return {
     breakRemainingMs: 0,
@@ -82,6 +114,13 @@ export const initialState: AppState = {
   remoteSessionId: null,
   clientId: null,
   sessionStartedAt: null,
+  meltConfig: null,
+  meltAnimOffsetMs: 0,
+  meltComplete: false,
+  meltOutcomeAction: null,
+  meltHistory: [],
+  meltAnimSpeed: 1,
+  meltBuilderOpen: false,
 };
 
 function applyBreakStart(
@@ -124,6 +163,16 @@ export function reducer(state: AppState, action: Action): AppState {
         lastOutcome: "solid",
         lastSessionMs: 0,
         ...clearBreakFields(),
+        ...(action.meltConfig !== undefined
+          ? {
+              meltConfig: action.meltConfig,
+              meltAnimOffsetMs: 0,
+              meltComplete: false,
+              meltOutcomeAction: null,
+              meltBuilderOpen: false,
+              meltHistory: [],
+            }
+          : clearMeltFields()),
         sessionName: action.sessionName?.trim() || null,
         breakTypesUsed: [],
         breakHistory: [],
@@ -136,19 +185,23 @@ export function reducer(state: AppState, action: Action): AppState {
         clientId:
           action.clientId !== undefined ? action.clientId : state.clientId,
       };
-    case "HYDRATE_REMOTE":
+    case "HYDRATE_REMOTE": {
+      const session = action.session ?? "LOCKED_IN";
+      const onBreak = session === "ON_BREAK";
       return {
         ...state,
-        session: action.session ?? "LOCKED_IN",
+        session,
         elapsedMs: action.elapsedMs,
         lastSessionMs: action.elapsedMs,
-        lastOutcome: "solid",
+        lastOutcome: onBreak ? "break" : "solid",
         sessionName:
           action.sessionName !== undefined
             ? action.sessionName
             : state.sessionName,
         breakTypesUsed: action.breakTypesUsed ?? state.breakTypesUsed,
         breakHistory: action.breakHistory ?? state.breakHistory,
+        breakMs:
+          action.breakMs !== undefined ? action.breakMs : state.breakMs,
         remoteSessionId: action.remoteSessionId,
         clientId:
           action.clientId !== undefined ? action.clientId : state.clientId,
@@ -157,17 +210,145 @@ export function reducer(state: AppState, action: Action): AppState {
           action.startedAt?.trim() ||
           state.sessionStartedAt ||
           new Date().toISOString(),
-        ...clearBreakFields(),
+        ...(onBreak
+          ? {
+              breakRemainingMs: action.breakRemainingMs ?? 0,
+              breakElapsedMs:
+                action.breakElapsedMs ?? action.breakMs ?? state.breakMs ?? 0,
+              breakOpenEnded: action.breakOpenEnded ?? true,
+              breakDurationMs: action.breakDurationMs ?? 0,
+              breakTypeId:
+                action.breakTypeId !== undefined
+                  ? action.breakTypeId
+                  : state.breakTypeId,
+              breakSource: action.breakSource ?? "personal",
+            }
+          : clearBreakFields()),
+        ...(action.meltConfig !== undefined
+          ? {
+              meltConfig: action.meltConfig,
+              meltAnimOffsetMs: action.meltAnimOffsetMs ?? 0,
+              meltComplete: action.meltComplete ?? false,
+              meltOutcomeAction: action.meltOutcomeAction ?? null,
+              meltHistory: action.meltHistory ?? [],
+              meltBuilderOpen: false,
+              meltAnimSpeed: 1,
+            }
+          : {}),
       };
+    }
+    case "HYDRATE_GUEST_DRAFT": {
+      const session = action.session ?? "LOCKED_IN";
+      const onBreak = session === "ON_BREAK";
+      const breakMs = action.breakMs ?? 0;
+      return {
+        ...state,
+        session,
+        elapsedMs: action.elapsedMs,
+        lastSessionMs: action.elapsedMs,
+        lastOutcome: onBreak
+          ? "break"
+          : action.didBreakPR
+            ? "pr"
+            : "solid",
+        sessionName: action.sessionName?.trim() || null,
+        breakTypesUsed: action.breakTypesUsed ?? [],
+        breakMs,
+        didBreakPR: Boolean(action.didBreakPR),
+        personalRecordMs:
+          action.personalRecordMs !== undefined
+            ? action.personalRecordMs
+            : state.personalRecordMs,
+        sessionStartedAt: new Date(
+          Date.now() - Math.max(0, action.elapsedMs),
+        ).toISOString(),
+        remoteSessionId: null,
+        ...(onBreak
+          ? {
+              breakRemainingMs: 0,
+              breakElapsedMs: breakMs,
+              breakOpenEnded: true,
+              breakDurationMs: 0,
+              breakTypeId: null,
+              breakSource: "personal" as const,
+            }
+          : clearBreakFields()),
+      };
+    }
     case "HYDRATE_STATS":
       return {
         ...state,
         streak: action.streak,
         todayTotalMs: action.todayTotalMs,
         personalRecordMs:
-          action.personalRecordMs !== undefined && action.personalRecordMs > 0
+          action.personalRecordMs !== undefined
             ? action.personalRecordMs
             : state.personalRecordMs,
+      };
+    case "OPEN_MELT_BUILDER":
+      if (
+        state.session !== "IDLE" &&
+        state.session !== "TAPPED_OUT" &&
+        state.session !== "ENDED"
+      ) {
+        return state;
+      }
+      return { ...state, meltBuilderOpen: true };
+    case "CLOSE_MELT_BUILDER":
+      return { ...state, meltBuilderOpen: false };
+    case "MELT_COMPLETE":
+      if (
+        (state.session !== "LOCKED_IN" &&
+          state.session !== "ON_BREAK" &&
+          state.session !== "CHOOSING_BREAK") ||
+        !state.meltConfig
+      ) {
+        return state;
+      }
+      return { ...state, meltComplete: true };
+    case "MELT_POST_ACTION": {
+      if (!state.meltConfig) return state;
+      const record = snapshotMeltRecord({
+        ...state,
+        meltComplete: true,
+        meltOutcomeAction: action.action,
+      });
+      const history = record
+        ? [...state.meltHistory, { ...record, outcomeAction: action.action }]
+        : state.meltHistory;
+
+      if (action.action === "trash") {
+        return {
+          ...state,
+          meltHistory: history,
+          ...clearMeltFields(),
+        };
+      }
+      if (action.action === "refreeze") {
+        return {
+          ...state,
+          meltHistory: history,
+          meltAnimOffsetMs: state.elapsedMs,
+          meltComplete: false,
+          meltOutcomeAction: null,
+        };
+      }
+      // refreeze_restart
+      return {
+        ...state,
+        meltHistory: history,
+        elapsedMs: 0,
+        meltAnimOffsetMs: 0,
+        meltComplete: false,
+        meltOutcomeAction: null,
+        didBreakPR: false,
+        sessionStartedAt: new Date().toISOString(),
+      };
+    }
+    case "SET_MELT_ANIM_SPEED":
+      return {
+        ...state,
+        meltAnimSpeed: Math.max(1, Math.min(600, action.speed)),
       };
     case "OPEN_PIT_STOP":
       if (state.session !== "LOCKED_IN") return state;
@@ -294,25 +475,24 @@ export function reducer(state: AppState, action: Action): AppState {
     case "TICK": {
       if (state.session !== "LOCKED_IN") return state;
       const elapsedMs = state.elapsedMs + action.delta;
-      const canBreakPr = state.personalRecordMs > 0;
+      // First PR (personalRecordMs === 0) and subsequent PRs fire once per session.
+      // lastOutcome === "pr" stays sticky so CLEAR_PR_BURST does not re-trigger confetti.
       const justBroke =
-        canBreakPr &&
+        elapsedMs > 0 &&
+        state.lastOutcome !== "pr" &&
         state.elapsedMs <= state.personalRecordMs &&
         elapsedMs > state.personalRecordMs;
       return {
         ...state,
         elapsedMs,
-        todayTotalMs: state.todayTotalMs + action.delta,
-        personalRecordMs: justBroke
-          ? elapsedMs
-          : elapsedMs > state.personalRecordMs
+        // todayTotalMs stays as hydrated base; UI adds in-session elapsed.
+        personalRecordMs:
+          elapsedMs > state.personalRecordMs
             ? elapsedMs
             : state.personalRecordMs,
         didBreakPR: justBroke ? true : state.didBreakPR,
         lastOutcome:
-          justBroke || (canBreakPr && elapsedMs > state.personalRecordMs)
-            ? "pr"
-            : "solid",
+          justBroke || elapsedMs > state.personalRecordMs ? "pr" : "solid",
         lastSessionMs: elapsedMs,
       };
     }

@@ -21,6 +21,9 @@ import { RoomPresenceStrip } from "@/components/rooms/RoomPresenceStrip";
 import { BreakVoteDialog } from "@/components/rooms/BreakVoteDialog";
 import { ActiveSessionDialog } from "@/components/session/ActiveSessionDialog";
 import { BreakStartDialog } from "@/components/session/BreakStartDialog";
+import { MeltBuilderDialog } from "@/components/session/MeltBuilderDialog";
+import { MeltPostActionDialog } from "@/components/session/MeltPostActionDialog";
+import { RoomMeltTable } from "@/components/rooms/RoomMeltTable";
 import { ShareCardDialog } from "@/components/session/ShareCardDialog";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -35,10 +38,17 @@ import {
   resolveBreakVote,
 } from "@/features/rooms/api";
 import { useRoomCloseWatch } from "@/features/rooms/closeWatch";
+import {
+  memberDisplayClock,
+  type SelfLiveClock,
+} from "@/features/rooms/live-member-clock";
 import { usePomodoroCadence } from "@/features/rooms/usePomodoroCadence";
 import { useRoomChannel } from "@/features/rooms/useRoomChannel";
 import type { BreakVoteChoice, RoomSummary } from "@/features/rooms/types";
-import { resolveOutcome } from "@/features/session/format";
+import {
+  buildBreakLiveLabel,
+  resolveOutcome,
+} from "@/features/session/format";
 import { pickRandomBreakType } from "@/features/session/break-types";
 import { initialState, projectBreakHistory, reducer } from "@/features/session/reducer";
 import {
@@ -46,7 +56,9 @@ import {
   loadBreakTimerMinutes,
 } from "@/lib/preferences/break-timer";
 import { useSessionClock } from "@/features/session/useSessionClock";
+import { useOfflineQueueReplay } from "@/features/session/useOfflineQueueReplay";
 import type { SessionReceiptData } from "@/components/session/SessionReceiptCard";
+import { hydrateRemoteFromSessionRow } from "@/features/session/hydrate-remote";
 import {
   ActiveSessionExistsError,
   endSession,
@@ -59,6 +71,16 @@ import type { SessionRow } from "@/types/database";
 import { createClient } from "@/lib/supabase/client";
 import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import { userFacingError } from "@/lib/supabase/errors";
+import {
+  createMeltConfig,
+  dessertMetadataFromState,
+  type MeltConfig,
+} from "@/features/session/melt-catalog";
+import {
+  computeMeltProgress,
+  isMeltComplete,
+  meltRoomStatusLabel,
+} from "@/features/session/melt-utils";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -75,6 +97,42 @@ function isFocusSession(session: (typeof initialState)["session"]) {
     session === "CHOOSING_BREAK" ||
     session === "BREAK_DONE"
   );
+}
+
+async function shareOrCopyInvite(link: string) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(link);
+      return "copied" as const;
+    }
+  } catch {
+    // Fall through to the native share sheet or legacy copy.
+  }
+
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: "LockedIn room",
+        text: "Join my LockedIn room",
+        url: link,
+      });
+      return "shared" as const;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return "cancelled" as const;
+      }
+    }
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = link;
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  textarea.remove();
+  return copied ? ("copied" as const) : ("failed" as const);
 }
 
 export default function RoomFocusPage({
@@ -100,11 +158,19 @@ export default function RoomFocusPage({
   const [conflictSession, setConflictSession] = useState<SessionRow | null>(
     null,
   );
+  const [meltDialogDismissed, setMeltDialogDismissed] = useState(false);
+  const [lastRemoteId, setLastRemoteId] = useState<string | null>(null);
+  /** Own melt-board seat; null = auto-spread until the user drags. */
+  const [meltBoardPos, setMeltBoardPos] = useState<{
+    x: number | null;
+    z: number | null;
+  }>({ x: null, z: null });
   const stateRef = useRef(state);
   stateRef.current = state;
   const seenRoomRef = useRef(false);
   const joinedRef = useRef(false);
   const appliedVoteRoundRef = useRef<string | null>(null);
+  const prevActiveBreakRoundRef = useRef<string | null>(null);
   const loadErrorToastRef = useRef(false);
 
   const userId = user?.id ?? null;
@@ -280,30 +346,65 @@ export default function RoomFocusPage({
       const breakType =
         state.breakTypeId ??
         (isPomodoro && onBreak ? "pomodoro" : null);
+      const breakLabel = state.breakTypeId
+        ? buildBreakLiveLabel(state.breakTypeId, state.breakElapsedMs, t)
+        : breakType === "pomodoro"
+          ? t("room.pomodoro")
+          : null;
+      const customizing = state.meltBuilderOpen && state.session !== "LOCKED_IN";
       return {
         userId,
         username,
         displayName: username,
         avatarPath,
-        status: state.session === "LOCKED_IN"
-          ? ("LOCKED_IN" as const)
-          : onBreak
-            ? ("BREAK" as const)
-            : ("WAITING" as const),
+        status: customizing
+          ? ("CUSTOMIZING" as const)
+          : state.session === "LOCKED_IN"
+            ? ("LOCKED_IN" as const)
+            : onBreak
+              ? ("BREAK" as const)
+              : ("WAITING" as const),
         elapsedMs: state.elapsedMs,
         seat: null as number | null,
-        breakLabel: null,
+        breakLabel: onBreak ? breakLabel : null,
         breakType: onBreak ? breakType : null,
+        breakElapsedMs: onBreak
+          ? state.breakOpenEnded
+            ? state.breakElapsedMs
+            : Math.max(0, state.breakDurationMs - state.breakRemainingMs)
+          : 0,
+        breakRemainingMs: onBreak ? state.breakRemainingMs : 0,
+        breakOpenEnded: onBreak ? state.breakOpenEnded : false,
+        meltConfig: state.meltConfig,
+        meltAnimOffsetMs: state.meltAnimOffsetMs,
+        meltAnimSpeed: state.meltAnimSpeed,
+        meltCustomizing: customizing,
+        meltStatusLabel: customizing
+          ? meltRoomStatusLabel(true, state.meltConfig, t)
+          : null,
+        meltBoardX: meltBoardPos.x,
+        meltBoardZ: meltBoardPos.z,
       };
     },
     [
       state.elapsedMs,
       state.session,
       state.breakTypeId,
+      state.breakElapsedMs,
+      state.breakRemainingMs,
+      state.breakDurationMs,
+      state.breakOpenEnded,
+      state.meltConfig,
+      state.meltAnimOffsetMs,
+      state.meltAnimSpeed,
+      state.meltBuilderOpen,
+      meltBoardPos.x,
+      meltBoardPos.z,
       isPomodoro,
       userId,
       username,
       avatarPath,
+      t,
     ],
   );
 
@@ -313,7 +414,66 @@ export default function RoomFocusPage({
     presenceSelf,
     room?.name,
   );
+
+  const selfLive = useMemo((): SelfLiveClock | null => {
+    if (!userId) return null;
+    return {
+      userId,
+      elapsedMs: presenceSelf.elapsedMs,
+      status: presenceSelf.status,
+      breakElapsedMs: presenceSelf.breakElapsedMs,
+      breakRemainingMs: presenceSelf.breakRemainingMs,
+      breakOpenEnded: presenceSelf.breakOpenEnded,
+    };
+  }, [
+    userId,
+    presenceSelf.elapsedMs,
+    presenceSelf.status,
+    presenceSelf.breakElapsedMs,
+    presenceSelf.breakRemainingMs,
+    presenceSelf.breakOpenEnded,
+  ]);
+
+  // Hydrate board seat from DB/presence when local has not been set yet.
+  useEffect(() => {
+    const melting =
+      (state.session === "LOCKED_IN" ||
+        state.session === "ON_BREAK" ||
+        state.session === "CHOOSING_BREAK" ||
+        state.session === "BREAK_DONE") &&
+      Boolean(state.meltConfig);
+    if (!melting || !userId || meltBoardPos.x != null) return;
+    const selfMember = members.find((m) => m.userId === userId);
+    if (
+      typeof selfMember?.meltBoardX === "number" &&
+      typeof selfMember?.meltBoardZ === "number"
+    ) {
+      setMeltBoardPos({
+        x: selfMember.meltBoardX,
+        z: selfMember.meltBoardZ,
+      });
+    }
+  }, [members, userId, meltBoardPos.x, state.session, state.meltConfig]);
+
+  // Clear board seat when leaving melt mode.
+  useEffect(() => {
+    const melting =
+      (state.session === "LOCKED_IN" ||
+        state.session === "ON_BREAK" ||
+        state.session === "CHOOSING_BREAK" ||
+        state.session === "BREAK_DONE") &&
+      Boolean(state.meltConfig);
+    if (!melting && (meltBoardPos.x != null || meltBoardPos.z != null)) {
+      setMeltBoardPos({ x: null, z: null });
+    }
+  }, [state.session, state.meltConfig, meltBoardPos.x, meltBoardPos.z]);
+
+  const onMeltBoardPosChange = useCallback((x: number, z: number) => {
+    setMeltBoardPos({ x, z });
+  }, []);
+
   useSessionClock(state, dispatch, { isAuthenticated });
+  useOfflineQueueReplay(status !== "loading" && isAuthenticated);
 
   // Auto-end stale orphans left by sleep / kill while in a room session
   useEffect(() => {
@@ -385,17 +545,77 @@ export default function RoomFocusPage({
   }, [status, userId]);
 
   useEffect(() => {
+    const currentActive = room?.activeBreakRoundId ?? null;
+    const prevActive = prevActiveBreakRoundRef.current;
     const voteRound = room?.lastVoteRoundId;
     const result = room?.lastVoteResult;
-    if (!voteRound || !result) return;
+
+    // Only react when a live vote round just resolved (active → null).
+    const justResolved =
+      Boolean(prevActive) &&
+      !currentActive &&
+      Boolean(voteRound) &&
+      prevActive === voteRound;
+
+    prevActiveBreakRoundRef.current = currentActive;
+
+    if (!justResolved || !voteRound || !result) return;
     if (appliedVoteRoundRef.current === voteRound) return;
     appliedVoteRoundRef.current = voteRound;
+
     if (result === "break") {
-      dispatch({ type: "OPEN_SHARED_BREAK_PICKER" });
+      // Stay voters keep focusing; break voters / non-voters in the round take break.
+      if (myVote === "stay") return;
+      if (stateRef.current.session === "LOCKED_IN") {
+        dispatch({ type: "OPEN_SHARED_BREAK_PICKER" });
+      }
     } else if (result === "cancelled") {
       toast.message(t("room.toast.voteCancelled"));
     }
-  }, [room?.lastVoteRoundId, room?.lastVoteResult]);
+  }, [room?.activeBreakRoundId, room?.lastVoteRoundId, room?.lastVoteResult, myVote, t]);
+
+  // Auto-resume non-stale cloud session for this room (or orphan-end if stale)
+  useEffect(() => {
+    if (status === "loading" || !userId || !room?.roomSessionId) return;
+    if (isFocusSession(state.session)) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const existing = await resumeActiveSession(createClient());
+        if (cancelled || !existing) return;
+        if (
+          existing.room_session_id &&
+          room.roomSessionId &&
+          existing.room_session_id !== room.roomSessionId
+        ) {
+          return;
+        }
+        if (!isSessionStale(existing)) {
+          setLastRemoteId(existing.id);
+          dispatch(hydrateRemoteFromSessionRow(existing));
+          toast.message("Resumed your session");
+          return;
+        }
+        const activeMs = Number(existing.active_ms) || 0;
+        const breakMs = Number(existing.break_ms) || 0;
+        await endSession(createClient(), {
+          id: existing.id,
+          activeMs,
+          breakMs,
+          breakTypes: existing.break_types_used,
+          outcome: "solid",
+          prBroken: false,
+        });
+      } catch {
+        /* ignore — conflict dialog handles LOCK IN */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount / room session gate
+  }, [status, userId, room?.roomSessionId]);
 
   useEffect(() => {
     if (!room?.id || !roundId || !voteEndsAt) return;
@@ -420,6 +640,15 @@ export default function RoomFocusPage({
   async function persistEnd(kind: "end" | "tapout") {
     const s = stateRef.current;
     if (!s.remoteSessionId) return;
+    setLastRemoteId(s.remoteSessionId);
+    const meta = dessertMetadataFromState(
+      s.meltConfig,
+      s.meltAnimOffsetMs,
+      s.elapsedMs,
+      s.meltComplete,
+      s.meltOutcomeAction,
+      s.meltHistory,
+    );
     const payload = {
       id: s.remoteSessionId,
       activeMs: s.elapsedMs,
@@ -428,6 +657,7 @@ export default function RoomFocusPage({
       breakHistory: projectBreakHistory(s),
       outcome: kind === "tapout" ? "tapout" : s.didBreakPR ? "pr" : "solid",
       prBroken: s.didBreakPR,
+      dessertMetadata: meta,
     };
     if (kind === "tapout") {
       await tapOutSession(createClient(), payload);
@@ -446,6 +676,7 @@ export default function RoomFocusPage({
         clientId,
         roomSessionId: room?.roomSessionId ?? null,
       });
+      setLastRemoteId(row.id);
       dispatch({
         type: "LOCK_IN",
         sessionName: sessionNameDraft || room?.name || undefined,
@@ -459,8 +690,7 @@ export default function RoomFocusPage({
           try {
             const activeMs = Number(existing.active_ms) || 0;
             const breakMs = Number(existing.break_ms) || 0;
-            const prBroken =
-              state.personalRecordMs > 0 && activeMs > state.personalRecordMs;
+            const prBroken = activeMs > state.personalRecordMs && activeMs > 0;
             await endSession(createClient(), {
               id: existing.id,
               activeMs,
@@ -474,6 +704,7 @@ export default function RoomFocusPage({
               clientId,
               roomSessionId: room?.roomSessionId ?? null,
             });
+            setLastRemoteId(row.id);
             dispatch({
               type: "LOCK_IN",
               sessionName: sessionNameDraft || room?.name || undefined,
@@ -500,6 +731,96 @@ export default function RoomFocusPage({
     room?.name,
     room?.roomSessionId,
   ]);
+
+  const onMeltLockIn = useCallback(
+    async (config: MeltConfig) => {
+      if (status === "loading" || !userId) return;
+      const supabase = createClient();
+      const clientId = sessionClientId(state.clientId);
+      try {
+        const row = await startSession(supabase, {
+          sessionName: sessionNameDraft || room?.name || null,
+          clientId,
+          roomSessionId: room?.roomSessionId ?? null,
+          dessertMetadata: {
+            active: {
+              config,
+              meltProgress: 0,
+              meltComplete: false,
+              outcomeAction: null,
+            },
+            history: [],
+          },
+        });
+        setLastRemoteId(row.id);
+        dispatch({
+          type: "LOCK_IN",
+          sessionName: sessionNameDraft || room?.name || undefined,
+          remoteSessionId: row.id,
+          clientId,
+          meltConfig: config,
+        });
+      } catch (err) {
+        if (err instanceof ActiveSessionExistsError) {
+          setConflictSession(err.existing);
+          setConflictOpen(true);
+          return;
+        }
+        toast.error(userFacingError(err, t("room.toast.startFailed")));
+      }
+    },
+    [
+      status,
+      userId,
+      state.clientId,
+      sessionNameDraft,
+      room?.name,
+      room?.roomSessionId,
+      t,
+    ],
+  );
+
+  const meltProgress = state.meltConfig
+    ? computeMeltProgress(
+        state.elapsedMs,
+        state.meltAnimOffsetMs,
+        state.meltConfig.meltDurationMs,
+        state.meltAnimSpeed,
+      )
+    : 0;
+
+  useEffect(() => {
+    if (!state.meltComplete) {
+      setMeltDialogDismissed(false);
+    }
+  }, [state.meltComplete]);
+
+  useEffect(() => {
+    const inMeltSession =
+      state.session === "LOCKED_IN" ||
+      state.session === "ON_BREAK" ||
+      state.session === "CHOOSING_BREAK";
+    if (
+      inMeltSession &&
+      state.meltConfig &&
+      !state.meltComplete &&
+      isMeltComplete(meltProgress)
+    ) {
+      dispatch({ type: "MELT_COMPLETE" });
+      toast.success(t("melt.complete.title"), {
+        description: t("melt.complete.desc"),
+      });
+    }
+  }, [state.session, state.meltConfig, state.meltComplete, meltProgress, t]);
+
+  const dessertMetadata = dessertMetadataFromState(
+    state.meltConfig,
+    state.meltAnimOffsetMs,
+    state.elapsedMs,
+    state.meltComplete,
+    state.meltOutcomeAction,
+    state.meltHistory,
+  );
 
   const onTapOut = useCallback(async () => {
     try {
@@ -581,53 +902,64 @@ export default function RoomFocusPage({
   );
 
   const roomReceipt: SessionReceiptData = useMemo(
-    () => ({
-      sessionName: state.sessionName || room?.name || t("room.sessionFallback"),
-      kind: "room",
-      roomCode: room?.code ?? displayCode,
-      startedAt: state.sessionStartedAt,
-      activeMs: shareDuration,
-      breakMs: state.breakMs,
-      breakTypesUsed: state.breakTypesUsed,
-      breakHistory: state.breakHistory,
-      outcome: shareOutcome,
-      prBroken: state.didBreakPR,
-      participants: members.map((m) => ({
-        user_id: m.userId,
-        username: m.username,
-        active_ms:
-          m.userId === userId ? shareDuration : m.elapsedMs,
-        break_ms: m.userId === userId ? state.breakMs : 0,
-        break_types_used:
-          m.userId === userId
-            ? state.breakTypesUsed
-            : m.breakType
-              ? [m.breakType]
-              : [],
-        outcome:
-          m.userId === userId
-            ? shareOutcome
-            : m.status === "LOCKED_IN"
-              ? "solid"
-              : m.status === "BREAK"
-                ? "break"
-                : "solid",
-        isYou: m.userId === userId,
-      })),
-    }),
+    () => {
+      const shareNow = Date.now();
+      return {
+        sessionName: state.sessionName || room?.name || t("room.sessionFallback"),
+        kind: "room",
+        roomCode: room?.code ?? displayCode,
+        startedAt: state.sessionStartedAt,
+        activeMs: shareDuration,
+        breakMs: state.breakMs,
+        breakTypesUsed: state.breakTypesUsed,
+        breakHistory: state.breakHistory,
+        outcome: shareOutcome,
+        prBroken: state.didBreakPR,
+        dessertMetadata,
+        participants: members.map((m) => {
+          const live = memberDisplayClock(m, shareNow, selfLive);
+          return {
+            user_id: m.userId,
+            username: m.username,
+            active_ms:
+              m.userId === userId ? shareDuration : live.elapsedMs,
+            break_ms: m.userId === userId ? state.breakMs : 0,
+            break_types_used:
+              m.userId === userId
+                ? state.breakTypesUsed
+                : m.breakType
+                  ? [m.breakType]
+                  : [],
+            outcome:
+              m.userId === userId
+                ? shareOutcome
+                : m.status === "LOCKED_IN"
+                  ? "solid"
+                  : m.status === "BREAK"
+                    ? "break"
+                    : "solid",
+            isYou: m.userId === userId,
+          };
+        }),
+      };
+    },
     [
       state.sessionName,
       state.sessionStartedAt,
       state.breakMs,
       state.breakTypesUsed,
+      state.breakHistory,
       state.didBreakPR,
       room?.name,
       room?.code,
       displayCode,
       shareDuration,
       shareOutcome,
+      dessertMetadata,
       members,
       userId,
+      selfLive,
+      t,
     ],
   );
 
@@ -635,11 +967,24 @@ export default function RoomFocusPage({
     <AppShell
       layoutMode="room-focus"
       presence={
-        <RoomPresencePane members={members} selfUserId={userId} />
+        <RoomPresencePane
+          members={members}
+          selfUserId={userId}
+          selfLive={selfLive}
+        />
       }
-      presenceStrip={<RoomPresenceStrip members={members} />}
+      presenceStrip={
+        <RoomPresenceStrip
+          members={members}
+          compact={
+            state.session === "LOCKED_IN" ||
+            state.session === "ON_BREAK" ||
+            state.session === "CHOOSING_BREAK"
+          }
+        />
+      }
     >
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
+      <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-3">
         {room?.status === "closing" && secondsLeft != null && (
           <ClosingBanner secondsLeft={secondsLeft} />
         )}
@@ -647,7 +992,10 @@ export default function RoomFocusPage({
         <FocusTimer
           state={state.session}
           elapsedMs={state.elapsedMs}
-          todayTotalMs={state.todayTotalMs}
+          todayTotalMs={
+            state.todayTotalMs +
+            (state.session === "LOCKED_IN" ? state.elapsedMs : 0)
+          }
           personalRecordMs={state.personalRecordMs}
           didBreakPR={state.didBreakPR}
           breakRemainingMs={state.breakRemainingMs}
@@ -661,13 +1009,13 @@ export default function RoomFocusPage({
           topBar={
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-xs font-medium text-slate-500">
+                <p className="text-xs font-medium text-muted-foreground">
                   {t("room.roomCode")}{" "}
-                  <span className="font-mono text-base font-bold tabular-nums tracking-widest text-slate-900">
+                  <span className="font-mono text-base font-bold tabular-nums tracking-widest text-foreground">
                     {displayCode}
                   </span>
                 </p>
-                <p className="mt-0.5 text-xs text-slate-400">
+                <p className="mt-0.5 text-xs text-muted-foreground">
                   {isPomodoro ? t("room.pomodoroCadence") : t("room.voteRoom")} ·{" "}
                   {room?.status ?? "…"}
                 </p>
@@ -680,16 +1028,11 @@ export default function RoomFocusPage({
                   className="rounded-xl"
                   onClick={async () => {
                     const link = `${window.location.origin}/rooms/${displayCode}`;
-                    try {
-                      await navigator.clipboard.writeText(link);
+                    const result = await shareOrCopyInvite(link);
+                    if (result === "copied") {
                       toast.success(t("room.toast.inviteCopied"));
-                    } catch {
-                      try {
-                        await navigator.clipboard.writeText(displayCode);
-                        toast.success(t("room.toast.codeCopied"));
-                      } catch {
-                        toast.error(t("room.toast.copyFailed"));
-                      }
+                    } else if (result === "failed") {
+                      toast.error(t("room.toast.copyFailed"));
                     }
                   }}
                 >
@@ -705,7 +1048,7 @@ export default function RoomFocusPage({
                     {t("room.breakQuestion")}
                   </Button>
                 ) : (
-                  <p className="hidden text-[11px] text-slate-400 sm:block">
+                  <p className="hidden text-[11px] text-muted-foreground sm:block">
                     {t("room.breaksAutomatic")}
                   </p>
                 )}
@@ -720,7 +1063,7 @@ export default function RoomFocusPage({
             </div>
           }
           heroTitle={
-            <h1 className="flex max-w-full flex-wrap items-baseline justify-center gap-x-2 gap-y-1 pb-0.5 text-center font-display text-2xl font-bold leading-snug tracking-tight text-slate-900 sm:text-3xl">
+            <h1 className="flex max-w-full flex-wrap items-baseline justify-center gap-x-2 gap-y-1 pb-0.5 text-center font-display text-xl font-bold leading-snug tracking-tight text-foreground sm:text-2xl lg:text-3xl">
               <span className="min-w-0 max-w-full line-clamp-2">
                 {room?.name || t("room.fallbackName")}
               </span>
@@ -746,6 +1089,26 @@ export default function RoomFocusPage({
           }}
           onShare={() => dispatch({ type: "OPEN_SHARE" })}
           onClearPrBurst={() => dispatch({ type: "CLEAR_PR_BURST" })}
+          meltConfig={state.meltConfig}
+          meltProgress={meltProgress}
+          meltAnimSpeed={state.meltAnimSpeed}
+          meltComplete={state.meltComplete}
+          onMeltIt={() => dispatch({ type: "OPEN_MELT_BUILDER" })}
+          onSpeedUpMelt={() =>
+            dispatch({
+              type: "SET_MELT_ANIM_SPEED",
+              speed: state.meltAnimSpeed >= 120 ? 1 : state.meltAnimSpeed * 4,
+            })
+          }
+          heroLayout="room"
+          heroExtra={
+            <RoomMeltTable
+              members={members}
+              selfUserId={userId}
+              selfLive={selfLive}
+              onBoardPosChange={onMeltBoardPosChange}
+            />
+          }
         />
       </div>
 
@@ -764,6 +1127,89 @@ export default function RoomFocusPage({
               mode === "count_down" ? breakTimerMs(breakTimerMinutes) : undefined,
           });
         }}
+      />
+
+      <MeltBuilderDialog
+        open={state.meltBuilderOpen}
+        onClose={() => dispatch({ type: "CLOSE_MELT_BUILDER" })}
+        onMeltIt={(config) => {
+          void onMeltLockIn(config);
+        }}
+        variant="room"
+      />
+
+      <MeltPostActionDialog
+        open={
+          state.meltComplete &&
+          Boolean(state.meltConfig) &&
+          !meltDialogDismissed
+        }
+        config={state.meltConfig ?? createMeltConfig({ kind: "iceCream" })}
+        onAction={(action) => {
+          if (action === "refreeze_restart") {
+            const prevElapsed = state.elapsedMs;
+            const prevId = state.remoteSessionId;
+            const prevBreak = state.breakMs;
+            const prevTypes = state.breakTypesUsed;
+            const prevHistory = projectBreakHistory(state);
+            const prevMeta = dessertMetadataFromState(
+              state.meltConfig,
+              state.meltAnimOffsetMs,
+              prevElapsed,
+              true,
+              "refreeze_restart",
+              state.meltHistory,
+            );
+            const meltConfig = state.meltConfig;
+            dispatch({ type: "MELT_POST_ACTION", action });
+            if (prevId && meltConfig) {
+              void (async () => {
+                try {
+                  await endSession(createClient(), {
+                    id: prevId,
+                    activeMs: prevElapsed,
+                    breakMs: prevBreak,
+                    breakTypes: prevTypes,
+                    breakHistory: prevHistory,
+                    outcome: "solid",
+                    prBroken: false,
+                    dessertMetadata: prevMeta,
+                  });
+                  const clientId = sessionClientId(state.clientId);
+                  const row = await startSession(createClient(), {
+                    sessionName: state.sessionName || room?.name || null,
+                    clientId,
+                    roomSessionId: room?.roomSessionId ?? null,
+                    dessertMetadata: {
+                      active: {
+                        config: meltConfig,
+                        meltProgress: 0,
+                        meltComplete: false,
+                        outcomeAction: null,
+                      },
+                      history: [],
+                    },
+                  });
+                  setLastRemoteId(row.id);
+                  dispatch({
+                    type: "LOCK_IN",
+                    sessionName: state.sessionName || room?.name || undefined,
+                    remoteSessionId: row.id,
+                    clientId,
+                    meltConfig,
+                  });
+                } catch (err) {
+                  toast.error(
+                    userFacingError(err, t("room.toast.startFailed")),
+                  );
+                }
+              })();
+            }
+            return;
+          }
+          dispatch({ type: "MELT_POST_ACTION", action });
+        }}
+        onDismiss={() => setMeltDialogDismissed(true)}
       />
 
       <BreakVoteDialog
@@ -795,16 +1241,8 @@ export default function RoomFocusPage({
         onResume={() => {
           if (!conflictSession) return;
           setConflictOpen(false);
-          dispatch({
-            type: "HYDRATE_REMOTE",
-            remoteSessionId: conflictSession.id,
-            clientId: conflictSession.client_id,
-            elapsedMs: Number(conflictSession.active_ms) || 0,
-            sessionName: conflictSession.session_name,
-            startedAt: conflictSession.started_at,
-            session:
-              conflictSession.status === "on_break" ? "ON_BREAK" : "LOCKED_IN",
-          });
+          setLastRemoteId(conflictSession.id);
+          dispatch(hydrateRemoteFromSessionRow(conflictSession));
         }}
         onTapOut={async () => {
           if (!conflictSession) return;
@@ -834,8 +1272,8 @@ export default function RoomFocusPage({
         outcome={shareOutcome}
         displayName={profileLabel}
         avatarUrl={avatarUrl}
-        sessionId={state.remoteSessionId}
-        canPost={isAuthenticated && Boolean(state.remoteSessionId)}
+        sessionId={lastRemoteId}
+        canPost={isAuthenticated && Boolean(lastRemoteId)}
         sessionName={state.sessionName || room?.name}
         receipt={{
           ...roomReceipt,

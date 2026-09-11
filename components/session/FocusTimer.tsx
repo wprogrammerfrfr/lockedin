@@ -2,9 +2,11 @@
 
 import { useEffect, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Lock, Pause, Play, Share2, Trophy } from "lucide-react";
+import { IceCreamCone, Lock, Pause, Play, Share2, Trophy } from "lucide-react";
 
-import { FlipClock } from "@/components/session/FlipClock";
+import { FlipClock, type FlipClockTone } from "@/components/session/FlipClock";
+import { MeltScene, PROGRESS_RING_CIRC } from "@/components/session/MeltScene";
+import { MeltTimerChip } from "@/components/session/MeltTimerChip";
 import { ParticleBurst } from "@/components/session/ParticleBurst";
 import {
   breakTypeAccent,
@@ -15,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { getBreakType, type BreakTypeId } from "@/features/session/break-types";
 import { buildBreakLiveLabel, formatMs } from "@/features/session/format";
 import type { SessionState } from "@/features/session/types";
+import type { MeltConfig } from "@/features/session/melt-catalog";
 import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import type { Locale } from "@/lib/i18n/locale";
 import { cn } from "@/lib/utils";
@@ -53,6 +56,15 @@ export function FocusTimer({
   hidePersonalBreak = false,
   heroTitle,
   topBar,
+  meltConfig = null,
+  meltProgress = 0,
+  onMeltIt,
+  onSpeedUpMelt,
+  meltAnimSpeed = 1,
+  meltComplete = false,
+  heroLayout = "solo",
+  heroExtra,
+  children,
 }: {
   state: SessionState;
   elapsedMs: number;
@@ -77,6 +89,18 @@ export function FocusTimer({
   hidePersonalBreak?: boolean;
   heroTitle?: ReactNode;
   topBar?: ReactNode;
+  meltConfig?: MeltConfig | null;
+  meltProgress?: number;
+  onMeltIt?: () => void;
+  onSpeedUpMelt?: () => void;
+  meltAnimSpeed?: number;
+  meltComplete?: boolean;
+  /** Solo keeps ring+dessert; room puts clock left + table in the outline. */
+  heroLayout?: "solo" | "room";
+  /** Room table (or other) rendered inside the hero outline. */
+  heroExtra?: ReactNode;
+  /** Extra content below the hero (legacy; prefer heroExtra for rooms). */
+  children?: ReactNode;
 }) {
   const { t, locale } = useTranslation();
   const breakDef = getBreakType(breakTypeId);
@@ -110,11 +134,52 @@ export function FocusTimer({
     return () => clearTimeout(timer);
   }, [didBreakPR, onClearPrBurst]);
 
+  const isMeltMode = Boolean(
+    meltConfig &&
+      (state === "LOCKED_IN" ||
+        state === "ON_BREAK" ||
+        state === "CHOOSING_BREAK" ||
+        state === "BREAK_DONE"),
+  );
+  const isRoomHero = heroLayout === "room";
+  const showMeltItChip =
+    Boolean(onMeltIt) &&
+    (state === "IDLE" || state === "TAPPED_OUT" || state === "ENDED");
+  const isDev = process.env.NODE_ENV !== "production";
+
+  const roomClockMs =
+    state === "ON_BREAK"
+      ? breakOpenEnded
+        ? breakElapsedMs
+        : breakRemainingMs
+      : elapsedMs;
+  const roomClockTone: FlipClockTone = muted
+    ? "stopped"
+    : state === "LOCKED_IN" || state === "ON_BREAK"
+      ? "live"
+      : "idle";
+  const roomStatusLabel =
+    state === "BREAK_DONE"
+      ? upper(t("timer.breakComplete"), locale)
+      : state === "ON_BREAK"
+        ? breakDef
+          ? breakLiveLabel
+          : t("timer.onBreak")
+        : state === "CHOOSING_BREAK"
+          ? upper(t("timer.pausedBreak"), locale)
+          : muted
+            ? upper(t("timer.sessionStopped"), locale)
+            : state === "LOCKED_IN"
+              ? upper(t("timer.liveElapsed"), locale)
+              : state === "ENDED"
+                ? upper(t("timer.sessionLogged"), locale)
+                : upper(t("timer.ready"), locale);
+
   return (
     <motion.div
       layout
       transition={springSoft}
-      className="relative"
+      className={cn("relative", isRoomHero && "flex min-h-0 flex-1 flex-col")}
       animate={
         muted
           ? { filter: "saturate(0.35)", y: 6 }
@@ -125,7 +190,12 @@ export function FocusTimer({
         layout
         className={cn(
           "relative overflow-visible rounded-2xl border shadow-soft",
-          isActiveFocus ? "p-3 sm:p-5" : "p-4 sm:p-8",
+          isRoomHero && "flex min-h-0 flex-1 flex-col",
+          isActiveFocus
+            ? isRoomHero
+              ? "p-2.5 sm:p-4"
+              : "p-3 sm:p-5"
+            : "p-4 sm:p-8",
           accent.card,
           muted && "grayscale-[0.35]",
         )}
@@ -137,13 +207,20 @@ export function FocusTimer({
         }}
       >
         {topBar ? (
-          <div className={cn(isActiveFocus ? "mb-3" : "mb-4")}>{topBar}</div>
+          <div
+            className={cn(
+              "shrink-0",
+              isActiveFocus ? "mb-2 sm:mb-3" : "mb-4",
+            )}
+          >
+            {topBar}
+          </div>
         ) : null}
         {heroTitle ? (
           <div
             className={cn(
-              "flex justify-center text-center",
-              isActiveFocus ? "mb-3" : "mb-5",
+              "flex shrink-0 justify-center text-center",
+              isActiveFocus ? "mb-2 sm:mb-3" : "mb-5",
             )}
           >
             {heroTitle}
@@ -159,7 +236,9 @@ export function FocusTimer({
             <span
               className={cn(
                 "font-display text-xl font-bold tracking-tight sm:text-2xl",
-                muted ? "text-red-700" : "text-slate-800",
+                muted
+                  ? "text-red-700 dark:text-red-300"
+                  : "text-foreground",
               )}
             >
               {(sessionName ?? "").trim() ||
@@ -171,17 +250,47 @@ export function FocusTimer({
         <div
           className={cn(
             "relative mx-auto flex min-w-0 w-full items-center justify-center overflow-visible rounded-2xl border px-2 sm:px-8 md:px-10",
-            isActiveFocus
-              ? "mb-3 min-h-[120px] py-3 sm:mb-4 sm:min-h-[200px] sm:py-6 md:min-h-[220px] lg:min-h-[240px]"
-              : "mb-4 min-h-[140px] py-4 sm:mb-6 sm:min-h-[280px] sm:py-10 md:min-h-[320px] lg:min-h-[360px]",
-            muted
-              ? "border-red-200/60 bg-red-50/50"
-              : state === "ON_BREAK" && breakDef
+            isRoomHero
+              ? "mb-2 min-h-0 flex-1 border-border bg-background py-2 sm:mb-3 sm:py-3"
+              : isMeltMode
+                ? "mb-3 min-h-[200px] border-border bg-background py-3 sm:min-h-[280px] sm:py-4 md:min-h-[360px]"
+                : isActiveFocus
+                  ? "mb-3 min-h-[120px] py-3 sm:mb-4 sm:min-h-[200px] sm:py-6 md:min-h-[220px] lg:min-h-[240px]"
+                  : "mb-4 min-h-[140px] py-4 sm:mb-6 sm:min-h-[280px] sm:py-10 md:min-h-[320px] lg:min-h-[360px]",
+            isRoomHero
+              ? state === "ON_BREAK" && breakDef
                 ? cn(accent.border, accent.bg)
-                : "border-slate-100 bg-slate-50",
+                : muted
+                  ? "border-red-200/60 bg-red-50/50 dark:border-red-400/30 dark:bg-red-500/10"
+                  : "border-border bg-background"
+              : isMeltMode && state === "ON_BREAK" && breakDef
+                ? cn(accent.border, accent.bg)
+                : !isMeltMode &&
+                  (muted
+                    ? "border-red-200/60 bg-red-50/50 dark:border-red-400/30 dark:bg-red-500/10"
+                    : state === "ON_BREAK" && breakDef
+                      ? cn(accent.border, accent.bg)
+                      : "border-border bg-background"),
           )}
         >
+          {showMeltItChip ? (
+            <motion.button
+              type="button"
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={springSoft}
+              className="absolute left-2 top-2 z-20 flex items-center gap-1.5 rounded-full border border-amber-300 bg-card/95 px-3 py-1.5 text-xs font-bold tracking-wide text-amber-800 shadow-soft backdrop-blur-sm hover:bg-amber-50 disabled:opacity-50 dark:border-amber-400/40 dark:text-amber-300 dark:hover:bg-amber-400/15 sm:left-3 sm:top-3"
+              onClick={onMeltIt}
+              disabled={lockInDisabled}
+            >
+              <IceCreamCone className="h-3.5 w-3.5" aria-hidden />
+              {t("melt.action.meltIt")}
+            </motion.button>
+          ) : null}
           <ParticleBurst active={didBreakPR && state === "LOCKED_IN"} />
+          <ParticleBurst
+            active={meltComplete && isMeltMode && state === "LOCKED_IN"}
+          />
 
           {state === "LOCKED_IN" && (
             <motion.div
@@ -192,79 +301,75 @@ export function FocusTimer({
             />
           )}
 
-          <div className="relative z-10 w-full min-w-0 text-center">
-            <AnimatePresence mode="wait">
-              {state === "BREAK_DONE" ? (
-                <motion.div
-                  key="lock-back"
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -12 }}
-                  transition={springSoft}
-                  className="px-2"
-                >
-                  <p className="font-display text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl md:text-6xl">
-                    {t("timer.lockBackIn")}
-                  </p>
-                  <p className="mt-3 text-xs tracking-[0.16em] text-slate-400">
-                    {upper(t("timer.breakComplete"), locale)}
-                  </p>
-                </motion.div>
-              ) : state === "ON_BREAK" ? (
-                <motion.div
-                  key="break-count"
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -12 }}
-                  transition={springSoft}
-                >
+          <div
+            className={cn(
+              "relative z-10 w-full min-w-0 text-center",
+              isRoomHero && "flex h-full min-h-0 flex-col",
+            )}
+          >
+            {isRoomHero ? (
+              <motion.div
+                key="room-hero"
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={springSoft}
+                className={cn(
+                  "grid h-full min-h-0 w-full grid-cols-1 items-stretch gap-2 sm:grid-cols-[auto_1fr] sm:gap-4",
+                  showMeltItChip && "pt-8 sm:pt-6",
+                )}
+              >
+                <div className="flex shrink-0 flex-col items-center justify-center gap-1 self-center sm:items-start sm:self-start sm:pt-1">
+                  {state === "BREAK_DONE" ? (
+                    <p className="font-display text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+                      {t("timer.lockBackIn")}
+                    </p>
+                  ) : (
+                    <FlipClock
+                      ms={roomClockMs}
+                      tone={roomClockTone}
+                      size="sm"
+                    />
+                  )}
                   <p
                     className={cn(
-                      "mb-3 text-base font-semibold sm:text-lg",
-                      accent.text,
+                      "max-w-[11rem] text-[10px] leading-snug tracking-[0.12em] sm:text-left",
+                      muted ? "text-red-400/70" : "text-muted-foreground",
+                      accent.text &&
+                        (state === "ON_BREAK" || state === "CHOOSING_BREAK") &&
+                        accent.text,
                     )}
                   >
-                    {breakDef ? (
+                    {state === "ON_BREAK" && breakDef ? (
                       <>
-                        <span className="mr-1.5" aria-hidden>
+                        <span className="mr-1" aria-hidden>
                           {breakDef.emoji}
                         </span>
-                        {breakLiveLabel}
+                        {roomStatusLabel}
                       </>
-                    ) : null}
-                  </p>
-                  <FlipClock
-                    ms={breakOpenEnded ? breakElapsedMs : breakRemainingMs}
-                  />
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="focus-clock"
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -12 }}
-                  transition={springSoft}
-                >
-                  <FlipClock ms={elapsedMs} muted={muted} />
-                  <p
-                    className={cn(
-                      "mt-3 text-xs tracking-[0.16em]",
-                      muted ? "text-red-400/70" : "text-slate-400",
-                    )}
-                  >
-                    {upper(
-                      muted
-                        ? t("timer.sessionStopped")
-                        : state === "LOCKED_IN"
-                          ? t("timer.liveElapsed")
-                          : state === "CHOOSING_BREAK"
-                            ? t("timer.pausedBreak")
-                            : state === "ENDED"
-                              ? t("timer.sessionLogged")
-                              : t("timer.ready"),
-                      locale,
+                    ) : (
+                      roomStatusLabel
                     )}
                   </p>
+                  {isMeltMode && meltConfig ? (
+                    <MeltTimerChip
+                      elapsedMs={elapsedMs}
+                      meltProgress={meltProgress}
+                      meltDurationMs={meltConfig.meltDurationMs}
+                      showElapsed={false}
+                      className="relative"
+                    />
+                  ) : null}
+                  {onSpeedUpMelt && isDev && isMeltMode ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-[10px] text-muted-foreground hover:text-amber-500 dark:hover:text-amber-400"
+                      onClick={onSpeedUpMelt}
+                    >
+                      ⚡ speed up melt ({meltAnimSpeed}x)
+                    </Button>
+                  ) : null}
                   <AnimatePresence>
                     {didBreakPR && state === "LOCKED_IN" && (
                       <motion.p
@@ -272,44 +377,292 @@ export function FocusTimer({
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0 }}
                         transition={springSoft}
-                        className="mt-3 font-display text-lg font-semibold text-amber-600"
+                        className="font-display text-sm font-semibold text-amber-600 dark:text-amber-400"
                       >
                         {t("timer.newPr")}
                       </motion.p>
                     )}
                   </AnimatePresence>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                </div>
+                <div className="min-h-0 min-w-0 flex-1 overflow-visible">
+                  {heroExtra}
+                </div>
+              </motion.div>
+            ) : (
+              <AnimatePresence mode="wait">
+                {isMeltMode && meltConfig ? (
+                  <motion.div
+                    key="melt-scene"
+                    initial={{ opacity: 0, scale: 0.96 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.96 }}
+                    transition={springSoft}
+                    className="flex w-full flex-col items-center justify-center gap-3 sm:flex-row sm:items-center sm:gap-6 md:gap-8"
+                  >
+                    <div className="relative aspect-square w-[min(100%,240px)] shrink-0 overflow-visible sm:w-[min(100%,min(420px,55%))]">
+                      <svg
+                        className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+                        viewBox="0 0 100 100"
+                        preserveAspectRatio="xMidYMid meet"
+                        aria-hidden
+                      >
+                        <circle
+                          cx={50}
+                          cy={50}
+                          r={46}
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          className="text-slate-200"
+                        />
+                        <motion.circle
+                          cx={50}
+                          cy={50}
+                          r={46}
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2.5}
+                          strokeLinecap="round"
+                          className={
+                            state === "LOCKED_IN"
+                              ? "text-lime-500"
+                              : "text-amber-400"
+                          }
+                          strokeDasharray={PROGRESS_RING_CIRC}
+                          strokeDashoffset={PROGRESS_RING_CIRC}
+                          initial={{ strokeDashoffset: PROGRESS_RING_CIRC }}
+                          animate={{
+                            strokeDashoffset:
+                              PROGRESS_RING_CIRC * (1 - meltProgress),
+                          }}
+                          transition={springSoft}
+                          transform="rotate(-90 50 50)"
+                        />
+                      </svg>
+                      <div className="absolute inset-[12%] flex items-center justify-center overflow-visible">
+                        <MeltScene
+                          config={meltConfig}
+                          progress={meltProgress}
+                          size="lg"
+                          animated={state === "LOCKED_IN"}
+                          className="!mx-auto !h-full !w-full !max-h-full !max-w-full"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex min-w-0 flex-col items-center justify-center gap-3 sm:flex-1">
+                      {state === "BREAK_DONE" ? (
+                        <>
+                          <p className="font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl md:text-5xl">
+                            {t("timer.lockBackIn")}
+                          </p>
+                          <p className="text-xs tracking-[0.16em] text-muted-foreground">
+                            {upper(t("timer.breakComplete"), locale)}
+                          </p>
+                        </>
+                      ) : state === "ON_BREAK" || state === "CHOOSING_BREAK" ? (
+                        <>
+                          <p
+                            className={cn(
+                              "text-base font-semibold sm:text-lg",
+                              accent.text,
+                            )}
+                          >
+                            {state === "CHOOSING_BREAK" ? (
+                              upper(t("timer.pausedBreak"), locale)
+                            ) : breakDef ? (
+                              <>
+                                <span className="mr-1.5" aria-hidden>
+                                  {breakDef.emoji}
+                                </span>
+                                {breakLiveLabel}
+                              </>
+                            ) : (
+                              t("timer.onBreak")
+                            )}
+                          </p>
+                          {state === "ON_BREAK" ? (
+                            <FlipClock
+                              ms={
+                                breakOpenEnded
+                                  ? breakElapsedMs
+                                  : breakRemainingMs
+                              }
+                            />
+                          ) : (
+                            <FlipClock ms={elapsedMs} muted />
+                          )}
+                          <MeltTimerChip
+                            elapsedMs={elapsedMs}
+                            meltProgress={meltProgress}
+                            meltDurationMs={meltConfig.meltDurationMs}
+                            showElapsed={false}
+                            className="relative"
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <FlipClock ms={elapsedMs} muted={muted} />
+                          <p className="text-xs tracking-[0.16em] text-muted-foreground">
+                            {upper(t("timer.liveElapsed"), locale)}
+                          </p>
+                          <MeltTimerChip
+                            elapsedMs={elapsedMs}
+                            meltProgress={meltProgress}
+                            meltDurationMs={meltConfig.meltDurationMs}
+                            showElapsed={false}
+                            className="relative"
+                          />
+                          {onSpeedUpMelt && isDev ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-[10px] text-muted-foreground hover:text-amber-500 dark:hover:text-amber-400"
+                              onClick={onSpeedUpMelt}
+                            >
+                              ⚡ speed up melt ({meltAnimSpeed}x)
+                            </Button>
+                          ) : null}
+                          <AnimatePresence>
+                            {didBreakPR && (
+                              <motion.p
+                                initial={{ opacity: 0, y: 8 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0 }}
+                                transition={springSoft}
+                                className="font-display text-lg font-semibold text-amber-600 dark:text-amber-400"
+                              >
+                                {t("timer.newPr")}
+                              </motion.p>
+                            )}
+                          </AnimatePresence>
+                        </>
+                      )}
+                    </div>
+                  </motion.div>
+                ) : state === "BREAK_DONE" ? (
+                  <motion.div
+                    key="lock-back"
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -12 }}
+                    transition={springSoft}
+                    className="px-2"
+                  >
+                    <p className="font-display text-4xl font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl">
+                      {t("timer.lockBackIn")}
+                    </p>
+                    <p className="mt-3 text-xs tracking-[0.16em] text-muted-foreground">
+                      {upper(t("timer.breakComplete"), locale)}
+                    </p>
+                  </motion.div>
+                ) : state === "ON_BREAK" ? (
+                  <motion.div
+                    key="break-count"
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -12 }}
+                    transition={springSoft}
+                  >
+                    <p
+                      className={cn(
+                        "mb-3 text-base font-semibold sm:text-lg",
+                        accent.text,
+                      )}
+                    >
+                      {breakDef ? (
+                        <>
+                          <span className="mr-1.5" aria-hidden>
+                            {breakDef.emoji}
+                          </span>
+                          {breakLiveLabel}
+                        </>
+                      ) : null}
+                    </p>
+                    <FlipClock
+                      ms={breakOpenEnded ? breakElapsedMs : breakRemainingMs}
+                    />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="focus-clock"
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -12 }}
+                    transition={springSoft}
+                  >
+                    <FlipClock ms={elapsedMs} muted={muted} />
+                    <p
+                      className={cn(
+                        "mt-3 text-xs tracking-[0.16em]",
+                        muted ? "text-red-400/70" : "text-muted-foreground",
+                      )}
+                    >
+                      {upper(
+                        muted
+                          ? t("timer.sessionStopped")
+                          : state === "LOCKED_IN"
+                            ? t("timer.liveElapsed")
+                            : state === "CHOOSING_BREAK"
+                              ? t("timer.pausedBreak")
+                              : state === "ENDED"
+                                ? t("timer.sessionLogged")
+                                : t("timer.ready"),
+                        locale,
+                      )}
+                    </p>
+                    <AnimatePresence>
+                      {didBreakPR && state === "LOCKED_IN" && (
+                        <motion.p
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0 }}
+                          transition={springSoft}
+                          className="mt-3 font-display text-lg font-semibold text-amber-600 dark:text-amber-400"
+                        >
+                          {t("timer.newPr")}
+                        </motion.p>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            )}
           </div>
         </div>
 
+        {children}
+
         <div
           className={cn(
-            "grid grid-cols-2 gap-3",
-            isActiveFocus ? "mb-3 sm:mb-4" : "mb-5 sm:mb-8",
+            "grid shrink-0 grid-cols-2 gap-2 sm:gap-3",
+            isActiveFocus ? "mb-2 sm:mb-3" : "mb-5 sm:mb-8",
           )}
         >
           <div
             className={cn(
-              "rounded-xl border px-4 py-3",
+              "rounded-xl border",
+              isActiveFocus ? "px-3 py-2" : "px-4 py-3",
               muted
-                ? "border-red-200/60 bg-red-50/40"
-                : "border-slate-200 bg-white",
+                ? "border-red-200/60 bg-red-50/40 dark:border-red-400/30 dark:bg-red-500/10"
+                : "border-border bg-card",
             )}
           >
             <p
               className={cn(
                 "text-[10px] tracking-[0.14em]",
-                muted ? "text-red-400/70" : "text-slate-400",
+                muted ? "text-red-400/70" : "text-muted-foreground",
               )}
             >
               {upper(t("timer.today"), locale)}
             </p>
             <p
               className={cn(
-                "mt-1 font-mono text-lg tabular-nums",
-                muted ? "text-red-700/70" : "text-slate-800",
+                "mt-0.5 font-mono tabular-nums",
+                isActiveFocus ? "text-base" : "mt-1 text-lg",
+                muted
+                  ? "text-red-700/70 dark:text-red-300/80"
+                  : "text-foreground",
               )}
             >
               {formatMs(todayTotalMs)}
@@ -317,24 +670,28 @@ export function FocusTimer({
           </div>
           <div
             className={cn(
-              "rounded-xl border px-4 py-3",
+              "rounded-xl border",
+              isActiveFocus ? "px-3 py-2" : "px-4 py-3",
               muted
-                ? "border-red-200/60 bg-red-50/40"
-                : "border-amber-200 bg-amber-50/60",
+                ? "border-red-200/60 bg-red-50/40 dark:border-red-400/30 dark:bg-red-500/10"
+                : "border-amber-200 bg-amber-50/60 dark:border-amber-400/30 dark:bg-amber-400/10",
             )}
           >
             <p
               className={cn(
                 "flex items-center gap-1 text-[10px] tracking-[0.14em]",
-                muted ? "text-red-400/70" : "text-amber-600",
+                muted ? "text-red-400/70" : "text-amber-600 dark:text-amber-400",
               )}
             >
               <Trophy className="h-3 w-3" /> {upper(t("timer.pr"), locale)}
             </p>
             <p
               className={cn(
-                "mt-1 font-mono text-lg tabular-nums",
-                muted ? "text-red-700/70" : "text-amber-700",
+                "mt-0.5 font-mono tabular-nums",
+                isActiveFocus ? "text-base" : "mt-1 text-lg",
+                muted
+                  ? "text-red-700/70 dark:text-red-300/80"
+                  : "text-amber-700 dark:text-amber-400",
               )}
             >
               {formatMs(personalRecordMs)}
@@ -342,7 +699,7 @@ export function FocusTimer({
           </div>
         </div>
 
-        <div className="flex flex-col items-stretch gap-3">
+        <div className="flex shrink-0 flex-col items-stretch gap-2 sm:gap-3">
           <AnimatePresence mode="wait">
             {state === "BREAK_DONE" ? (
               <motion.div
@@ -364,7 +721,7 @@ export function FocusTimer({
                 <Button
                   size="xl"
                   variant="outline"
-                  className="w-full border-slate-300 py-6 text-xl font-bold tracking-wide text-slate-700 sm:py-8 sm:text-2xl"
+                  className="w-full border-border py-6 text-xl font-bold tracking-wide text-foreground sm:py-8 sm:text-2xl"
                   onClick={onEndSession}
                 >
                   {t("timer.endSession")}
@@ -382,9 +739,9 @@ export function FocusTimer({
                 className="flex flex-col gap-3"
               >
                 <label className="block">
-                  <span className="mb-1.5 block text-[10px] tracking-[0.14em] text-slate-400">
+                  <span className="mb-1.5 block text-[10px] tracking-[0.14em] text-muted-foreground">
                     {upper(t("timer.sessionName"), locale)}{" "}
-                    <span className="normal-case tracking-normal text-slate-400">
+                    <span className="normal-case tracking-normal text-muted-foreground">
                       {t("timer.optional")}
                     </span>
                   </span>
@@ -394,7 +751,7 @@ export function FocusTimer({
                     onChange={(e) => onSessionNameChange(e.target.value)}
                     placeholder={t("timer.sessionNamePlaceholder")}
                     maxLength={80}
-                    className="w-full cursor-text rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
+                    className="w-full cursor-text rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none transition focus:border-border focus:ring-2 focus:ring-ring/40"
                   />
                 </label>
                 <Button
@@ -420,7 +777,10 @@ export function FocusTimer({
               >
                 <div
                   className={cn(
-                    "flex w-full items-center justify-center rounded-2xl border py-5 font-display text-lg font-bold tracking-wide sm:py-6 sm:text-xl",
+                    "flex w-full items-center justify-center rounded-2xl border font-display font-bold tracking-wide",
+                    isActiveFocus
+                      ? "py-3 text-base sm:py-3.5 sm:text-lg"
+                      : "py-5 text-lg sm:py-6 sm:text-xl",
                     accent.button,
                   )}
                 >
@@ -440,7 +800,7 @@ export function FocusTimer({
                 transition={springSoft}
               >
                 <motion.div
-                  className="pointer-events-none absolute -inset-2 rounded-2xl border-2 border-lime-400"
+                  className="pointer-events-none absolute -inset-1.5 rounded-xl border-2 border-lime-400 sm:-inset-2 sm:rounded-2xl"
                   animate={{ scale: [1, 1.03, 1], opacity: [0.4, 0.95, 0.4] }}
                   transition={{
                     duration: 2.1,
@@ -450,14 +810,14 @@ export function FocusTimer({
                   style={{ boxShadow: "0 0 28px rgba(132,204,22,0.45)" }}
                 />
                 <Button
-                  size="xl"
+                  size="lg"
                   className={cn(
-                    "relative z-10 w-full cursor-default py-6 text-xl font-bold tracking-wide sm:py-8 sm:text-2xl md:text-3xl",
+                    "relative z-10 w-full cursor-default py-3 text-base font-bold tracking-wide sm:py-3.5 sm:text-lg",
                     accent.button,
                   )}
                   aria-pressed
                 >
-                  <Lock className="!size-7" />
+                  <Lock className="!size-5" />
                   {t("timer.lockedIn")}
                 </Button>
               </motion.div>
@@ -468,7 +828,7 @@ export function FocusTimer({
             {showSecondary && (
               <motion.div
                 key="secondary"
-                className="grid grid-cols-2 gap-3"
+                className="grid grid-cols-2 gap-2 sm:gap-3"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
@@ -478,7 +838,7 @@ export function FocusTimer({
                   <Button
                     size="lg"
                     variant="outline"
-                    className="border-amber-200 text-amber-700 hover:bg-amber-50"
+                    className="border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-400/40 dark:text-amber-300 dark:hover:bg-amber-400/15"
                     onClick={onPitStop}
                   >
                     <Pause className="h-4 w-4" />
@@ -519,7 +879,7 @@ export function FocusTimer({
               className={cn(
                 muted
                   ? "text-red-400/80 hover:text-red-600"
-                  : "text-slate-500 hover:text-slate-800",
+                  : "text-muted-foreground hover:text-foreground",
               )}
               onClick={onShare}
             >

@@ -24,6 +24,7 @@ export default function DevPage() {
   );
   const [gateOpen, setGateOpen] = useState(false);
   const [hasGithub, setHasGithub] = useState(false);
+  const [needsGithubReconnect, setNeedsGithubReconnect] = useState(false);
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [stats, setStats] = useState<StatsMap>({});
 
@@ -52,6 +53,7 @@ export default function DevPage() {
         if (cancelled) return;
         setProjects(list);
         const next: StatsMap = {};
+        let sawLinkGithub = false;
         for (const p of list) {
           let activeMs = 0;
           try {
@@ -76,6 +78,11 @@ export default function DevPage() {
                 commits = body.commits ?? 0;
                 additions = body.additions ?? 0;
                 deletions = body.deletions ?? 0;
+              } else if (res.status === 403) {
+                const body = (await res.json().catch(() => null)) as {
+                  error?: string;
+                } | null;
+                if (body?.error === "link_github") sawLinkGithub = true;
               }
             } catch {
               /* ignore */
@@ -83,7 +90,10 @@ export default function DevPage() {
           }
           next[p.id] = { commits, additions, deletions, activeMs };
         }
-        if (!cancelled) setStats(next);
+        if (!cancelled) {
+          setStats(next);
+          setNeedsGithubReconnect(sawLinkGithub);
+        }
       } catch {
         if (!cancelled) setProjects([]);
       }
@@ -107,7 +117,7 @@ export default function DevPage() {
       provider: "github",
       options: {
         scopes: "read:user repo",
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${window.location.origin}/auth/callback?next=/dev`,
       },
     });
   }
@@ -116,22 +126,24 @@ export default function DevPage() {
     <ChromePage>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
         <div>
-          <h1 className="font-display text-2xl font-bold text-slate-900">
+          <h1 className="font-display text-2xl font-bold text-foreground">
             Developer Mode
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-muted-foreground">
             Track project Cost (hours × rate) and Value side-by-side with GitHub
             LOC.
           </p>
         </div>
 
-        {isAuthenticated && !hasGithub && (
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-sm text-slate-600">
-              Link GitHub to load commits and LOC for your projects.
+        {isAuthenticated && (!hasGithub || needsGithubReconnect) && (
+          <div className="rounded-xl border border-border bg-card p-4">
+            <p className="text-sm text-muted-foreground">
+              {needsGithubReconnect
+                ? "GitHub session expired. Reconnect to load commits and LOC."
+                : "Link GitHub to load commits and LOC for your projects."}
             </p>
             <Button className="mt-3 rounded-xl" onClick={linkGithub}>
-              Link GitHub
+              {needsGithubReconnect ? "Reconnect GitHub" : "Link GitHub"}
             </Button>
           </div>
         )}
@@ -155,7 +167,7 @@ export default function DevPage() {
                 />
               ))}
               {projects.length === 0 && (
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-muted-foreground">
                   Add a project to see Cost vs Value.
                 </p>
               )}

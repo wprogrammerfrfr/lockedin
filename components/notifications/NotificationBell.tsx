@@ -137,7 +137,7 @@ export function NotificationBell({
             : "Notifications"
         }
       >
-        <Bell className="h-5 w-5 text-slate-500" />
+        <Bell className="h-5 w-5 text-muted-foreground" />
         {showBadge && (
           <span
             className={cn(
@@ -164,7 +164,7 @@ export function NotificationBell({
             ref={panelRef}
             role="dialog"
             aria-label="Notifications"
-            className="fixed z-[100] overflow-hidden rounded-xl border border-slate-200 bg-white p-2 shadow-soft"
+            className="fixed z-[100] overflow-hidden rounded-xl border border-border bg-card p-2 shadow-soft"
             style={panelStyle}
           >
             <NotificationList

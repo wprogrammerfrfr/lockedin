@@ -680,7 +680,7 @@ export function receiptOutcomeLabel(
 ): string {
   if (prBroken || outcome === "pr") return "NEW PR";
   if (outcome === "tapout" || outcome === "tapped_out" || outcome === "left_early") {
-    return "Finish";
+    return "TAP OUT";
   }
   if (outcome === "break") return "BREAK";
   return "LOCKED IN";

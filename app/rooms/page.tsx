@@ -45,14 +45,14 @@ export default function RoomsPage() {
     <ChromePage>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
         <div>
-          <h1 className="font-display text-2xl font-bold text-slate-900">
+          <h1 className="font-display text-2xl font-bold text-foreground">
             {t("nav.rooms")}
           </h1>
-          <p className="mt-1 text-sm text-slate-500">{t("rooms.subtitle")}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{t("rooms.subtitle")}</p>
         </div>
 
         {status === "loading" ? (
-          <p className="text-sm text-slate-400">{t("common.loading")}</p>
+          <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
         ) : isAuthenticated ? (
           <>
             <JoinCreateBar
@@ -62,7 +62,7 @@ export default function RoomsPage() {
             <WeeklyLeaderboard timezone={tz} compact />
           </>
         ) : (
-          <p className="text-sm text-slate-400">{t("auth.loginRequired")}</p>
+          <p className="text-sm text-muted-foreground">{t("auth.loginRequired")}</p>
         )}
       </div>
 

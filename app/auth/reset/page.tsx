@@ -13,8 +13,10 @@ function ResetForm() {
   const router = useRouter();
   const params = useSearchParams();
   const urlError = params.get("error");
-  const hasUrlAuth =
-    Boolean(params.get("code")) || Boolean(params.get("token_hash"));
+  const code = params.get("code");
+  const tokenHash = params.get("token_hash");
+  const type = params.get("type");
+  const hasUrlAuth = Boolean(code) || Boolean(tokenHash);
 
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -26,32 +28,55 @@ function ResetForm() {
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Legacy emails that land on /auth/reset?code=… → exchange via callback.
+  useEffect(() => {
+    if (urlError) return;
+    if (!code && !tokenHash) return;
+    const qs = new URLSearchParams({ next: "/auth/reset" });
+    if (code) qs.set("code", code);
+    if (tokenHash) {
+      qs.set("token_hash", tokenHash);
+      if (type) qs.set("type", type);
+      else qs.set("type", "recovery");
+    }
+    window.location.replace(`/auth/callback?${qs.toString()}`);
+  }, [urlError, code, tokenHash, type]);
+
   useEffect(() => {
     if (urlError) {
       setReady(true);
       setSessionOk(false);
       return;
     }
+    // Wait for redirect when legacy code/hash is present.
+    if (hasUrlAuth) return;
 
     const supabase = createClient();
     let cancelled = false;
-    let settled = false;
 
     const markReady = (ok: boolean) => {
-      if (cancelled || settled) return;
-      settled = true;
-      setSessionOk(ok);
-      setReady(true);
-      if (!ok) {
-        setError("Recovery link failed. Request a new one.");
+      if (cancelled) return;
+      if (ok) {
+        setSessionOk(true);
+        setReady(true);
+        setError(null);
+        return;
       }
+      // Only lock failure after grace; success can still arrive later.
+      setReady(true);
+      setSessionOk((prev) => {
+        if (prev) return prev;
+        setError("Recovery link failed. Request a new one.");
+        return false;
+      });
     };
 
-    void supabase.auth.getSession().then(({ data }) => {
-      if (data.session?.user) {
-        markReady(true);
-      }
-    }).catch(() => undefined);
+    void supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (data.session?.user) markReady(true);
+      })
+      .catch(() => undefined);
 
     const {
       data: { subscription },
@@ -67,15 +92,16 @@ function ResetForm() {
       }
     });
 
-    // In-flight emails that still hit /auth/reset?code= rely on detectSessionInUrl.
-    const graceMs = hasUrlAuth ? 4000 : 1500;
     const timer = window.setTimeout(() => {
-      void supabase.auth.getSession().then(({ data }) => {
-        markReady(Boolean(data.session?.user));
-      }).catch(() => {
-        markReady(false);
-      });
-    }, graceMs);
+      void supabase.auth
+        .getSession()
+        .then(({ data }) => {
+          markReady(Boolean(data.session?.user));
+        })
+        .catch(() => {
+          markReady(false);
+        });
+    }, 1500);
 
     return () => {
       cancelled = true;
@@ -119,10 +145,20 @@ function ResetForm() {
     }
   }
 
+  if (hasUrlAuth && !urlError) {
+    return (
+      <Card className="w-full max-w-md rounded-2xl border-border bg-card shadow-soft">
+        <CardContent className="py-10 text-center text-sm text-muted-foreground">
+          Completing recovery…
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (!ready) {
     return (
-      <Card className="w-full max-w-md rounded-2xl border-slate-200 bg-white shadow-soft">
-        <CardContent className="py-10 text-center text-sm text-slate-500">
+      <Card className="w-full max-w-md rounded-2xl border-border bg-card shadow-soft">
+        <CardContent className="py-10 text-center text-sm text-muted-foreground">
           Verifying recovery link…
         </CardContent>
       </Card>
@@ -130,7 +166,7 @@ function ResetForm() {
   }
 
   return (
-    <Card className="w-full max-w-md rounded-2xl border-slate-200 bg-white shadow-soft">
+    <Card className="w-full max-w-md rounded-2xl border-border bg-card shadow-soft">
       <CardHeader className="text-center">
         <CardTitle className="font-display text-2xl">Set new password</CardTitle>
       </CardHeader>
@@ -163,7 +199,9 @@ function ResetForm() {
           {(error || message) && (
             <p
               className={
-                error ? "text-sm text-red-600" : "text-sm text-emerald-600"
+                error
+                  ? "rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300"
+                  : "rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
               }
             >
               {error ?? message}
@@ -183,10 +221,10 @@ function ResetForm() {
 
 export default function AuthResetPage() {
   return (
-    <div className="flex min-h-full flex-1 items-center justify-center bg-slate-50 px-4 py-10">
+    <div className="flex min-h-full flex-1 items-center justify-center bg-background px-4 py-10">
       <Suspense
         fallback={
-          <p className="text-sm text-slate-500">Loading recovery…</p>
+          <p className="text-sm text-muted-foreground">Loading recovery…</p>
         }
       >
         <ResetForm />

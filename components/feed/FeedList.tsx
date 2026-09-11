@@ -72,22 +72,22 @@ export function FeedList({
   }
 
   if (loading) {
-    return <p className="text-sm text-slate-400">{t("feed.loading")}</p>;
+    return <p className="text-sm text-muted-foreground">{t("feed.loading")}</p>;
   }
 
   if (error) {
     return (
-      <p className="text-sm text-slate-500">{t("feed.unavailable")}</p>
+      <p className="text-sm text-muted-foreground">{t("feed.unavailable")}</p>
     );
   }
 
   if (posts.length === 0) {
     return (
-      <div className="space-y-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center">
-        <p className="text-sm text-slate-500">{t("feed.emptyTitle")}</p>
-        <p className="text-xs text-slate-400">
+      <div className="space-y-3 rounded-xl border border-dashed border-border bg-background px-4 py-6 text-center">
+        <p className="text-sm text-muted-foreground">{t("feed.emptyTitle")}</p>
+        <p className="text-xs text-muted-foreground">
           {t("feed.emptyDesc")}{" "}
-          <Link href="/lockin" className="font-medium text-slate-700 underline">
+          <Link href="/lockin" className="font-medium text-foreground underline">
             {t("nav.lockin")}
           </Link>{" "}
           {t("feed.emptyCta")}
@@ -105,23 +105,23 @@ export function FeedList({
         const outcome = asOutcome(post.session?.outcome);
         const isOwn = user?.id === post.author_id;
         return (
-          <Card key={post.id} className="border-slate-200 bg-white">
+          <Card key={post.id} className="border-border bg-card">
             <CardContent className="space-y-3 p-4">
               <div className="flex items-center gap-3">
                 <Avatar className="h-9 w-9 rounded-xl">
                   {url ? <AvatarImage src={url} alt="" /> : null}
-                  <AvatarFallback className="rounded-xl bg-slate-100 text-xs">
+                  <AvatarFallback className="rounded-xl bg-muted text-xs">
                     {(post.author?.username ?? "?").slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
                   <Link
                     href={`/u/${post.author?.username ?? ""}`}
-                    className="font-display text-sm font-semibold text-slate-800 hover:underline"
+                    className="font-display text-sm font-semibold text-foreground hover:underline"
                   >
                     {post.author?.username}
                   </Link>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-muted-foreground">
                     {new Date(post.created_at).toLocaleString()}
                   </p>
                 </div>
@@ -137,14 +137,14 @@ export function FeedList({
                     }
                     aria-label={t("feed.postActions")}
                   >
-                    <MoreHorizontal className="h-4 w-4 text-slate-400" />
+                    <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
                   </Button>
                   {menuOpen === post.id ? (
-                    <div className="absolute right-0 z-10 mt-1 w-40 rounded-xl border border-slate-200 bg-white py-1 shadow-sm">
+                    <div className="absolute right-0 z-10 mt-1 w-40 rounded-xl border border-border bg-card py-1 shadow-sm">
                       {isOwn ? (
                         <button
                           type="button"
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-rose-600 hover:bg-slate-50"
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-rose-600 hover:bg-background"
                           onClick={() => {
                             setMenuOpen(null);
                             void handleDelete(post.id);
@@ -156,7 +156,7 @@ export function FeedList({
                       ) : (
                         <button
                           type="button"
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-background"
                           onClick={() => {
                             setMenuOpen(null);
                             setReportPostId(post.id);
@@ -180,11 +180,11 @@ export function FeedList({
                 />
               ) : null}
 
-              <p className="font-mono text-sm tabular-nums text-slate-700">
+              <p className="font-mono text-sm tabular-nums text-foreground">
                 {lockedInForLabel(post.session?.active_ms ?? 0)}
               </p>
               {post.caption && (
-                <p className="text-sm text-slate-600">{post.caption}</p>
+                <p className="text-sm text-muted-foreground">{post.caption}</p>
               )}
               <div className="flex items-center gap-3">
                 <LikeButton
@@ -193,7 +193,7 @@ export function FeedList({
                   count={post.like_count ?? 0}
                 />
                 {(post.comment_count ?? 0) > 0 ? (
-                  <span className="font-mono text-xs tabular-nums text-slate-400">
+                  <span className="font-mono text-xs tabular-nums text-muted-foreground">
                     {t("feed.comments", { n: post.comment_count ?? 0 })}
                   </span>
                 ) : null}

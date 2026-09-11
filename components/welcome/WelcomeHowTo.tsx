@@ -14,7 +14,7 @@ const STEPS = [
     icon: Play,
     title: "Start a session",
     body: "Hit LOCK IN to start a timed focus session. Name it if you want — CS midterm grind, lab report, whatever you’re in for.",
-    wrap: "border-slate-200 bg-white",
+    wrap: "border-border bg-card",
     selected: "border-slate-800 ring-2 ring-slate-800/15",
     iconWrap: "bg-slate-800 text-white",
     glow: undefined as string | undefined,
@@ -26,7 +26,7 @@ const STEPS = [
     icon: Lock,
     title: "Time counts",
     body: "The clock runs while you’re locked in. A lime glow marks the live session. Only active minutes count toward your hours.",
-    wrap: "border-emerald-200 bg-white",
+    wrap: "border-emerald-200 bg-card",
     selected: "border-lime-400 ring-2 ring-lime-400/40",
     iconWrap: "bg-lime-400 text-slate-950",
     glow: "0 0 0 1px rgba(16,185,129,0.25), 0 8px 28px rgba(132,204,22,0.28)",
@@ -38,7 +38,7 @@ const STEPS = [
     icon: Pause,
     title: "Pause without losing it",
     body: "BREAK pauses active time. Hydration, doomscroll, or touch grass — break minutes never count toward locked-in hours.",
-    wrap: "border-amber-200 bg-white",
+    wrap: "border-amber-200 bg-card",
     selected: "border-amber-400 ring-2 ring-amber-300/50",
     iconWrap: "bg-amber-100 text-amber-800",
     glow: "0 0 0 1px rgba(245,158,11,0.2), 0 8px 24px rgba(245,158,11,0.18)",
@@ -50,9 +50,9 @@ const STEPS = [
     icon: Lock,
     title: "End early",
     body: "TAP OUT ends the session before you’re done. The timer sighs out — no red flash. You can still share the card.",
-    wrap: "border-slate-200 bg-white",
+    wrap: "border-border bg-card",
     selected: "border-[#a8a3b5] ring-2 ring-[#a8a3b5]/40",
-    iconWrap: "bg-slate-200 text-slate-600",
+    iconWrap: "bg-slate-200 text-muted-foreground",
     glow: undefined as string | undefined,
   },
 ];
@@ -91,17 +91,17 @@ export function WelcomeHowTo() {
               >
                 <Icon className="h-4 w-4" />
               </span>
-              <span className="font-display text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+              <span className="font-display text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
                 {step.label}
               </span>
               <span className="ml-auto text-lg leading-none" aria-hidden>
                 {step.emoji}
               </span>
             </div>
-            <p className="font-display text-lg font-bold text-slate-900">
+            <p className="font-display text-lg font-bold text-foreground">
               {step.title}
             </p>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               {step.body}
             </p>
           </motion.button>

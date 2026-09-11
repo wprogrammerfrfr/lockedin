@@ -186,7 +186,7 @@ export function ShareCardDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[min(90dvh,52rem)] max-w-md flex-col gap-3 overflow-hidden border-slate-200 bg-white">
+      <DialogContent className="flex max-h-[min(90dvh,52rem)] max-w-md flex-col gap-3 overflow-hidden border-border bg-card">
         <DialogHeader className="shrink-0">
           <DialogTitle>
             {cardView === "summary"
@@ -218,6 +218,7 @@ export function ShareCardDialog({
                   outcome={displayOutcome}
                   sessionName={resolvedSessionName}
                   caption={caption}
+                  dessertMetadata={receiptData.dessertMetadata}
                 />
               </motion.div>
             ) : (

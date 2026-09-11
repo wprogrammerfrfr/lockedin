@@ -44,7 +44,7 @@ export function PomodoroCreateFields({
               "rounded-xl border px-3 py-2 text-sm font-medium transition-colors",
               kind === id
                 ? "border-emerald-300 bg-emerald-50 text-emerald-800"
-                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                : "border-border bg-card text-muted-foreground hover:bg-background",
             )}
           >
             {label}
@@ -67,15 +67,15 @@ export function PomodoroCreateFields({
                 className={cn(
                   "rounded-xl border px-3 py-1.5 font-mono text-xs tabular-nums",
                   workMinutes === p.work && breakMinutes === p.break
-                    ? "border-lime-400 bg-lime-50 text-slate-900"
-                    : "border-slate-200 text-slate-600",
+                    ? "border-lime-400 bg-lime-50 text-foreground"
+                    : "border-border text-muted-foreground",
                 )}
               >
                 {p.label}
               </button>
             ))}
           </div>
-          <p className="text-xs text-slate-400">{t("room.pomodoroDesc")}</p>
+          <p className="text-xs text-muted-foreground">{t("room.pomodoroDesc")}</p>
         </div>
       )}
     </div>

@@ -87,7 +87,7 @@ export function WelcomeTimerPreview() {
       >
         <div className="mb-4 flex items-center gap-2">
           <Lock className={cn("h-4 w-4", accent.text)} />
-          <span className="font-display text-sm font-bold uppercase tracking-[0.14em] text-slate-800">
+          <span className="font-display text-sm font-bold uppercase tracking-[0.14em] text-foreground">
             FOCUS TIMER
           </span>
         </div>
@@ -96,8 +96,8 @@ export function WelcomeTimerPreview() {
           className={cn(
             "relative mx-auto mb-4 flex min-h-[108px] w-full min-w-0 items-center justify-center overflow-hidden rounded-2xl border px-2 py-3 sm:min-h-[132px] sm:px-4 sm:py-5",
             muted
-              ? "border-slate-200 bg-slate-100/80"
-              : "border-slate-100 bg-slate-50",
+              ? "border-border bg-muted/80"
+              : "border-border bg-background",
           )}
         >
           {demo === "LOCKED_IN" && (
@@ -110,7 +110,7 @@ export function WelcomeTimerPreview() {
           )}
           <div className="relative z-10 w-full min-w-0 text-center">
             <FlipClock ms={elapsedMs} size="sm" forceHours={false} />
-            <p className="mt-3 text-xs uppercase tracking-[0.16em] text-slate-400">
+            <p className="mt-3 text-xs uppercase tracking-[0.16em] text-muted-foreground">
               {muted
                 ? "session stopped"
                 : demo === "LOCKED_IN"
@@ -156,7 +156,7 @@ export function WelcomeTimerPreview() {
               <Button
                 size="lg"
                 variant="outline"
-                className="border-slate-300 bg-slate-100 text-slate-600 hover:bg-slate-200"
+                className="border-border bg-muted text-muted-foreground hover:bg-slate-200"
                 onClick={onTapOut}
               >
                 TAP OUT

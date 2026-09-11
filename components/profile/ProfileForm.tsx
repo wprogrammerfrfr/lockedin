@@ -100,7 +100,7 @@ export function ProfileForm({ profile, disabled, onSave }: ProfileFormProps) {
           disabled={disabled}
           maxLength={280}
           rows={3}
-          className="w-full cursor-text rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
+          className="w-full cursor-text rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:border-border focus:ring-2 focus:ring-ring/40"
         />
       </div>
       <div>
@@ -110,7 +110,7 @@ export function ProfileForm({ profile, disabled, onSave }: ProfileFormProps) {
           value={timezone}
           onChange={(e) => setTimezone(e.target.value)}
           disabled={disabled}
-          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
+          className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground outline-none focus:border-border focus:ring-2 focus:ring-ring/40"
         >
           {timezones.map((tz) => (
             <option key={tz} value={tz}>
@@ -119,10 +119,10 @@ export function ProfileForm({ profile, disabled, onSave }: ProfileFormProps) {
           ))}
         </select>
       </div>
-      <Button type="submit" disabled={disabled || saving} className="rounded-xl bg-lime-500 text-slate-900 hover:bg-lime-400">
+      <Button type="submit" disabled={disabled || saving} className="rounded-xl bg-lime-500 text-foreground hover:bg-lime-400">
         {saving ? t("profile.saving") : t("profile.saveProfile")}
       </Button>
-      {message && <p className="text-xs text-slate-500">{message}</p>}
+      {message && <p className="text-xs text-muted-foreground">{message}</p>}
     </form>
   );
 }

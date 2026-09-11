@@ -77,16 +77,16 @@ export function WelcomeHeroEquation() {
         aria-hidden
       >
         <LinkedInWordmark />
-        <span className="font-display text-lg font-bold text-slate-400 sm:text-2xl lg:text-3xl">
+        <span className="font-display text-lg font-bold text-muted-foreground sm:text-2xl lg:text-3xl">
           +
         </span>
         <StravaWordmark />
-        <span className="font-display text-lg font-bold text-slate-400 sm:text-2xl lg:text-3xl">
+        <span className="font-display text-lg font-bold text-muted-foreground sm:text-2xl lg:text-3xl">
           =
         </span>
         <LockedInLogo className="text-xl tracking-tight sm:text-3xl lg:text-5xl" />
       </div>
-      <p className="mt-4 font-display text-xl font-bold tracking-tight text-slate-900 sm:text-2xl lg:text-3xl">
+      <p className="mt-4 font-display text-xl font-bold tracking-tight text-foreground sm:text-2xl lg:text-3xl">
         For everyone who needs to LOCK TF IN
       </p>
     </div>

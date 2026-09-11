@@ -98,12 +98,12 @@ export function JoinCreateBar({
 
   if (step === "name") {
     return (
-      <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
+      <div className="space-y-4 rounded-xl border border-border bg-card p-4">
         <div>
-          <p className="font-display text-base font-bold text-slate-900">
+          <p className="font-display text-base font-bold text-foreground">
             {t("room.nameSession")}
           </p>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-muted-foreground">
             {t("room.nameSessionDesc")}
           </p>
         </div>
@@ -140,7 +140,7 @@ export function JoinCreateBar({
   }
 
   return (
-    <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
+    <div className="space-y-4 rounded-xl border border-border bg-card p-4">
       <div className="flex flex-col gap-2">
         <Input
           value={code}
@@ -165,7 +165,7 @@ export function JoinCreateBar({
         </Button>
       </div>
 
-      <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.16em] text-slate-400">
+      <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
         <span className="h-px flex-1 bg-slate-200" />
         {t("common.or")}
         <span className="h-px flex-1 bg-slate-200" />

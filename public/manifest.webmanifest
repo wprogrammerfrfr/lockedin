@@ -6,7 +6,7 @@
   "start_url": "/lockin",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f8fafc",
+  "background_color": "#09090b",
   "theme_color": "#84cc16",
   "icons": [
     {

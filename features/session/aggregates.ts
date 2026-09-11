@@ -73,7 +73,7 @@ export function computePersonalRecordMs(
 ): number {
   let max = 0;
   for (const s of sessions) {
-    if (!isTerminal(s.status) && s.status !== "active") continue;
+    if (!isTerminal(s.status)) continue;
     max = Math.max(max, Number(s.active_ms) || 0);
   }
   return max;

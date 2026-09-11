@@ -8,19 +8,23 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { FocusTimer } from "@/components/session/FocusTimer";
 import { LockInHeader } from "@/components/session/LockInHeader";
 import { BreakStartDialog } from "@/components/session/BreakStartDialog";
+import { MeltBuilderDialog } from "@/components/session/MeltBuilderDialog";
+import { MeltPostActionDialog } from "@/components/session/MeltPostActionDialog";
 import { ShareCardDialog } from "@/components/session/ShareCardDialog";
 import { ActiveSessionDialog } from "@/components/session/ActiveSessionDialog";
 import { WeeklyLeaderboard } from "@/components/social/WeeklyLeaderboard";
 import { createClient } from "@/lib/supabase/client";
 import { userFacingError } from "@/lib/supabase/errors";
 import {
-  mergeLocalSessionsIntoUser,
   saveLocalSessionDraft,
   loadLocalSessionDrafts,
   finalizeActiveSessionDraft,
   clearActiveSessionDraft,
+  loadActiveSessionDraft,
+  isActiveSessionDraftStale,
 } from "@/lib/auth/merge";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import { initialState, projectBreakHistory, reducer } from "@/features/session/reducer";
 import {
   computePersonalRecordMs,
@@ -36,10 +40,11 @@ import {
 import { useDocumentSessionChrome } from "@/features/session/useDocumentSessionChrome";
 import { useSessionHotkeys } from "@/features/session/useSessionHotkeys";
 import { useSessionClock } from "@/features/session/useSessionClock";
+import { useOfflineQueueReplay } from "@/features/session/useOfflineQueueReplay";
+import { hydrateRemoteFromSessionRow } from "@/features/session/hydrate-remote";
 import {
   ActiveSessionExistsError,
   endSession,
-  heartbeatSession,
   isSessionStale,
   resumeActiveSession,
   startSession,
@@ -47,9 +52,14 @@ import {
 } from "@/features/session/sync";
 import type { SessionRow } from "@/types/database";
 import {
-  replayOfflineQueue,
-  type OfflineOp,
-} from "@/features/session/offlineQueue";
+  dessertMetadataFromState,
+  createMeltConfig,
+  type MeltConfig,
+} from "@/features/session/melt-catalog";
+import {
+  computeMeltProgress,
+  isMeltComplete,
+} from "@/features/session/melt-utils";
 
 function isFocusSession(
   session: (typeof initialState)["session"],
@@ -75,6 +85,7 @@ function sessionClientId(existing: string | null): string {
 }
 
 export default function LockInPage() {
+  const { t } = useTranslation();
   const { status, isAuthenticated, user } = useAuth();
   const authReady = status !== "loading";
   const userId = user?.id ?? null;
@@ -88,6 +99,7 @@ export default function LockInPage() {
   const [timezone, setTimezone] = useState("UTC");
   const [lastRemoteId, setLastRemoteId] = useState<string | null>(null);
   const [statsNonce, setStatsNonce] = useState(0);
+  const [meltDialogDismissed, setMeltDialogDismissed] = useState(false);
   const [breakTimerMinutes, setBreakTimerMinutes] = useState(
     loadBreakTimerMinutes,
   );
@@ -140,11 +152,20 @@ export default function LockInPage() {
 
     void (async () => {
       if (!isAuthenticated || !userId) {
-        const sessions = loadLocalSessionDrafts().map((d) => ({
-          started_at: d.endedAt,
-          active_ms: d.elapsedMs,
-          status: d.outcome === "tapout" ? "tapped_out" : "ended",
-        }));
+        const sessions = loadLocalSessionDrafts().map((d) => {
+          const endedAt = d.endedAt;
+          const activeMs = d.elapsedMs;
+          const startedAt =
+            d.startedAt ||
+            new Date(
+              new Date(endedAt).getTime() - Math.max(0, activeMs),
+            ).toISOString();
+          return {
+            started_at: startedAt,
+            active_ms: activeMs,
+            status: d.outcome === "tapout" ? "tapped_out" : "ended",
+          };
+        });
         if (cancelled) return;
         dispatch({
           type: "HYDRATE_STATS",
@@ -181,73 +202,9 @@ export default function LockInPage() {
     };
   }, [authReady, isAuthenticated, userId, timezone, state.session, statsNonce]);
 
-  useEffect(() => {
-    if (!authReady || !isAuthenticated) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const result = await mergeLocalSessionsIntoUser(createClient());
-        if (cancelled) return;
-        if (!result.ok && result.error) {
-          toast.error(userFacingError(result.error, "Could not sync guest sessions"));
-        } else if (result.merged > 0) {
-          toast.success(
-            result.merged === 1
-              ? "Synced 1 guest session"
-              : `Synced ${result.merged} guest sessions`,
-          );
-          setStatsNonce((n) => n + 1);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          toast.error(userFacingError(err, "Could not sync guest sessions"));
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [authReady, isAuthenticated]);
+  useOfflineQueueReplay(authReady, () => setStatsNonce((n) => n + 1));
 
-  useEffect(() => {
-    if (!authReady) return;
-    void replayOfflineQueue(async (op: OfflineOp) => {
-      const sb = createClient();
-      if (op.kind === "heartbeat") {
-        await heartbeatSession(sb, {
-          id: op.sessionId,
-          activeMs: op.activeMs,
-          breakMs: op.breakMs,
-          breakTypes: op.breakTypes,
-          status: op.status,
-        });
-      } else if (op.kind === "end") {
-        await endSession(sb, {
-          id: op.sessionId,
-          activeMs: op.activeMs,
-          breakMs: op.breakMs,
-          breakTypes: op.breakTypes,
-          outcome: op.outcome,
-          prBroken: op.prBroken,
-        });
-      } else {
-        await tapOutSession(sb, {
-          id: op.sessionId,
-          activeMs: op.activeMs,
-          breakMs: op.breakMs,
-          breakTypes: op.breakTypes,
-          outcome: op.outcome,
-          prBroken: op.prBroken,
-        });
-      }
-    })
-      .then((result) => {
-        if (result.replayed > 0) setStatsNonce((n) => n + 1);
-      })
-      .catch(() => undefined);
-  }, [authReady]);
-
-  // Orphan recovery: auto-end stale active sessions left by sleep / kill / crash
+  // Resume non-stale cloud sessions; only auto-end true orphans (stale)
   useEffect(() => {
     if (!authReady || !isAuthenticated) return;
     if (isFocusSession(state.session)) return;
@@ -258,7 +215,13 @@ export default function LockInPage() {
         const sb = createClient();
         const existing = await resumeActiveSession(sb);
         if (cancelled || !existing) return;
-        if (!isSessionStale(existing)) return;
+
+        if (!isSessionStale(existing)) {
+          setLastRemoteId(existing.id);
+          dispatch(hydrateRemoteFromSessionRow(existing));
+          toast.message("Resumed your session");
+          return;
+        }
 
         const activeMs = Number(existing.active_ms) || 0;
         const breakMs = Number(existing.break_ms) || 0;
@@ -273,7 +236,7 @@ export default function LockInPage() {
         } catch {
           prMs = 0;
         }
-        const prBroken = prMs > 0 && activeMs > prMs;
+        const prBroken = activeMs > prMs && activeMs > 0;
 
         await endSession(sb, {
           id: existing.id,
@@ -303,10 +266,28 @@ export default function LockInPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount/auth gate
   }, [authReady, isAuthenticated, timezone]);
 
-  // Guest: promote abandoned mid-session draft after unexpected close
+  // Guest: restore fresh mid-session draft; finalize only when stale
   useEffect(() => {
     if (!authReady || isAuthenticated) return;
     if (isFocusSession(state.session)) return;
+
+    const draft = loadActiveSessionDraft();
+    if (!draft) return;
+
+    if (!isActiveSessionDraftStale(draft) && (draft.elapsedMs || 0) > 0) {
+      dispatch({
+        type: "HYDRATE_GUEST_DRAFT",
+        sessionName: draft.sessionName,
+        elapsedMs: draft.elapsedMs,
+        breakMs: draft.breakMs,
+        breakTypesUsed: draft.breakTypesUsed,
+        personalRecordMs: draft.personalRecordMs,
+        didBreakPR: draft.didBreakPR,
+        session: (draft.breakMs || 0) > 0 ? "ON_BREAK" : "LOCKED_IN",
+      });
+      toast.message("Resumed your session");
+      return;
+    }
 
     const finished = finalizeActiveSessionDraft();
     if (finished) {
@@ -358,8 +339,7 @@ export default function LockInPage() {
           try {
             const activeMs = Number(existing.active_ms) || 0;
             const breakMs = Number(existing.break_ms) || 0;
-            const prBroken =
-              state.personalRecordMs > 0 && activeMs > state.personalRecordMs;
+            const prBroken = activeMs > state.personalRecordMs && activeMs > 0;
             await endSession(createClient(), {
               id: existing.id,
               activeMs,
@@ -411,19 +391,31 @@ export default function LockInPage() {
       saveLocalSessionDraft({
         sessionName: state.sessionName,
         elapsedMs: state.elapsedMs,
+        breakMs: state.breakMs,
         outcome,
         breakTypesUsed: state.breakTypesUsed,
+        startedAt: state.sessionStartedAt ?? undefined,
       });
     },
     [
       isAuthenticated,
       state.breakTypesUsed,
+      state.breakMs,
       state.elapsedMs,
       state.sessionName,
+      state.sessionStartedAt,
     ],
   );
 
   const onTapOut = useCallback(async () => {
+    const meta = dessertMetadataFromState(
+      state.meltConfig,
+      state.meltAnimOffsetMs,
+      state.elapsedMs,
+      state.meltComplete,
+      state.meltOutcomeAction,
+      state.meltHistory,
+    );
     if (isAuthenticated && state.remoteSessionId) {
       try {
         await tapOutSession(createClient(), {
@@ -434,6 +426,7 @@ export default function LockInPage() {
           breakHistory: projectBreakHistory(state),
           outcome: "tapout",
           prBroken: state.didBreakPR,
+          dessertMetadata: meta,
         });
         dispatch({ type: "TAP_OUT" });
       } catch (err) {
@@ -451,9 +444,22 @@ export default function LockInPage() {
     state.didBreakPR,
     state.elapsedMs,
     state.remoteSessionId,
+    state.meltConfig,
+    state.meltAnimOffsetMs,
+    state.meltComplete,
+    state.meltOutcomeAction,
+    state.meltHistory,
   ]);
 
   const onEndSession = useCallback(async () => {
+    const meta = dessertMetadataFromState(
+      state.meltConfig,
+      state.meltAnimOffsetMs,
+      state.elapsedMs,
+      state.meltComplete,
+      state.meltOutcomeAction,
+      state.meltHistory,
+    );
     if (isAuthenticated && state.remoteSessionId) {
       try {
         await endSession(createClient(), {
@@ -464,6 +470,7 @@ export default function LockInPage() {
           breakHistory: projectBreakHistory(state),
           outcome: state.didBreakPR ? "pr" : "solid",
           prBroken: state.didBreakPR,
+          dessertMetadata: meta,
         });
         setLastRemoteId(state.remoteSessionId);
         dispatch({ type: "END_SESSION" });
@@ -482,6 +489,11 @@ export default function LockInPage() {
     state.didBreakPR,
     state.elapsedMs,
     state.remoteSessionId,
+    state.meltConfig,
+    state.meltAnimOffsetMs,
+    state.meltComplete,
+    state.meltOutcomeAction,
+    state.meltHistory,
   ]);
 
   const hotkeyHandlers = useMemo(
@@ -503,6 +515,92 @@ export default function LockInPage() {
     state.session,
     state.elapsedMs,
     state.breakOpenEnded ? state.breakElapsedMs : state.breakRemainingMs,
+  );
+
+  const meltProgress = state.meltConfig
+    ? computeMeltProgress(
+        state.elapsedMs,
+        state.meltAnimOffsetMs,
+        state.meltConfig.meltDurationMs,
+        state.meltAnimSpeed,
+      )
+    : 0;
+
+  useEffect(() => {
+    if (!state.meltComplete) {
+      setMeltDialogDismissed(false);
+    }
+  }, [state.meltComplete]);
+
+  useEffect(() => {
+    const inMeltSession =
+      state.session === "LOCKED_IN" ||
+      state.session === "ON_BREAK" ||
+      state.session === "CHOOSING_BREAK";
+    if (
+      inMeltSession &&
+      state.meltConfig &&
+      !state.meltComplete &&
+      isMeltComplete(meltProgress)
+    ) {
+      dispatch({ type: "MELT_COMPLETE" });
+      toast.success(t("melt.complete.title"), {
+        description: t("melt.complete.desc"),
+      });
+    }
+  }, [
+    state.session,
+    state.meltConfig,
+    state.meltComplete,
+    meltProgress,
+    t,
+  ]);
+
+  const dessertMetadata = dessertMetadataFromState(
+    state.meltConfig,
+    state.meltAnimOffsetMs,
+    state.elapsedMs,
+    state.meltComplete,
+    state.meltOutcomeAction,
+    state.meltHistory,
+  );
+
+  const onMeltLockIn = useCallback(
+    async (config: MeltConfig) => {
+      if (!authReady) return;
+
+      if (!isAuthenticated) {
+        dispatch({ type: "LOCK_IN", sessionName: sessionNameDraft, meltConfig: config });
+        return;
+      }
+
+      const supabase = createClient();
+      const clientId = sessionClientId(state.clientId);
+
+      try {
+        const row = await startSession(supabase, {
+          sessionName: sessionNameDraft,
+          clientId,
+          dessertMetadata: { active: { config, meltProgress: 0, meltComplete: false, outcomeAction: null }, history: [] },
+        });
+        setLastRemoteId(row.id);
+        dispatch({
+          type: "LOCK_IN",
+          sessionName: sessionNameDraft,
+          remoteSessionId: row.id,
+          clientId,
+          meltConfig: config,
+        });
+      } catch (err) {
+        if (err instanceof ActiveSessionExistsError) {
+          setConflictSession(err.existing);
+          setConflictOpen(true);
+          return;
+        }
+        toast.error(userFacingError(err, "Could not start melt session"));
+      }
+    },
+    [authReady, isAuthenticated, sessionNameDraft, state.clientId],
   );
 
   const shareDuration =
@@ -539,7 +637,10 @@ export default function LockInPage() {
         <FocusTimer
           state={state.session}
           elapsedMs={state.elapsedMs}
-          todayTotalMs={state.todayTotalMs}
+          todayTotalMs={
+            state.todayTotalMs +
+            (state.session === "LOCKED_IN" ? state.elapsedMs : 0)
+          }
           personalRecordMs={state.personalRecordMs}
           didBreakPR={state.didBreakPR}
           breakRemainingMs={state.breakRemainingMs}
@@ -567,6 +668,99 @@ export default function LockInPage() {
           onShare={() => dispatch({ type: "OPEN_SHARE" })}
           onClearPrBurst={() => dispatch({ type: "CLEAR_PR_BURST" })}
           lockInDisabled={!authReady}
+          meltConfig={state.meltConfig}
+          meltProgress={meltProgress}
+          meltAnimSpeed={state.meltAnimSpeed}
+          meltComplete={state.meltComplete}
+          onMeltIt={() => dispatch({ type: "OPEN_MELT_BUILDER" })}
+          onSpeedUpMelt={() =>
+            dispatch({
+              type: "SET_MELT_ANIM_SPEED",
+              speed: state.meltAnimSpeed >= 120 ? 1 : state.meltAnimSpeed * 4,
+            })
+          }
+        />
+
+        <MeltBuilderDialog
+          open={state.meltBuilderOpen}
+          onClose={() => dispatch({ type: "CLOSE_MELT_BUILDER" })}
+          onMeltIt={(config) => {
+            void onMeltLockIn(config);
+          }}
+          variant="solo"
+        />
+
+        <MeltPostActionDialog
+          open={
+            state.meltComplete &&
+            Boolean(state.meltConfig) &&
+            !meltDialogDismissed
+          }
+          config={state.meltConfig ?? createMeltConfig({ kind: "iceCream" })}
+          onAction={(action) => {
+            if (action === "refreeze_restart") {
+              const prevElapsed = state.elapsedMs;
+              const prevId = state.remoteSessionId;
+              const prevBreak = state.breakMs;
+              const prevTypes = state.breakTypesUsed;
+              const prevHistory = projectBreakHistory(state);
+              const prevMeta = dessertMetadataFromState(
+                state.meltConfig,
+                state.meltAnimOffsetMs,
+                prevElapsed,
+                true,
+                "refreeze_restart",
+                state.meltHistory,
+              );
+              const meltConfig = state.meltConfig;
+              dispatch({ type: "MELT_POST_ACTION", action });
+              if (isAuthenticated && prevId && meltConfig) {
+                void (async () => {
+                  try {
+                    await endSession(createClient(), {
+                      id: prevId,
+                      activeMs: prevElapsed,
+                      breakMs: prevBreak,
+                      breakTypes: prevTypes,
+                      breakHistory: prevHistory,
+                      outcome: "solid",
+                      prBroken: false,
+                      dessertMetadata: prevMeta,
+                    });
+                    const clientId = sessionClientId(state.clientId);
+                    const row = await startSession(createClient(), {
+                      sessionName: state.sessionName,
+                      clientId,
+                      dessertMetadata: {
+                        active: {
+                          config: meltConfig,
+                          meltProgress: 0,
+                          meltComplete: false,
+                          outcomeAction: null,
+                        },
+                        history: [],
+                      },
+                    });
+                    setLastRemoteId(row.id);
+                    dispatch({
+                      type: "LOCK_IN",
+                      sessionName: state.sessionName ?? undefined,
+                      remoteSessionId: row.id,
+                      clientId,
+                      meltConfig,
+                    });
+                  } catch (err) {
+                    toast.error(
+                      userFacingError(err, "Could not restart melt session"),
+                    );
+                  }
+                })();
+              }
+              return;
+            }
+            dispatch({ type: "MELT_POST_ACTION", action });
+          }}
+          onDismiss={() => setMeltDialogDismissed(true)}
         />
 
         <BreakStartDialog
@@ -608,6 +802,7 @@ export default function LockInPage() {
           breakHistory: state.breakHistory,
           outcome: shareOutcome,
           prBroken: state.didBreakPR,
+          dessertMetadata,
         }}
       />
 
@@ -619,16 +814,7 @@ export default function LockInPage() {
           if (!conflictSession) return;
           setConflictOpen(false);
           setLastRemoteId(conflictSession.id);
-          dispatch({
-            type: "HYDRATE_REMOTE",
-            remoteSessionId: conflictSession.id,
-            clientId: conflictSession.client_id,
-            elapsedMs: Number(conflictSession.active_ms) || 0,
-            sessionName: conflictSession.session_name,
-            startedAt: conflictSession.started_at,
-            session:
-              conflictSession.status === "on_break" ? "ON_BREAK" : "LOCKED_IN",
-          });
+          dispatch(hydrateRemoteFromSessionRow(conflictSession));
         }}
         onTapOut={async () => {
           if (!conflictSession) return;

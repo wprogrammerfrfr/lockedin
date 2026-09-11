@@ -44,7 +44,7 @@ export function ProfileSearch() {
   return (
     <div className="space-y-3">
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -53,11 +53,11 @@ export function ProfileSearch() {
         />
       </div>
       {status !== "loading" && !isAuthenticated && (
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-muted-foreground">
           Sign in to search students.
         </p>
       )}
-      {loading && <p className="text-xs text-slate-400">Searching…</p>}
+      {loading && <p className="text-xs text-muted-foreground">Searching…</p>}
       <ul className="space-y-2">
         {hits.map((h) => {
           const url = publicAvatarUrl(h.avatar_path);
@@ -65,20 +65,20 @@ export function ProfileSearch() {
             <li key={h.id}>
               <Link
                 href={`/u/${h.username}`}
-                className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 hover:bg-slate-50"
+                className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-2 hover:bg-background"
               >
                 <Avatar className="h-9 w-9 rounded-xl">
                   {url ? <AvatarImage src={url} alt="" /> : null}
-                  <AvatarFallback className="rounded-xl bg-slate-100 text-xs">
+                  <AvatarFallback className="rounded-xl bg-muted text-xs">
                     {h.username.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0">
-                  <p className="truncate font-display text-sm font-semibold text-slate-800">
+                  <p className="truncate font-display text-sm font-semibold text-foreground">
                     @{h.username}
                   </p>
                   {h.bio ? (
-                    <p className="truncate text-xs text-slate-500">{h.bio}</p>
+                    <p className="truncate text-xs text-muted-foreground">{h.bio}</p>
                   ) : null}
                 </div>
               </Link>

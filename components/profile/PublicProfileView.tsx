@@ -94,9 +94,6 @@ export function PublicProfileView({
         const status = await getFollowRelation(createClient(), profileId);
         if (!cancelled) {
           setFollowStatus(status);
-          setTheyFollowYou(
-            status === "pending_incoming" || status === "none",
-          );
           // Check inbound accepted for follow-back when status is none
           if (status === "none" || status === "rejected") {
             const { data } = await createClient()
@@ -107,7 +104,9 @@ export function PublicProfileView({
               .eq("status", "accepted")
               .maybeSingle();
             if (!cancelled) setTheyFollowYou(Boolean(data));
-          } else if (status === "accepted") {
+          } else if (status === "pending_incoming") {
+            setTheyFollowYou(true);
+          } else {
             setTheyFollowYou(false);
           }
         }
@@ -132,7 +131,7 @@ export function PublicProfileView({
 
   return (
     <>
-      <Card className="border-slate-200 bg-white">
+      <Card className="border-border bg-card">
         <CardContent className="flex flex-col gap-5 p-6 sm:flex-row sm:items-start">
           <ProfileHeroAvatar
             name={username}
@@ -142,17 +141,17 @@ export function PublicProfileView({
           <div className="min-w-0 flex-1 space-y-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h1 className="font-display text-2xl font-bold text-slate-900">
+                <h1 className="font-display text-2xl font-bold text-foreground">
                   {username}
                 </h1>
-                <p className="text-sm text-slate-500">@{username}</p>
+                <p className="text-sm text-muted-foreground">@{username}</p>
                 {bio ? (
-                  <p className="mt-2 text-sm text-slate-600">{bio}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">{bio}</p>
                 ) : null}
                 <div className="mt-2">
                   <Badge
                     variant="outline"
-                    className="rounded-lg border-slate-200 text-xs"
+                    className="rounded-lg border-border text-xs"
                   >
                     {githubVerified
                       ? "GitHub Verified ✓"
@@ -191,7 +190,7 @@ export function PublicProfileView({
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="h-8 rounded-lg text-xs text-slate-500"
+                        className="h-8 rounded-lg text-xs text-muted-foreground"
                         onClick={() => setReportOpen(true)}
                       >
                         <Flag className="mr-1 h-3.5 w-3.5" />

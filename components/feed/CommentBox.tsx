@@ -98,9 +98,9 @@ export function CommentBox({ postId }: { postId: string }) {
   return (
     <div className="space-y-3 border-t border-slate-100 pt-3">
       {loading ? (
-        <p className="text-xs text-slate-400">Loading comments…</p>
+        <p className="text-xs text-muted-foreground">Loading comments…</p>
       ) : comments.length === 0 ? (
-        <p className="text-xs text-slate-400">No comments yet.</p>
+        <p className="text-xs text-muted-foreground">No comments yet.</p>
       ) : (
         <ul className="max-h-48 space-y-2.5 overflow-y-auto">
           {comments.map((c) => {
@@ -110,28 +110,28 @@ export function CommentBox({ postId }: { postId: string }) {
               <li key={c.id} className="flex gap-2">
                 <Avatar className="mt-0.5 h-7 w-7 shrink-0 rounded-lg">
                   {url ? <AvatarImage src={url} alt="" /> : null}
-                  <AvatarFallback className="rounded-lg bg-slate-100 text-[10px]">
+                  <AvatarFallback className="rounded-lg bg-muted text-[10px]">
                     {name.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-slate-700">
+                  <p className="text-xs text-foreground">
                     <Link
                       href={`/u/${name}`}
-                      className="font-semibold text-slate-900 hover:underline"
+                      className="font-semibold text-foreground hover:underline"
                     >
                       @{name}
                     </Link>{" "}
-                    <span className="text-slate-600">{c.body}</span>
+                    <span className="text-muted-foreground">{c.body}</span>
                   </p>
-                  <p className="mt-0.5 text-[10px] text-slate-400">
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">
                     {relativeTime(c.created_at)}
                   </p>
                 </div>
                 {user?.id === c.user_id ? (
                   <button
                     type="button"
-                    className="shrink-0 rounded-lg p-1 text-slate-300 hover:bg-slate-50 hover:text-rose-500"
+                    className="shrink-0 rounded-lg p-1 text-slate-300 hover:bg-background hover:text-rose-500"
                     aria-label="Delete comment"
                     onClick={() => {
                       void deleteComment(createClient(), c.id)

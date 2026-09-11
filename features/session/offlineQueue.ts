@@ -14,12 +14,16 @@ export type OfflineOp =
       activeMs: number;
       breakMs: number;
       breakTypes: unknown;
+      breakHistory?: unknown;
       outcome: string;
       prBroken: boolean;
+      dessertMetadata?: unknown;
       at: number;
     };
 
 const STORAGE_KEY = "lockedin.offlineQueue";
+const LOCK_KEY = "lockedin.offlineQueue.lock";
+const LOCK_TTL_MS = 15_000;
 
 export function isLikelyOffline() {
   return typeof navigator !== "undefined" && navigator.onLine === false;
@@ -39,7 +43,36 @@ function readQueue(): OfflineOp[] {
 
 function writeQueue(ops: OfflineOp[]) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(ops));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(ops));
+  } catch {
+    // Safari private browsing and storage pressure can reject localStorage.
+  }
+}
+
+function tryAcquireReplayLock(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    const raw = localStorage.getItem(LOCK_KEY);
+    const now = Date.now();
+    if (raw) {
+      const ts = Number(raw);
+      if (Number.isFinite(ts) && now - ts < LOCK_TTL_MS) return false;
+    }
+    localStorage.setItem(LOCK_KEY, String(now));
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+function releaseReplayLock() {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(LOCK_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 export async function enqueueOfflineOp(op: OfflineOp) {
@@ -60,21 +93,31 @@ export function clearOfflineQueue() {
 export async function replayOfflineQueue(
   run: (op: OfflineOp) => Promise<void>,
 ) {
-  const q = readQueue();
-  if (q.length === 0) return { replayed: 0 };
+  if (!tryAcquireReplayLock()) return { replayed: 0, remaining: readQueue().length };
 
-  const remaining: OfflineOp[] = [];
-  let replayed = 0;
+  try {
+    const q = readQueue();
+    if (q.length === 0) return { replayed: 0 };
 
-  for (const op of q) {
-    try {
-      await run(op);
-      replayed += 1;
-    } catch {
-      remaining.push(op);
+    // Clear the snapshot first. If a replay discovers that the device is still
+    // offline, sync.ts will enqueue a fresh copy that must not be overwritten.
+    writeQueue([]);
+    const remaining: OfflineOp[] = [];
+    let replayed = 0;
+
+    for (const op of q) {
+      try {
+        await run(op);
+        replayed += 1;
+      } catch {
+        remaining.push(op);
+      }
     }
-  }
 
-  writeQueue(remaining);
-  return { replayed, remaining: remaining.length };
+    const requeued = readQueue();
+    writeQueue([...remaining, ...requeued]);
+    return { replayed, remaining: remaining.length + requeued.length };
+  } finally {
+    releaseReplayLock();
+  }
 }

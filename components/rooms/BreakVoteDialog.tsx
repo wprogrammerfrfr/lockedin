@@ -52,7 +52,7 @@ export function BreakVoteDialog({
   return (
     <Dialog open={open} onOpenChange={() => undefined}>
       <DialogContent
-        className="max-w-sm border-slate-200 bg-white"
+        className="max-w-sm border-border bg-card"
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
@@ -61,10 +61,10 @@ export function BreakVoteDialog({
           <DialogDescription>{t("room.breakVoteDesc")}</DialogDescription>
         </DialogHeader>
 
-        <p className="font-mono text-center text-2xl tabular-nums text-slate-800">
+        <p className="font-mono text-center text-2xl tabular-nums text-foreground">
           {left}s
         </p>
-        <p className="text-center text-xs text-slate-500">
+        <p className="text-center text-xs text-muted-foreground">
           {t("room.voteTally", { bet: tallies.break, stay: tallies.stay })}
           {youVoteLabel}
         </p>
@@ -87,7 +87,7 @@ export function BreakVoteDialog({
             onClick={() => onVote("stay")}
           >
             <span className="font-display text-base font-bold">{t("room.nah")}</span>
-            <span className="text-[11px] font-medium normal-case tracking-normal text-slate-500">
+            <span className="text-[11px] font-medium normal-case tracking-normal text-muted-foreground">
               {t("room.stayLockedIn")}
             </span>
           </Button>
@@ -95,7 +95,7 @@ export function BreakVoteDialog({
         {canCancel ? (
           <Button
             variant="ghost"
-            className="w-full rounded-xl text-slate-500"
+            className="w-full rounded-xl text-muted-foreground"
             onClick={() => onCancel?.()}
           >
             {t("room.cancelVote")}
