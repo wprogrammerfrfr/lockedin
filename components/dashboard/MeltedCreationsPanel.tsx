@@ -1,64 +1,96 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MeltPreviewIcon } from "@/components/session/MeltScene";
-import type { DessertMetadata, MeltPostAction, MeltRecord } from "@/features/session/melt-catalog";
-import { meltSummaryLine } from "@/features/session/melt-utils";
+import { MeltScene } from "@/components/session/MeltScene";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import type {
+  DessertMetadata,
+  MeltRecord,
+} from "@/features/session/melt-catalog";
 import { createClient } from "@/lib/supabase/client";
 import { useTranslation } from "@/lib/i18n/LocaleProvider";
 
 type MeltHistoryRow = {
   id: string;
-  session_name?: string | null;
-  active_ms?: number;
-  started_at?: string;
+  started_at?: string | null;
+  ended_at?: string | null;
   dessert_metadata?: DessertMetadata | null;
 };
 
-function collectMeltRecords(sessions: MeltHistoryRow[]): MeltRecord[] {
-  const out: MeltRecord[] = [];
+type MeltCardRecord = MeltRecord & { displayDate?: string };
+
+function collectMeltRecords(sessions: MeltHistoryRow[]): MeltCardRecord[] {
+  const out: MeltCardRecord[] = [];
   for (const s of sessions) {
     const meta = s.dessert_metadata;
     if (!meta) continue;
-    if (meta.active?.config) out.push(meta.active);
-    if (Array.isArray(meta.history)) out.push(...meta.history);
+    const sessionDate = s.ended_at || s.started_at || undefined;
+    if (meta.active?.config) {
+      out.push({
+        ...meta.active,
+        displayDate: meta.active.completedAt || sessionDate,
+      });
+    }
+    if (Array.isArray(meta.history)) {
+      for (const rec of meta.history) {
+        out.push({
+          ...rec,
+          displayDate: rec.completedAt || sessionDate,
+        });
+      }
+    }
   }
   return out.sort((a, b) => {
-    const at = a.completedAt ?? "";
-    const bt = b.completedAt ?? "";
+    const at = a.displayDate ?? a.completedAt ?? "";
+    const bt = b.displayDate ?? b.completedAt ?? "";
     return bt.localeCompare(at);
   });
 }
 
-function outcomeLabel(
-  action: MeltPostAction | null | undefined,
-  t: (key: string) => string,
-): string | null {
-  if (!action) return null;
-  if (action === "trash") return t("melt.postAction.trash");
-  if (action === "refreeze") return t("melt.postAction.refreeze");
-  if (action === "refreeze_restart") return t("melt.postAction.refreezeRestart");
-  return action;
+function formatMeltDate(iso?: string): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(d);
 }
 
-export function MeltedCreationsPanel({ userId }: { userId: string | null }) {
+export function MeltedCreationsDialog({
+  userId,
+  open,
+  onOpenChange,
+}: {
+  userId: string | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const { t } = useTranslation();
-  const [records, setRecords] = useState<MeltRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [records, setRecords] = useState<MeltCardRecord[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!userId) {
-      setRecords([]);
-      setLoading(false);
+    if (!open || !userId) {
+      if (!open) {
+        setRecords([]);
+        setLoading(false);
+      }
       return;
     }
     let cancelled = false;
+    setLoading(true);
     void (async () => {
       try {
         const { data, error } = await createClient()
           .from("sessions")
-          .select("id, dessert_metadata")
+          .select("id, started_at, ended_at, dessert_metadata")
           .eq("user_id", userId)
           .in("status", ["ended", "tapped_out"])
           .order("started_at", { ascending: false })
@@ -72,6 +104,8 @@ export function MeltedCreationsPanel({ userId }: { userId: string | null }) {
           collectMeltRecords(
             (data ?? []).map((row) => ({
               id: row.id as string,
+              started_at: row.started_at as string | null,
+              ended_at: (row as { ended_at?: string | null }).ended_at ?? null,
               dessert_metadata: row.dessert_metadata as DessertMetadata | null,
             })),
           ),
@@ -85,57 +119,62 @@ export function MeltedCreationsPanel({ userId }: { userId: string | null }) {
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [open, userId]);
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm text-muted-foreground">
-          {t("melt.dashboard.title")}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <p className="text-sm text-muted-foreground">{t("melt.dashboard.loading")}</p>
-        ) : records.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("melt.dashboard.empty")}</p>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {records.slice(0, 12).map((rec, i) => (
-              <div
-                key={`${rec.config.displayName}-${rec.completedAt ?? i}-${i}`}
-                className="flex items-center gap-3 rounded-xl border border-border bg-background p-3"
-              >
-                <MeltPreviewIcon
-                  config={rec.config}
-                  progress={rec.meltProgress}
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-foreground">
-                    {rec.config.displayName}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {meltSummaryLine(rec.config, rec.meltComplete, t)}
-                  </p>
-                  <p className="mt-0.5 font-mono text-[10px] tabular-nums text-lime-700">
-                    {Math.round(rec.meltProgress * 100)}%
-                  </p>
-                  {rec.outcomeAction ? (
-                    <p className="mt-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                      {outcomeLabel(rec.outcomeAction, t)}
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        {records.length > 0 ? (
-          <p className="mt-3 text-[10px] text-muted-foreground">
-            {t("melt.dashboard.count", { count: records.length })}
-          </p>
-        ) : null}
-      </CardContent>
-    </Card>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[min(90dvh,52rem)] max-w-3xl flex-col gap-3 overflow-hidden border-border bg-card">
+        <DialogHeader className="shrink-0">
+          <DialogTitle>{t("melt.dashboard.title")}</DialogTitle>
+        </DialogHeader>
+
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-0.5">
+          {loading ? (
+            <p className="text-sm text-muted-foreground">
+              {t("melt.dashboard.loading")}
+            </p>
+          ) : records.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {t("melt.dashboard.empty")}
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {records.slice(0, 12).map((rec, i) => {
+                const dateLabel = formatMeltDate(rec.displayDate);
+                return (
+                  <div
+                    key={`${rec.config.displayName}-${rec.displayDate ?? i}-${i}`}
+                    className="relative flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-amber-200 via-yellow-100 to-orange-100 p-5 text-slate-900 shadow-soft [color-scheme:light]"
+                  >
+                    <div className="flex flex-col items-center gap-3 text-center">
+                      <MeltScene
+                        config={rec.config}
+                        progress={rec.meltProgress}
+                        size="sm"
+                        animated={false}
+                        className="pointer-events-none"
+                      />
+                      <p className="font-display text-sm font-bold tracking-tight text-slate-900 sm:text-base">
+                        {rec.config.displayName}
+                      </p>
+                    </div>
+                    {dateLabel ? (
+                      <p className="mt-4 self-end text-[10px] font-semibold tabular-nums text-slate-800/80">
+                        {dateLabel}
+                      </p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {!loading && records.length > 0 ? (
+            <p className="mt-3 text-[10px] text-muted-foreground">
+              {t("melt.dashboard.count", { count: records.length })}
+            </p>
+          ) : null}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

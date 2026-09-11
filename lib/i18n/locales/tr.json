@@ -371,6 +371,7 @@
   "melt.room.fillingIce": "Buz dolduruluyor",
   "melt.receipt.historyCount": "Bu oturumda {count} erime",
   "melt.dashboard.title": "Erilmiş Tatlılar",
+  "melt.dashboard.open": "Erilmiş Tatlılar",
   "melt.dashboard.empty": "Henüz yok — zamanlayıcıda MELT IT'e bas.",
   "melt.dashboard.loading": "Yükleniyor…",
   "melt.dashboard.count": "Toplam {count} kayıt",

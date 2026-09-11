@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarDays, List } from "lucide-react";
+import { CalendarDays, IceCreamCone, List } from "lucide-react";
 import { toast } from "sonner";
 import {
   DaySessionsDialog,
   SessionDetailDialog,
   SessionListRow,
 } from "@/components/dashboard/DaySessionsDialog";
+import { MeltedCreationsDialog } from "@/components/dashboard/MeltedCreationsPanel";
 import { MyLockInsTitle } from "@/components/brand/LockedInLogo";
 import { ContributionHeatmap } from "@/components/profile/ContributionHeatmap";
 import { Button } from "@/components/ui/button";
@@ -92,6 +93,8 @@ export function SessionHistoryPanel({
   /** When omitted, shows logo-style "My Lock ins". Pass a string for public profiles. */
   title,
   subtitle,
+  /** Owner dashboard only — opens Melted Creations dialog. Omit on public profiles. */
+  meltedCreationsUserId = null,
 }: {
   username: string | null;
   timezone: string;
@@ -102,6 +105,7 @@ export function SessionHistoryPanel({
   unavailable?: boolean;
   title?: string;
   subtitle?: string;
+  meltedCreationsUserId?: string | null;
 }) {
   const { t } = useTranslation();
   const [view, setView] = useState<HistoryView>("calendar");
@@ -117,6 +121,7 @@ export function SessionHistoryPanel({
   const [listHasMore, setListHasMore] = useState(false);
   const [listFromHeatmap, setListFromHeatmap] = useState(false);
   const [detail, setDetail] = useState<ProfileDaySession | null>(null);
+  const [meltOpen, setMeltOpen] = useState(false);
 
   useEffect(() => {
     setView(readStoredView());
@@ -276,6 +281,18 @@ export function SessionHistoryPanel({
                 {subtitle ?? t("dash.historySubtitle")}
               </p>
             </div>
+            {meltedCreationsUserId && !locked ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0 gap-1.5 rounded-xl border-border"
+                onClick={() => setMeltOpen(true)}
+              >
+                <IceCreamCone className="h-3.5 w-3.5" />
+                {t("melt.dashboard.open")}
+              </Button>
+            ) : null}
           </div>
         </CardHeader>
         <CardContent>
@@ -404,6 +421,14 @@ export function SessionHistoryPanel({
         timeZone={tz}
         canShare={canShare}
       />
+
+      {meltedCreationsUserId ? (
+        <MeltedCreationsDialog
+          userId={meltedCreationsUserId}
+          open={meltOpen}
+          onOpenChange={setMeltOpen}
+        />
+      ) : null}
     </>
   );
 }

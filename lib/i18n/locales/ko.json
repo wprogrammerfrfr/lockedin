@@ -371,6 +371,7 @@
   "melt.room.fillingIce": "얼음 채우는 중",
   "melt.receipt.historyCount": "이번 세션에서 {count}개 녹임",
   "melt.dashboard.title": "녹인 작품",
+  "melt.dashboard.open": "녹인 작품",
   "melt.dashboard.empty": "아직 없음 — 타이머에서 MELT IT를 눌러보세요.",
   "melt.dashboard.loading": "불러오는 중…",
   "melt.dashboard.count": "총 {count}개 저장됨",

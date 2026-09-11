@@ -5,7 +5,6 @@ import { ChromePage } from "@/components/layout/ChromePage";
 import { AuthGateModal } from "@/components/auth/AuthGateModal";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { SessionHistoryPanel } from "@/components/dashboard/SessionHistoryPanel";
-import { MeltedCreationsPanel } from "@/components/dashboard/MeltedCreationsPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CountUp } from "@/components/ui/count-up";
 import { formatMs, formatTotalHours } from "@/features/session/format";
@@ -202,17 +201,15 @@ export default function DashboardPage() {
         </div>
 
         {isAuthenticated ? (
-          <>
-            <MeltedCreationsPanel userId={userId} />
-            <SessionHistoryPanel
+          <SessionHistoryPanel
             username={username}
             timezone={timeZone}
             heatmapDays={heatmapDays}
             canShare
             emptyHint
             unavailable={unavailable}
+            meltedCreationsUserId={userId}
           />
-          </>
         ) : (
           <Card className="border-border bg-card">
             <CardContent className="py-8 text-center text-sm text-muted-foreground">

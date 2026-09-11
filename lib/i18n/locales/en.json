@@ -374,6 +374,7 @@
   "melt.room.fillingIce": "Filling up ice",
   "melt.receipt.historyCount": "{count} melted creation(s) this session",
   "melt.dashboard.title": "Melted Creations",
+  "melt.dashboard.open": "Melted Creations",
   "melt.dashboard.empty": "No melted desserts yet — hit MELT IT on the timer.",
   "melt.dashboard.loading": "Loading melted creations…",
   "melt.dashboard.count": "{count} total melted creations saved",

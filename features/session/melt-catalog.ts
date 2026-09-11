@@ -292,6 +292,7 @@ export function dessertMetadataFromState(
         meltProgress: progress,
         meltComplete,
         outcomeAction: meltOutcomeAction,
+        completedAt: new Date().toISOString(),
       }
     : null;
 
