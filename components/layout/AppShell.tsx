@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Menu } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ClaimUsernameDialog } from "@/components/auth/ClaimUsernameDialog";
 import { LockedInLogo } from "@/components/brand/LockedInLogo";
@@ -41,9 +42,11 @@ export function AppShell({
   sidebarFooter,
 }: AppShellProps) {
   const { status, user } = useAuth();
+  const pathname = usePathname();
   const showSidebar = layoutMode === "chrome";
   const showIdleLeft = layoutMode === "chrome" && Boolean(idleLeft);
   const showPresence = layoutMode === "room-focus" && Boolean(presence);
+  const animatePageChrome = layoutMode === "chrome";
   const tzUserId = useRef<string | null>(null);
   const [navOpen, setNavOpen] = useState(false);
   const [presenceOpen, setPresenceOpen] = useState(false);
@@ -192,7 +195,7 @@ export function AppShell({
             layoutMode === "solo-focus"
               ? "flex min-h-0 items-start justify-center overflow-y-auto px-3 py-4 sm:items-center sm:px-6"
               : layoutMode === "room-focus"
-                ? "flex min-h-0 flex-col overflow-y-auto overscroll-none px-0 py-0"
+                ? "flex min-h-0 flex-col overflow-y-auto px-0 py-0"
                 : "overflow-y-auto px-4 py-6 sm:px-6 lg:px-8 lg:py-8",
           )}
           style={
@@ -222,7 +225,7 @@ export function AppShell({
               layoutMode === "solo-focus"
                 ? "max-w-6xl scale-100"
                 : layoutMode === "room-focus"
-                  ? "flex min-h-0 w-full max-w-6xl flex-1 flex-col"
+                  ? "w-full max-w-6xl"
                   : "max-w-6xl",
             )}
           >
@@ -240,7 +243,21 @@ export function AppShell({
                 )}
               </button>
             )}
-            {children}
+            {animatePageChrome ? (
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={pathname}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={springSoft}
+                >
+                  {children}
+                </motion.div>
+              </AnimatePresence>
+            ) : (
+              children
+            )}
           </motion.div>
         </main>
 

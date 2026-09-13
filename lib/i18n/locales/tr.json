@@ -391,7 +391,6 @@
   "melt.complete.desc": "Çöpe at, yeniden dondur veya devam et.",
   "melt.timer.chipLabel": "Geçen {elapsed}, %{percent} eridi",
   "melt.timer.meltsIn": "%{percent} · {time} içinde erir",
-  "melt.room.boardTitle": "Erime Panosu",
   "melt.room.emptySeat": "boş koltuk",
   "melt.room.tableEmpty": "biri erittiğinde tatlılar görünür",
   "melt.room.building": "hazırlanıyor…",

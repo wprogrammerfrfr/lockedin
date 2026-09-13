@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { motion } from "framer-motion";
 import { LogIn, PanelLeft, PanelLeftClose } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { LockedInLogo } from "@/components/brand/LockedInLogo";
 import { NAV_ITEMS, navTabFromPathname } from "@/components/layout/nav";
+import { springSoft } from "@/components/session/state-accent";
 import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -181,24 +183,33 @@ export function Sidebar({
               href={item.href}
               onClick={onNavigate}
               className={cn(
-                "flex items-center gap-3 rounded-xl px-3 py-3 font-display text-sm font-semibold transition-colors",
+                "relative flex items-center gap-3 rounded-xl px-3 py-3 font-display text-sm font-semibold transition-colors",
                 compact ? "justify-center" : "justify-start",
                 active
-                  ? "bg-muted text-emerald-700 shadow-soft dark:text-lime-400"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  ? "text-emerald-700 dark:text-lime-400"
+                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
               )}
               aria-current={active ? "page" : undefined}
               title={compact ? label : undefined}
             >
+              {active ? (
+                <motion.span
+                  layoutId={
+                    variant === "drawer" ? "nav-active-drawer" : "nav-active"
+                  }
+                  className="absolute inset-0 rounded-xl bg-muted shadow-soft"
+                  transition={springSoft}
+                />
+              ) : null}
               <Icon
                 className={cn(
-                  "h-5 w-5 shrink-0",
+                  "relative z-10 h-5 w-5 shrink-0",
                   active
                     ? "text-emerald-600 dark:text-lime-400"
                     : "text-muted-foreground",
                 )}
               />
-              {!compact && <span>{label}</span>}
+              {!compact && <span className="relative z-10">{label}</span>}
             </Link>
           );
         })}

@@ -11,7 +11,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Copy } from "lucide-react";
+import { Copy, IceCreamCone } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { LockedInLogo } from "@/components/brand/LockedInLogo";
 import { FocusTimer } from "@/components/session/FocusTimer";
@@ -985,7 +985,7 @@ export default function RoomFocusPage({
         />
       }
     >
-      <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-3">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-3">
         {room?.status === "closing" && secondsLeft != null && (
           <ClosingBanner secondsLeft={secondsLeft} />
         )}
@@ -1022,6 +1022,21 @@ export default function RoomFocusPage({
                 </p>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
+                {(state.session === "IDLE" ||
+                  state.session === "TAPPED_OUT" ||
+                  state.session === "ENDED") && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 rounded-lg border-amber-300 bg-amber-50 px-2.5 font-display text-xs font-bold text-amber-900 hover:bg-amber-100 disabled:opacity-50 sm:h-9 sm:rounded-xl sm:px-3 sm:text-sm dark:border-amber-400/40 dark:bg-amber-400/15 dark:text-amber-300 dark:hover:bg-amber-400/25"
+                    onClick={() => dispatch({ type: "OPEN_MELT_BUILDER" })}
+                    disabled={status === "loading"}
+                  >
+                    <IceCreamCone className="mr-1 h-3.5 w-3.5 sm:mr-1.5" />
+                    {t("melt.action.meltIt")}
+                  </Button>
+                )}
                 <Button
                   type="button"
                   variant="outline"

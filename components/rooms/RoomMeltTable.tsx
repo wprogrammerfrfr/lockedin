@@ -162,6 +162,10 @@ function DessertOnTable({
   const [dragPos, setDragPos] = useState<{ x: number; z: number } | null>(null);
   const dragPosRef = useRef<{ x: number; z: number } | null>(null);
   const lastEmitRef = useRef(0);
+  const [hovered, setHovered] = useState(false);
+  const [pinnedName, setPinnedName] = useState(false);
+  const pressOriginRef = useRef<{ x: number; y: number } | null>(null);
+  const movedRef = useRef(false);
 
   const clock = memberDisplayClock(member, now, selfLive);
   const progress = computeMeltProgress(
@@ -217,6 +221,8 @@ function DessertOnTable({
   );
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    pressOriginRef.current = { x: e.clientX, y: e.clientY };
+    movedRef.current = false;
     if (!isSelf || !onBoardPosChange) return;
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -228,6 +234,12 @@ function DessertOnTable({
   };
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const origin = pressOriginRef.current;
+    if (origin) {
+      const dx = e.clientX - origin.x;
+      const dy = e.clientY - origin.y;
+      if (dx * dx + dy * dy > 36) movedRef.current = true;
+    }
     if (!dragging || !isSelf) return;
     const next = pointerToBoard(e.clientX, e.clientY);
     if (!next) return;
@@ -241,21 +253,27 @@ function DessertOnTable({
   };
 
   const endDrag = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!dragging) return;
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch {
-      /* already released */
+    if (dragging) {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {
+        /* already released */
+      }
+      const finalPos = dragPosRef.current ?? { x: baseX, z: baseZ };
+      setDragging(false);
+      onBoardPosChange?.(finalPos.x, finalPos.z);
     }
-    const finalPos = dragPosRef.current ?? { x: baseX, z: baseZ };
-    setDragging(false);
-    onBoardPosChange?.(finalPos.x, finalPos.z);
+    // Tap toggles dessert name; ignore if the pointer moved (drag).
+    if (!movedRef.current) {
+      setPinnedName((v) => !v);
+    }
+    pressOriginRef.current = null;
+    movedRef.current = false;
   };
 
-  const caption = t("melt.room.placeCaption", {
-    username: member.username,
-    dessert: config.displayName,
-  });
+  const showDessertName = hovered || pinnedName;
+  const label = showDessertName ? config.displayName : member.username;
+  const ariaLabel = `${member.username} — ${config.displayName}`;
 
   // Self always animated; others get FX when ≤2 desserts; larger LOD for room board.
   const sceneAnimated = isSelf || meltingCount <= 2;
@@ -270,7 +288,7 @@ function DessertOnTable({
       transition={springSoft}
       className={cn(
         "absolute -translate-x-1/2",
-        isSelf && onBoardPosChange && "cursor-grab touch-none",
+        isSelf && onBoardPosChange ? "cursor-grab touch-none" : "cursor-pointer",
         dragging && "cursor-grabbing z-30",
       )}
       style={{
@@ -283,12 +301,15 @@ function DessertOnTable({
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
+      aria-label={ariaLabel}
     >
       {/* Scoop sits on the slab; captions overlay the apron below the contact. */}
       <div className="relative flex w-full flex-col items-center">
         <div
           className="relative flex aspect-square w-full items-end justify-center overflow-visible"
-          title={isSelf ? t("melt.room.dragHint") : undefined}
+          title={isSelf ? t("melt.room.dragHint") : config.displayName}
         >
           <MeltScene
             config={config}
@@ -302,9 +323,20 @@ function DessertOnTable({
           className="pointer-events-none absolute top-full left-1/2 mt-0.5 -translate-x-1/2 text-center"
           style={{ width: Math.max(dessertPx, 72), maxWidth: dessertPx * 1.15 }}
         >
-          <p className="truncate text-[10px] font-medium leading-tight text-zinc-800 dark:text-zinc-100 sm:text-[11px]">
-            {caption}
-          </p>
+          <div className="relative h-[1.1em] overflow-hidden">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.p
+                key={label}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={springSoft}
+                className="truncate text-[10px] font-medium leading-tight text-zinc-800 dark:text-zinc-100 sm:text-[11px]"
+              >
+                {label}
+              </motion.p>
+            </AnimatePresence>
+          </div>
           <p className="font-mono text-[10px] tabular-nums text-zinc-600 dark:text-zinc-300 sm:text-[11px]">
             {formatMs(clock.displayMs)}
           </p>
@@ -330,7 +362,6 @@ export function RoomMeltTable({
   /** Own dessert was placed; parent syncs presence + DB. */
   onBoardPosChange?: (x: number, z: number) => void;
 }) {
-  const { t } = useTranslation();
   const stageRef = useRef<HTMLDivElement>(null);
   const chromeRef = useRef<HTMLDivElement>(null);
   const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
@@ -386,10 +417,6 @@ export function RoomMeltTable({
         className,
       )}
     >
-      <p className="mb-1 shrink-0 text-center text-[9px] tracking-[0.14em] text-muted-foreground uppercase sm:text-[10px]">
-        {t("melt.room.boardTitle")}
-      </p>
-
       {/* Stage fills leftover height; compact table+scoops are vertically centered. */}
       <div
         ref={stageRef}

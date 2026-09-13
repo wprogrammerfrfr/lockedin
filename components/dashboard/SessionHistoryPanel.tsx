@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { CalendarDays, IceCreamCone, List } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -11,9 +12,10 @@ import {
 import { MeltedCreationsDialog } from "@/components/dashboard/MeltedCreationsPanel";
 import { MyLockInsTitle } from "@/components/brand/LockedInLogo";
 import { ContributionHeatmap } from "@/components/profile/ContributionHeatmap";
+import { springSoft } from "@/components/session/state-accent";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   profileSessionHistory,
   profileSessionsForDay,
@@ -334,64 +336,83 @@ export function SessionHistoryPanel({
                 {t("dash.followToUnlock")}
               </p>
             ) : (
-              <>
-                <TabsContent value="calendar" className="mt-0">
-                  <ContributionHeatmap
-                    days={heatmapDays}
-                    emptyHint={emptyHint}
-                    onDayClick={(date) => {
-                      if (locked) {
-                        toast.message(t("dash.followToSeeSessions"), {
-                          description: t("dash.followUnlockDesc"),
-                        });
-                        return;
-                      }
-                      setSelectedDay(date);
-                      setDayOpen(true);
-                    }}
-                  />
-                </TabsContent>
-                <TabsContent value="list" className="mt-0">
-                  {listLoading && listSessions.length === 0 ? (
-                    <p className="py-8 text-center text-sm text-muted-foreground">
-                      {t("dash.loadingSessions")}
-                    </p>
-                  ) : listError ? (
-                    <p className="py-8 text-center text-sm text-muted-foreground">
-                      {listError}
-                    </p>
-                  ) : listSessions.length === 0 ? (
-                    <p className="rounded-xl border border-dashed border-border bg-background px-4 py-8 text-center text-sm text-muted-foreground">
-                      {t("dash.noSessions")}
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      <ul className="max-h-[28rem] space-y-2 overflow-y-auto">
-                        {listSessions.map((s) => (
-                          <li key={s.id}>
-                            <SessionListRow
-                              session={s}
-                              timeZone={tz}
-                              showDate
-                              onClick={() => setDetail(s)}
-                            />
-                          </li>
-                        ))}
-                      </ul>
-                      {listHasMore && !listFromHeatmap ? (
-                        <Button
-                          variant="outline"
-                          className={cn("w-full rounded-xl")}
-                          disabled={listLoading}
-                          onClick={() => void loadMore()}
-                        >
-                          {listLoading ? t("common.loading") : t("dash.loadMore")}
-                        </Button>
-                      ) : null}
-                    </div>
-                  )}
-                </TabsContent>
-              </>
+              <AnimatePresence mode="wait" initial={false}>
+                {view === "calendar" ? (
+                  <motion.div
+                    key="calendar"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={springSoft}
+                    className="mt-0"
+                  >
+                    <ContributionHeatmap
+                      days={heatmapDays}
+                      emptyHint={emptyHint}
+                      onDayClick={(date) => {
+                        if (locked) {
+                          toast.message(t("dash.followToSeeSessions"), {
+                            description: t("dash.followUnlockDesc"),
+                          });
+                          return;
+                        }
+                        setSelectedDay(date);
+                        setDayOpen(true);
+                      }}
+                    />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="list"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={springSoft}
+                    className="mt-0"
+                  >
+                    {listLoading && listSessions.length === 0 ? (
+                      <p className="py-8 text-center text-sm text-muted-foreground">
+                        {t("dash.loadingSessions")}
+                      </p>
+                    ) : listError ? (
+                      <p className="py-8 text-center text-sm text-muted-foreground">
+                        {listError}
+                      </p>
+                    ) : listSessions.length === 0 ? (
+                      <p className="rounded-xl border border-dashed border-border bg-background px-4 py-8 text-center text-sm text-muted-foreground">
+                        {t("dash.noSessions")}
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        <ul className="max-h-[28rem] space-y-2 overflow-y-auto">
+                          {listSessions.map((s) => (
+                            <li key={s.id}>
+                              <SessionListRow
+                                session={s}
+                                timeZone={tz}
+                                showDate
+                                onClick={() => setDetail(s)}
+                              />
+                            </li>
+                          ))}
+                        </ul>
+                        {listHasMore && !listFromHeatmap ? (
+                          <Button
+                            variant="outline"
+                            className={cn("w-full rounded-xl")}
+                            disabled={listLoading}
+                            onClick={() => void loadMore()}
+                          >
+                            {listLoading
+                              ? t("common.loading")
+                              : t("dash.loadMore")}
+                          </Button>
+                        ) : null}
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             )}
           </Tabs>
         </CardContent>

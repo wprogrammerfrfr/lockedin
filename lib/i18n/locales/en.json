@@ -391,7 +391,6 @@
   "melt.complete.desc": "Trash it, refreeze it, or keep going.",
   "melt.timer.chipLabel": "Elapsed {elapsed}, {percent}% melted",
   "melt.timer.meltsIn": "{percent}% · melts in {time}",
-  "melt.room.boardTitle": "Melt Board",
   "melt.room.emptySeat": "empty seat",
   "melt.room.tableEmpty": "desserts appear when someone melts",
   "melt.room.building": "building…",

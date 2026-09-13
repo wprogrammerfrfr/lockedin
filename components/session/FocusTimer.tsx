@@ -217,7 +217,7 @@ export function FocusTimer({
     <motion.div
       layout
       transition={springSoft}
-      className={cn("relative", isRoomHero && "flex min-h-0 flex-1 flex-col")}
+      className="relative"
       animate={
         muted
           ? { filter: "saturate(0.35)", y: 6 }
@@ -228,7 +228,6 @@ export function FocusTimer({
         layout
         className={cn(
           "relative overflow-visible rounded-2xl border shadow-soft",
-          isRoomHero && "flex min-h-0 flex-1 flex-col",
           isActiveFocus
             ? isRoomHero
               ? "p-2.5 sm:p-4"
@@ -289,7 +288,7 @@ export function FocusTimer({
           className={cn(
             "relative mx-auto flex min-w-0 w-full items-center justify-center overflow-visible rounded-2xl border px-2 sm:px-8 md:px-10",
             isRoomHero
-              ? "mb-2 min-h-0 flex-1 border-border bg-background py-2 sm:mb-3 sm:py-3"
+              ? "mb-2 border-border bg-background px-4 py-5 sm:mb-3 sm:px-8 sm:py-8"
               : isMeltMode
                 ? "mb-3 min-h-[200px] border-border bg-background py-3 sm:min-h-[280px] sm:py-4 md:min-h-[360px]"
                 : isActiveFocus
@@ -328,7 +327,7 @@ export function FocusTimer({
           <div
             className={cn(
               "relative z-10 w-full min-w-0 text-center",
-              isRoomHero && "flex h-full min-h-0 flex-col",
+              isRoomHero && "flex flex-col",
             )}
           >
             {isRoomHero ? (
@@ -339,21 +338,13 @@ export function FocusTimer({
                 animate={{ opacity: 1, scale: 1 }}
                 transition={springSoft}
                 className={cn(
-                  "flex h-full min-h-0 w-full gap-2",
+                  "flex w-full items-center gap-3 sm:gap-4",
                   roomLandscape
-                    ? "flex-row items-stretch gap-4"
-                    : "flex-col items-stretch",
+                    ? "flex-row"
+                    : "flex-col",
                 )}
               >
-                <div
-                  className={cn(
-                    "flex shrink-0 flex-col gap-1.5",
-                    roomLandscape
-                      ? "items-start self-start pt-1"
-                      : "items-center self-center",
-                  )}
-                >
-                  {meltItChip}
+                <div className="flex shrink-0 flex-col items-center gap-1.5 self-center">
                   {state === "BREAK_DONE" ? (
                     <p className="font-display text-xl font-bold tracking-tight text-foreground sm:text-2xl">
                       {t("timer.lockBackIn")}
@@ -367,8 +358,7 @@ export function FocusTimer({
                   )}
                   <p
                     className={cn(
-                      "max-w-[11rem] text-[10px] leading-snug tracking-[0.12em]",
-                      roomLandscape ? "text-left" : "text-center",
+                      "max-w-[11rem] text-center text-[10px] leading-snug tracking-[0.12em]",
                       muted ? "text-red-400/70" : "text-muted-foreground",
                       accent.text &&
                         (state === "ON_BREAK" || state === "CHOOSING_BREAK") &&

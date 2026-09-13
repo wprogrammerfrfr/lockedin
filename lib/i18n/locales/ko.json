@@ -391,7 +391,6 @@
   "melt.complete.desc": "버리기, 다시 얼리기, 또는 계속하기.",
   "melt.timer.chipLabel": "경과 {elapsed}, {percent}% 녹음",
   "melt.timer.meltsIn": "{percent}% · {time} 후 녹음",
-  "melt.room.boardTitle": "멜트 보드",
   "melt.room.emptySeat": "빈 자리",
   "melt.room.tableEmpty": "녹일 때 디저트가 나타나요",
   "melt.room.building": "만드는 중…",
