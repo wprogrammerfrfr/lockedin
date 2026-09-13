@@ -3,6 +3,21 @@ import type { SessionState } from "@/features/session/types";
 
 export const springSoft = { type: "spring" as const, stiffness: 260, damping: 28 };
 
+/** Snappy chrome nav — ~180ms settle, no bounce. */
+export const springChrome = {
+  type: "spring" as const,
+  stiffness: 520,
+  damping: 42,
+  mass: 0.7,
+};
+
+/** Enter-only page/tab content fade + rise for chrome switches. */
+export const pageTabMotion = {
+  initial: { opacity: 0, y: 6 },
+  animate: { opacity: 1, y: 0 },
+  transition: springChrome,
+};
+
 /** Overdamped melt settle — turns progress ticks into organic squash/sink. */
 export const springMelt = { type: "spring" as const, stiffness: 48, damping: 22 };
 

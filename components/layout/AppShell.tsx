@@ -10,7 +10,7 @@ import { ClaimUsernameDialog } from "@/components/auth/ClaimUsernameDialog";
 import { LockedInLogo } from "@/components/brand/LockedInLogo";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
-import { springSoft } from "@/components/session/state-accent";
+import { pageTabMotion, springSoft } from "@/components/session/state-accent";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -217,9 +217,7 @@ export function AppShell({
               : undefined
           }
         >
-          <motion.div
-            layout
-            transition={springSoft}
+          <div
             className={cn(
               "mx-auto w-full",
               layoutMode === "solo-focus"
@@ -244,21 +242,13 @@ export function AppShell({
               </button>
             )}
             {animatePageChrome ? (
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.div
-                  key={pathname}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={springSoft}
-                >
-                  {children}
-                </motion.div>
-              </AnimatePresence>
+              <motion.div key={pathname} {...pageTabMotion}>
+                {children}
+              </motion.div>
             ) : (
               children
             )}
-          </motion.div>
+          </div>
         </main>
 
         <AnimatePresence initial={false}>

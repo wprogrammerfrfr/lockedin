@@ -1,13 +1,18 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { LogIn, PanelLeft, PanelLeftClose } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { LockedInLogo } from "@/components/brand/LockedInLogo";
-import { NAV_ITEMS, navTabFromPathname } from "@/components/layout/nav";
-import { springSoft } from "@/components/session/state-accent";
+import {
+  NAV_ITEMS,
+  navTabFromPathname,
+  type NavTab,
+} from "@/components/layout/nav";
+import { springChrome } from "@/components/session/state-accent";
 import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -120,8 +125,14 @@ export function Sidebar({
 }) {
   const { t } = useTranslation();
   const pathname = usePathname();
-  const activeTab = navTabFromPathname(pathname);
+  const [pendingTab, setPendingTab] = useState<NavTab | null>(null);
+  const routeTab = navTabFromPathname(pathname);
+  const activeTab = pendingTab ?? routeTab;
   const compact = variant === "rail" && collapsed;
+
+  useEffect(() => {
+    setPendingTab(null);
+  }, [pathname]);
 
   return (
     <aside
@@ -181,7 +192,10 @@ export function Sidebar({
             <Link
               key={item.id}
               href={item.href}
-              onClick={onNavigate}
+              onClick={() => {
+                setPendingTab(item.id);
+                onNavigate?.();
+              }}
               className={cn(
                 "relative flex items-center gap-3 rounded-xl px-3 py-3 font-display text-sm font-semibold transition-colors",
                 compact ? "justify-center" : "justify-start",
@@ -198,7 +212,7 @@ export function Sidebar({
                     variant === "drawer" ? "nav-active-drawer" : "nav-active"
                   }
                   className="absolute inset-0 rounded-xl bg-muted shadow-soft"
-                  transition={springSoft}
+                  transition={springChrome}
                 />
               ) : null}
               <Icon
