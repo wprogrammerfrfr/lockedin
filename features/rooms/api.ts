@@ -313,8 +313,9 @@ export async function fetchRoomMembers(
       avatarPath: publicAvatarUrl(profile?.avatar_path ?? null),
       status,
       elapsedMs: Number((row as { elapsed_ms?: number | null }).elapsed_ms) || 0,
-      // Stamp fetch time so clients can extrapolate until the next sync.
-      clockSyncedAt: Date.now(),
+      // Do not invent clockSyncedAt — DB has no break ms fields. Leaving this
+      // unset lets Realtime presence stamps win in pickNewerClockFields /
+      // mergeMembers so BREAK countdowns keep ticking across polls.
       seat: (row as { seat?: number | null }).seat ?? null,
       breakLabel,
       // break_label stores the stable break type id for table-only fallback.

@@ -38,10 +38,15 @@ const BOARD_X_MAX = 0.91;
 /** Depth: 0 = front (larger), 1 = back (smaller / higher). */
 const BOARD_Z_MIN = 0;
 const BOARD_Z_MAX = 1;
-/** Tabletop contact as % from bottom of the chrome box (front lip y=48 → ~60%). */
-const TABLETOP_BOTTOM_PCT = 58;
+/**
+ * Tabletop contact as % from bottom of the chrome box.
+ * Shorter chrome (viewBox 320×78): top face ~y22–36, lip ~36–46 → contact ~42%.
+ */
+const TABLETOP_BOTTOM_PCT = 42;
 /** Extra stage height above the chrome for scoop/topping headroom. */
-const STAGE_HEADROOM_RATIO = 0.22;
+const STAGE_HEADROOM_RATIO = 0.18;
+const DESSERT_MIN_PX = 88;
+const DESSERT_MAX_PX = 220;
 
 function isActiveMelt(member: RoomMeltMember): boolean {
   if (!member.meltConfig || member.meltCustomizing) return false;
@@ -79,29 +84,47 @@ function boardToStyle(x: number, z: number) {
   return { leftPct, scale, zIndex };
 }
 
-/** Dessert footprint as % of table width — never viewport units. */
-function dessertWidthPx(tableWidth: number): number {
-  if (tableWidth <= 0) return 56;
-  const pct = tableWidth * 0.2;
-  return Math.min(104, Math.max(52, pct));
+/**
+ * Dessert footprint from stage height (primary) and width / count (secondary).
+ * Table hugs this size — never a fixed 104px cap.
+ */
+function dessertWidthPx(
+  stageWidth: number,
+  stageHeight: number,
+  count: number,
+): number {
+  if (stageWidth <= 0 && stageHeight <= 0) return 96;
+  const n = Math.max(1, count);
+  const fromHeight = stageHeight > 0 ? stageHeight * 0.48 : DESSERT_MIN_PX;
+  const fromWidth =
+    stageWidth > 0 ? (stageWidth / n) * 0.72 : DESSERT_MIN_PX;
+  return Math.min(
+    DESSERT_MAX_PX,
+    Math.max(DESSERT_MIN_PX, Math.min(fromHeight, fromWidth)),
+  );
 }
 
-/** Flat 2D table slab (top face + apron + legs) — no perspective polygons. */
+function tableChromeWidthPx(dessertPx: number, count: number): number {
+  const n = Math.max(1, count);
+  return Math.round(n * dessertPx * 1.55 + 24);
+}
+
+/** Flat 2D table slab — compact top + short legs (viewBox 320×78). */
 function SideTableChrome({ className }: { className?: string }) {
   return (
     <svg
       className={cn("pointer-events-none h-full w-full", className)}
-      viewBox="0 0 320 120"
+      viewBox="0 0 320 78"
       preserveAspectRatio="none"
       aria-hidden
     >
-      {/* Legs under slab so joins stay clean */}
-      <rect x="28" y="62" width="10" height="50" fill="#9CA3AF" />
-      <rect x="282" y="62" width="10" height="50" fill="#9CA3AF" />
+      {/* Legs — short so scoops dominate the stage */}
+      <rect x="28" y="46" width="10" height="22" fill="#9CA3AF" />
+      <rect x="282" y="46" width="10" height="22" fill="#9CA3AF" />
       {/* Front lip */}
-      <rect x="12" y="48" width="296" height="14" fill="#D1D5DB" />
+      <rect x="12" y="36" width="296" height="12" fill="#D1D5DB" />
       {/* Top surface */}
-      <rect x="12" y="32" width="296" height="18" rx="6" fill="#E5E7EB" />
+      <rect x="12" y="22" width="296" height="16" rx="6" fill="#E5E7EB" />
     </svg>
   );
 }
@@ -115,7 +138,8 @@ function DessertOnTable({
   index,
   total,
   tableRef,
-  tableWidth,
+  dessertPx,
+  tabletopFromBottomPct,
   onBoardPosChange,
 }: {
   member: RoomMeltMember;
@@ -126,7 +150,9 @@ function DessertOnTable({
   index: number;
   total: number;
   tableRef: RefObject<HTMLDivElement | null>;
-  tableWidth: number;
+  dessertPx: number;
+  /** Contact line as % from bottom of the board wrapper. */
+  tabletopFromBottomPct: number;
   onBoardPosChange?: (x: number, z: number) => void;
 }) {
   const { t } = useTranslation();
@@ -155,10 +181,7 @@ function DessertOnTable({
   const x = dragPos?.x ?? baseX;
   const z = dragPos?.z ?? baseZ;
   const { leftPct, scale, zIndex } = boardToStyle(x, z);
-  const widthPx = dessertWidthPx(tableWidth);
-  const chromeHeightFrac = 1 / (1 + STAGE_HEADROOM_RATIO);
-  const liveBottomPct =
-    chromeHeightFrac * (TABLETOP_BOTTOM_PCT + clamp01(z) * 4);
+  const liveBottomPct = tabletopFromBottomPct + clamp01(z) * 3;
 
   // Drop local drag override once parent/members catch up.
   useEffect(() => {
@@ -234,9 +257,9 @@ function DessertOnTable({
     dessert: config.displayName,
   });
 
-  // Self always animated; others get FX when ≤2 desserts; md LOD for 1–2.
+  // Self always animated; others get FX when ≤2 desserts; larger LOD for room board.
   const sceneAnimated = isSelf || meltingCount <= 2;
-  const sceneSize = meltingCount <= 2 ? "md" : "sm";
+  const sceneSize = meltingCount <= 2 ? "lg" : "md";
 
   return (
     <motion.div
@@ -254,7 +277,7 @@ function DessertOnTable({
         left: `${leftPct}%`,
         bottom: `${liveBottomPct}%`,
         zIndex: dragging ? 30 : zIndex,
-        width: widthPx,
+        width: dessertPx,
       }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -275,11 +298,14 @@ function DessertOnTable({
             className="!h-full !w-full !max-h-full !max-w-full pointer-events-none"
           />
         </div>
-        <div className="pointer-events-none absolute top-full left-1/2 mt-0.5 w-[max(100%,7rem)] -translate-x-1/2 text-center">
-          <p className="truncate text-[9px] font-medium leading-tight text-foreground sm:text-[10px]">
+        <div
+          className="pointer-events-none absolute top-full left-1/2 mt-0.5 -translate-x-1/2 text-center"
+          style={{ width: Math.max(dessertPx, 72), maxWidth: dessertPx * 1.15 }}
+        >
+          <p className="truncate text-[10px] font-medium leading-tight text-zinc-800 dark:text-zinc-100 sm:text-[11px]">
             {caption}
           </p>
-          <p className="font-mono text-[9px] tabular-nums text-muted-foreground">
+          <p className="font-mono text-[10px] tabular-nums text-zinc-600 dark:text-zinc-300 sm:text-[11px]">
             {formatMs(clock.displayMs)}
           </p>
         </div>
@@ -307,22 +333,49 @@ export function RoomMeltTable({
   const { t } = useTranslation();
   const stageRef = useRef<HTMLDivElement>(null);
   const chromeRef = useRef<HTMLDivElement>(null);
-  const [tableWidth, setTableWidth] = useState(0);
+  const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
   const now = useNow(50);
   const melting = sortMeltingMembers(members);
   const meltingCount = melting.length;
   // Chrome is the bottom slice of the stage; tabletop sits partway up that slice.
   const chromeHeightFrac = 1 / (1 + STAGE_HEADROOM_RATIO);
+  const dessertPx = dessertWidthPx(stageSize.w, stageSize.h, meltingCount || 1);
+  const chromeWidth = Math.min(
+    stageSize.w > 0 ? stageSize.w : 320,
+    tableChromeWidthPx(dessertPx, meltingCount || 1),
+  );
+  // Compact chrome height: short legs + headroom sized for scoops.
+  const chromeHeightPx = Math.max(
+    56,
+    Math.min(
+      stageSize.h > 0 ? stageSize.h * chromeHeightFrac : 120,
+      dessertPx * 0.72 + 40,
+    ),
+  );
+  /** Scoop hangs above the slab; wrapper includes caption room below contact. */
+  const scoopOverhangPx = Math.round(dessertPx * 0.92);
+  const captionPadPx = 28;
+  const boardHeightPx = chromeHeightPx + scoopOverhangPx + captionPadPx;
+  /** Contact line as % from bottom of the board wrapper (chrome sits at bottom). */
+  const tabletopFromBottomPct =
+    (chromeHeightPx / boardHeightPx) * TABLETOP_BOTTOM_PCT;
 
   useEffect(() => {
-    const el = chromeRef.current;
+    const el = stageRef.current;
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect.width ?? 0;
-      setTableWidth((prev) => (Math.abs(prev - w) < 0.5 ? prev : w));
+      const box = entries[0]?.contentRect;
+      if (!box) return;
+      const w = box.width;
+      const h = box.height;
+      setStageSize((prev) =>
+        Math.abs(prev.w - w) < 0.5 && Math.abs(prev.h - h) < 0.5
+          ? prev
+          : { w, h },
+      );
     });
     ro.observe(el);
-    setTableWidth(el.clientWidth);
+    setStageSize({ w: el.clientWidth, h: el.clientHeight });
     return () => ro.disconnect();
   }, []);
 
@@ -337,41 +390,52 @@ export function RoomMeltTable({
         {t("melt.room.boardTitle")}
       </p>
 
-      {/* Stage includes scoop headroom above the chrome so tops stay inside the box. */}
+      {/* Stage fills leftover height; compact table+scoops are vertically centered. */}
       <div
         ref={stageRef}
-        className="relative mx-auto min-h-[10rem] w-full min-w-0 flex-1 overflow-visible sm:min-h-[12rem]"
+        className="relative mx-auto flex min-h-[10rem] w-full min-w-0 flex-1 items-center justify-center overflow-visible sm:min-h-[12rem]"
       >
         <div
-          ref={chromeRef}
-          className="absolute inset-x-0 bottom-0 mx-auto w-full"
+          className="relative"
           style={{
-            height: `${chromeHeightFrac * 100}%`,
+            width: chromeWidth > 0 ? chromeWidth : "100%",
+            height: boardHeightPx,
             maxWidth: "100%",
+            maxHeight: "100%",
           }}
         >
-          <SideTableChrome className="absolute inset-0" />
-        </div>
+          <div
+            ref={chromeRef}
+            className="absolute inset-x-0 bottom-0 mx-auto w-full"
+            style={{
+              height: chromeHeightPx,
+              maxWidth: "100%",
+            }}
+          >
+            <SideTableChrome className="absolute inset-0" />
+          </div>
 
-        <AnimatePresence mode="popLayout">
-          {melting.map((member, index) => (
-            <DessertOnTable
-              key={member.userId}
-              member={member}
-              selfUserId={selfUserId}
-              selfLive={selfLive}
-              now={now}
-              meltingCount={meltingCount}
-              index={index}
-              total={meltingCount}
-              tableRef={chromeRef}
-              tableWidth={tableWidth}
-              onBoardPosChange={
-                member.userId === selfUserId ? onBoardPosChange : undefined
-              }
-            />
-          ))}
-        </AnimatePresence>
+          <AnimatePresence mode="popLayout">
+            {melting.map((member, index) => (
+              <DessertOnTable
+                key={member.userId}
+                member={member}
+                selfUserId={selfUserId}
+                selfLive={selfLive}
+                now={now}
+                meltingCount={meltingCount}
+                index={index}
+                total={meltingCount}
+                tableRef={chromeRef}
+                dessertPx={dessertPx}
+                tabletopFromBottomPct={tabletopFromBottomPct}
+                onBoardPosChange={
+                  member.userId === selfUserId ? onBoardPosChange : undefined
+                }
+              />
+            ))}
+          </AnimatePresence>
+        </div>
       </div>
     </div>
   );

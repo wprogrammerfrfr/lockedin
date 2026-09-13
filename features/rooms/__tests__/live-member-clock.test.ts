@@ -113,6 +113,24 @@ describe("pickNewerClockFields", () => {
     expect(picked.elapsedMs).toBe(9_000);
     expect(picked.clockSyncedAt).toBe(500);
   });
+
+  it("prefers presence BREAK clocks over newer DB row without break fields", () => {
+    const presence = {
+      elapsedMs: 12_000,
+      clockSyncedAt: 1_000,
+      breakOpenEnded: false,
+      breakElapsedMs: 0,
+      breakRemainingMs: 30_000,
+    };
+    const dbPoll = {
+      elapsedMs: 12_000,
+      clockSyncedAt: 9_999,
+      // no break fields — typical fetchRoomMembers snapshot
+    };
+    const picked = pickNewerClockFields(presence, dbPoll);
+    expect(picked.breakRemainingMs).toBe(30_000);
+    expect(picked.clockSyncedAt).toBe(1_000);
+  });
 });
 
 describe("mergeMembers", () => {
@@ -167,5 +185,42 @@ describe("mergeMembers", () => {
     ]);
     const merged = mergeMembers(table, presence);
     expect(merged[0]?.elapsedMs).toBe(0);
+  });
+
+  it("keeps live BREAK countdown when DB poll has no break ms and no stamp", () => {
+    const table = [
+      baseMember({
+        userId: "u1",
+        seat: 1,
+        elapsedMs: 12_000,
+        status: "BREAK",
+        breakLabel: "coffee",
+        breakType: "coffee",
+        // no clockSyncedAt — matches fetchRoomMembers after fix
+      }),
+    ];
+    const presence = new Map<string, RoomPresenceMember>([
+      [
+        "u1",
+        baseMember({
+          userId: "u1",
+          seat: 1,
+          elapsedMs: 12_000,
+          clockSyncedAt: 1_000_000,
+          status: "BREAK",
+          breakOpenEnded: false,
+          breakElapsedMs: 0,
+          breakRemainingMs: 25_000,
+          breakLabel: "coffee",
+          breakType: "coffee",
+        }),
+      ],
+    ]);
+    const merged = mergeMembers(table, presence);
+    expect(merged[0]?.status).toBe("BREAK");
+    expect(merged[0]?.breakRemainingMs).toBe(25_000);
+    expect(merged[0]?.clockSyncedAt).toBe(1_000_000);
+    const clock = memberDisplayClock(merged[0]!, 1_005_000);
+    expect(clock.displayMs).toBe(20_000);
   });
 });

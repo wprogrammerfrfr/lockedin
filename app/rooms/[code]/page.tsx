@@ -976,6 +976,7 @@ export default function RoomFocusPage({
       presenceStrip={
         <RoomPresenceStrip
           members={members}
+          selfLive={selfLive}
           compact={
             state.session === "LOCKED_IN" ||
             state.session === "ON_BREAK" ||
@@ -1007,25 +1008,25 @@ export default function RoomFocusPage({
           onSessionNameChange={setSessionNameDraft}
           lockInDisabled={status === "loading"}
           topBar={
-            <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
               <div className="min-w-0">
-                <p className="text-xs font-medium text-muted-foreground">
+                <p className="text-[11px] font-medium text-muted-foreground sm:text-xs">
                   {t("room.roomCode")}{" "}
-                  <span className="font-mono text-base font-bold tabular-nums tracking-widest text-foreground">
+                  <span className="font-mono text-sm font-bold tabular-nums tracking-widest text-foreground sm:text-base">
                     {displayCode}
                   </span>
                 </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
+                <p className="mt-0.5 hidden text-xs text-muted-foreground sm:block">
                   {isPomodoro ? t("room.pomodoroCadence") : t("room.voteRoom")} ·{" "}
                   {room?.status ?? "…"}
                 </p>
               </div>
-              <div className="flex flex-wrap items-center justify-end gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="rounded-xl"
+                  className="h-8 rounded-lg px-2.5 text-xs sm:h-9 sm:rounded-xl sm:px-3 sm:text-sm"
                   onClick={async () => {
                     const link = `${window.location.origin}/rooms/${displayCode}`;
                     const result = await shareOrCopyInvite(link);
@@ -1036,13 +1037,14 @@ export default function RoomFocusPage({
                     }
                   }}
                 >
-                  <Copy className="mr-1.5 h-3.5 w-3.5" />
+                  <Copy className="mr-1 h-3.5 w-3.5 sm:mr-1.5" />
                   {t("room.invite")}
                 </Button>
                 {isVoteRoom ? (
                   <Button
                     variant="outline"
-                    className="rounded-xl border-amber-300 bg-amber-50 font-display font-bold text-amber-900 hover:bg-amber-100"
+                    size="sm"
+                    className="h-8 rounded-lg border-amber-300 bg-amber-50 px-2.5 font-display text-xs font-bold text-amber-900 hover:bg-amber-100 sm:h-9 sm:rounded-xl sm:px-3 sm:text-sm"
                     onClick={() => void onRequestBreak()}
                   >
                     {t("room.breakQuestion")}
@@ -1054,7 +1056,8 @@ export default function RoomFocusPage({
                 )}
                 <Button
                   variant="outline"
-                  className="rounded-xl"
+                  size="sm"
+                  className="h-8 rounded-lg px-2.5 text-xs sm:h-9 sm:rounded-xl sm:px-3 sm:text-sm"
                   onClick={() => void onLeave()}
                 >
                   {t("room.leave")}
@@ -1063,7 +1066,7 @@ export default function RoomFocusPage({
             </div>
           }
           heroTitle={
-            <h1 className="flex max-w-full flex-wrap items-baseline justify-center gap-x-2 gap-y-1 pb-0.5 text-center font-display text-xl font-bold leading-snug tracking-tight text-foreground sm:text-2xl lg:text-3xl">
+            <h1 className="flex max-w-full flex-wrap items-baseline justify-center gap-x-2 gap-y-0.5 pb-0.5 text-center font-display text-lg font-bold leading-snug tracking-tight text-foreground sm:text-2xl lg:text-3xl">
               <span className="min-w-0 max-w-full line-clamp-2">
                 {room?.name || t("room.fallbackName")}
               </span>

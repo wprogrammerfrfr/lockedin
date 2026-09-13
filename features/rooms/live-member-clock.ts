@@ -121,6 +121,10 @@ export function useNow(intervalMs: number): number {
 /**
  * Pick the newer of two clocked snapshots. Prefer `a` when stamps are equal
  * or missing on `b`. Uses nullish coalescing so `elapsedMs: 0` is kept.
+ *
+ * When either side carries real BREAK clock fields and the other does not
+ * (typical DB row vs Realtime presence), prefer the side with break fields
+ * even if its stamp is slightly older — DB polls invent no break ms.
  */
 export function pickNewerClockFields(
   a: Pick<
@@ -147,6 +151,20 @@ export function pickNewerClockFields(
   | "breakRemainingMs"
   | "breakOpenEnded"
 > {
+  const aHasBreak = hasBreakClockFields(a);
+  const bHasBreak = hasBreakClockFields(b);
+  if (aHasBreak !== bHasBreak) {
+    const src = aHasBreak ? a : b;
+    const other = aHasBreak ? b : a;
+    return {
+      elapsedMs: src.elapsedMs ?? other.elapsedMs ?? 0,
+      clockSyncedAt: src.clockSyncedAt ?? other.clockSyncedAt,
+      breakElapsedMs: src.breakElapsedMs ?? other.breakElapsedMs ?? 0,
+      breakRemainingMs: src.breakRemainingMs ?? other.breakRemainingMs ?? 0,
+      breakOpenEnded: src.breakOpenEnded ?? other.breakOpenEnded ?? false,
+    };
+  }
+
   const aAt = a.clockSyncedAt ?? 0;
   const bAt = b.clockSyncedAt ?? 0;
   const preferA = aAt >= bAt;
@@ -159,4 +177,20 @@ export function pickNewerClockFields(
     breakRemainingMs: src.breakRemainingMs ?? other.breakRemainingMs ?? 0,
     breakOpenEnded: src.breakOpenEnded ?? other.breakOpenEnded ?? false,
   };
+}
+
+function hasBreakClockFields(
+  c: Pick<
+    RoomPresenceMember,
+    "breakElapsedMs" | "breakRemainingMs" | "breakOpenEnded"
+  >,
+): boolean {
+  if (c.breakOpenEnded === true) return true;
+  if (typeof c.breakRemainingMs === "number" && c.breakRemainingMs > 0) {
+    return true;
+  }
+  if (typeof c.breakElapsedMs === "number" && c.breakElapsedMs > 0) {
+    return true;
+  }
+  return false;
 }

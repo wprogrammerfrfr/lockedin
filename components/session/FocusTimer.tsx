@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { IceCreamCone, Lock, Pause, Play, Share2, Trophy } from "lucide-react";
 
@@ -147,6 +153,38 @@ export function FocusTimer({
     (state === "IDLE" || state === "TAPPED_OUT" || state === "ENDED");
   const isDev = process.env.NODE_ENV !== "production";
 
+  /** Room hero: stack in portrait, side-by-side only when wider than tall. */
+  const roomHeroRef = useRef<HTMLDivElement>(null);
+  const [roomLandscape, setRoomLandscape] = useState(false);
+  useLayoutEffect(() => {
+    if (!isRoomHero) return;
+    const el = roomHeroRef.current;
+    if (!el) return;
+    const measure = () => {
+      const { width, height } = el.getBoundingClientRect();
+      setRoomLandscape(width > height && width >= 560);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isRoomHero]);
+
+  const meltItChip = showMeltItChip ? (
+    <motion.button
+      type="button"
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={springSoft}
+      className="z-20 flex shrink-0 items-center gap-1.5 self-start rounded-full border border-amber-300 bg-card/95 px-3 py-1.5 text-xs font-bold tracking-wide text-amber-800 shadow-soft backdrop-blur-sm hover:bg-amber-50 disabled:opacity-50 dark:border-amber-400/40 dark:text-amber-300 dark:hover:bg-amber-400/15"
+      onClick={onMeltIt}
+      disabled={lockInDisabled}
+    >
+      <IceCreamCone className="h-3.5 w-3.5" aria-hidden />
+      {t("melt.action.meltIt")}
+    </motion.button>
+  ) : null;
+
   const roomClockMs =
     state === "ON_BREAK"
       ? breakOpenEnded
@@ -273,20 +311,6 @@ export function FocusTimer({
                       : "border-border bg-background"),
           )}
         >
-          {showMeltItChip ? (
-            <motion.button
-              type="button"
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={springSoft}
-              className="absolute left-2 top-2 z-20 flex items-center gap-1.5 rounded-full border border-amber-300 bg-card/95 px-3 py-1.5 text-xs font-bold tracking-wide text-amber-800 shadow-soft backdrop-blur-sm hover:bg-amber-50 disabled:opacity-50 dark:border-amber-400/40 dark:text-amber-300 dark:hover:bg-amber-400/15 sm:left-3 sm:top-3"
-              onClick={onMeltIt}
-              disabled={lockInDisabled}
-            >
-              <IceCreamCone className="h-3.5 w-3.5" aria-hidden />
-              {t("melt.action.meltIt")}
-            </motion.button>
-          ) : null}
           <ParticleBurst active={didBreakPR && state === "LOCKED_IN"} />
           <ParticleBurst
             active={meltComplete && isMeltMode && state === "LOCKED_IN"}
@@ -310,15 +334,26 @@ export function FocusTimer({
             {isRoomHero ? (
               <motion.div
                 key="room-hero"
+                ref={roomHeroRef}
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={springSoft}
                 className={cn(
-                  "grid h-full min-h-0 w-full grid-cols-1 items-stretch gap-2 sm:grid-cols-[auto_1fr] sm:gap-4",
-                  showMeltItChip && "pt-8 sm:pt-6",
+                  "flex h-full min-h-0 w-full gap-2",
+                  roomLandscape
+                    ? "flex-row items-stretch gap-4"
+                    : "flex-col items-stretch",
                 )}
               >
-                <div className="flex shrink-0 flex-col items-center justify-center gap-1 self-center sm:items-start sm:self-start sm:pt-1">
+                <div
+                  className={cn(
+                    "flex shrink-0 flex-col gap-1.5",
+                    roomLandscape
+                      ? "items-start self-start pt-1"
+                      : "items-center self-center",
+                  )}
+                >
+                  {meltItChip}
                   {state === "BREAK_DONE" ? (
                     <p className="font-display text-xl font-bold tracking-tight text-foreground sm:text-2xl">
                       {t("timer.lockBackIn")}
@@ -332,7 +367,8 @@ export function FocusTimer({
                   )}
                   <p
                     className={cn(
-                      "max-w-[11rem] text-[10px] leading-snug tracking-[0.12em] sm:text-left",
+                      "max-w-[11rem] text-[10px] leading-snug tracking-[0.12em]",
+                      roomLandscape ? "text-left" : "text-center",
                       muted ? "text-red-400/70" : "text-muted-foreground",
                       accent.text &&
                         (state === "ON_BREAK" || state === "CHOOSING_BREAK") &&
@@ -450,6 +486,7 @@ export function FocusTimer({
                       </div>
                     </div>
                     <div className="flex min-w-0 flex-col items-center justify-center gap-3 sm:flex-1">
+                      {meltItChip}
                       {state === "BREAK_DONE" ? (
                         <>
                           <p className="font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl md:text-5xl">
@@ -547,8 +584,9 @@ export function FocusTimer({
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -12 }}
                     transition={springSoft}
-                    className="px-2"
+                    className="flex flex-col items-center gap-1.5 px-2"
                   >
+                    {meltItChip}
                     <p className="font-display text-4xl font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl">
                       {t("timer.lockBackIn")}
                     </p>
@@ -563,7 +601,9 @@ export function FocusTimer({
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -12 }}
                     transition={springSoft}
+                    className="flex flex-col items-center gap-1.5"
                   >
+                    {meltItChip}
                     <p
                       className={cn(
                         "mb-3 text-base font-semibold sm:text-lg",
@@ -590,7 +630,9 @@ export function FocusTimer({
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -12 }}
                     transition={springSoft}
+                    className="flex flex-col items-center gap-1.5"
                   >
+                    {meltItChip}
                     <FlipClock ms={elapsedMs} muted={muted} />
                     <p
                       className={cn(
