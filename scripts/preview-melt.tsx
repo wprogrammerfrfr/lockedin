@@ -15,7 +15,6 @@ const ALL_TOPPINGS: IceCreamToppingId[] = [
   "chocolate_sauce",
   "cherry",
   "whipped_cream",
-  "cookie_crumb",
 ];
 
 const iceCream = (

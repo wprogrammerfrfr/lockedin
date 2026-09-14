@@ -35,8 +35,7 @@ export type IceCreamToppingId =
   | "sprinkles"
   | "chocolate_sauce"
   | "cherry"
-  | "whipped_cream"
-  | "cookie_crumb";
+  | "whipped_cream";
 
 export type CatalogOption = {
   id: string;
@@ -111,7 +110,6 @@ export const ICE_CREAM_TOPPINGS: CatalogOption[] = [
   { id: "chocolate_sauce", label: "Choco Sauce", emoji: "🍫" },
   { id: "cherry", label: "Cherry", emoji: "🍒" },
   { id: "whipped_cream", label: "Whipped Cream", emoji: "☁️" },
-  { id: "cookie_crumb", label: "Cookie Crumbs", emoji: "🍪" },
 ];
 
 export const MELT_PRESETS: {

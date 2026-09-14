@@ -11,6 +11,14 @@ import { seededRange, seededInt } from "@/features/session/melt-seed";
 
 const SPRINKLE_COLORS = ["#F472B6", "#60A5FA", "#FBBF24", "#34D399", "#FB7185", "#A78BFA"];
 
+function lightenHex(hex: string, amount: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.min(255, ((n >> 16) & 0xff) + amount);
+  const g = Math.min(255, ((n >> 8) & 0xff) + amount);
+  const b = Math.min(255, (n & 0xff) + amount);
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
+}
+
 export function MeltToppings({
   toppings,
   scoop,
@@ -37,8 +45,10 @@ export function MeltToppings({
   const { cx, r } = surface;
   const halfW = Math.max(10, r);
   const opacity = 1 - localMelt * 0.85;
-  // Small embed into cream as it melts — no absolute-screen float.
   const embed = localMelt * 2;
+
+  const sprinkleW = Math.max(9, r * 0.26);
+  const sprinkleH = Math.max(3.6, r * 0.1);
 
   return (
     <g opacity={opacity}>
@@ -83,41 +93,27 @@ export function MeltToppings({
             });
             const rot = seededRange(seed, 30 + i, -40, 40);
             const c = SPRINKLE_COLORS[seededInt(seed, 40 + i, 0, SPRINKLE_COLORS.length - 1)]!;
+            const hi = lightenHex(c, 48);
             return (
-              <rect
-                key={i}
-                x={pt.x - 2.5}
-                y={pt.y - 1}
-                width={5}
-                height={2}
-                rx={0.6}
-                fill={c}
-                transform={`rotate(${rot} ${pt.x} ${pt.y})`}
-              />
-            );
-          })
-        : null}
-
-      {toppings.includes("cookie_crumb") && showTiny
-        ? [0, 1, 2].map((i) => {
-            const pt = pointOnScoopCap(surface, seed, 50 + i, {
-              maxFrac: 0.6,
-              embed: 2 + embed,
-            });
-            const w = seededRange(seed, 70 + i, 5, 9);
-            const h = seededRange(seed, 80 + i, 3, 5);
-            const rot = seededRange(seed, 90 + i, -25, 25);
-            return (
-              <rect
-                key={i}
-                x={pt.x - w / 2}
-                y={pt.y - h / 2}
-                width={w}
-                height={h}
-                rx={1.2}
-                fill="#8B5A2B"
-                transform={`rotate(${rot} ${pt.x} ${pt.y})`}
-              />
+              <g key={i} transform={`rotate(${rot} ${pt.x} ${pt.y})`}>
+                <rect
+                  x={pt.x - sprinkleW / 2}
+                  y={pt.y - sprinkleH / 2}
+                  width={sprinkleW}
+                  height={sprinkleH}
+                  rx={sprinkleH / 2}
+                  fill={c}
+                />
+                <rect
+                  x={pt.x - sprinkleW / 2 + sprinkleH * 0.35}
+                  y={pt.y - sprinkleH / 2 + sprinkleH * 0.15}
+                  width={sprinkleW * 0.45}
+                  height={sprinkleH * 0.35}
+                  rx={sprinkleH * 0.2}
+                  fill={hi}
+                  opacity={0.85}
+                />
+              </g>
             );
           })
         : null}
@@ -125,9 +121,8 @@ export function MeltToppings({
       {toppings.includes("cherry") ? (() => {
         const pt = pointOnScoopCap(surface, seed, 3, {
           maxFrac: 0.35,
-          embed: embed,
+          embed,
         });
-        // Seat on the upper dome — stem may arc above the peak.
         const x = pt.x + seededRange(seed, 5, -r * 0.12, r * 0.12);
         const y = surface.yMin + r * 0.35 + embed;
         return (

@@ -713,22 +713,6 @@ function ToppingsLayer({
             transform={`rotate(${s.rot} ${cx + s.x + 2.5} ${cy + s.y + 1})`}
           />
         ))}
-      {toppings.includes("cookie_crumb") &&
-        [
-          { x: -10, y: 12, w: 8, h: 5 },
-          { x: 8, y: 10, w: 7, h: 4 },
-        ].map((c, i) => (
-          <rect
-            key={i}
-            x={cx + c.x}
-            y={cy + c.y}
-            width={c.w}
-            height={c.h}
-            rx={1}
-            fill="#92400E"
-            transform={`rotate(${i * 18 - 10} ${cx + c.x + c.w / 2} ${cy + c.y + c.h / 2})`}
-          />
-        ))}
     </g>
   );
 }

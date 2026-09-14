@@ -22,8 +22,8 @@ export function meltLodForSize(size: MeltSceneSize): MeltLodFlags {
       showGrain: false,
       meltKeyframeCount: 2,
       showGlassSheen: false,
-      maxSprinkleDots: 3,
-      showTinyToppings: false,
+      maxSprinkleDots: 5,
+      showTinyToppings: true,
     };
   }
   if (size === "md") {
@@ -35,7 +35,7 @@ export function meltLodForSize(size: MeltSceneSize): MeltLodFlags {
       showGrain: false,
       meltKeyframeCount: 5,
       showGlassSheen: true,
-      maxSprinkleDots: 5,
+      maxSprinkleDots: 8,
       showTinyToppings: true,
     };
   }
@@ -48,7 +48,7 @@ export function meltLodForSize(size: MeltSceneSize): MeltLodFlags {
     showGrain: true,
     meltKeyframeCount: 5,
     showGlassSheen: true,
-    maxSprinkleDots: 5,
+    maxSprinkleDots: 8,
     showTinyToppings: true,
   };
 }

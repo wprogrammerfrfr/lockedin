@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Cloud, Code2, IceCreamCone, Target, Users } from "lucide-react";
 import { LockedInLogo } from "@/components/brand/LockedInLogo";
+import { InstallAppButton } from "@/components/pwa/InstallAppButton";
 import { WelcomeCtas } from "@/components/welcome/WelcomeCtas";
 import { WelcomeDevShowcase } from "@/components/welcome/WelcomeDevShowcase";
 import { WelcomeFeatures } from "@/components/welcome/WelcomeFeatures";
@@ -74,7 +75,10 @@ export function WelcomeLanding() {
               work without an account. Sign in to sync hours, sit with 2–6
               people, and share the card.
             </p>
-            <WelcomeCtas size="xl" stack className="mt-8" />
+            <div className="mt-8 flex w-full max-w-xl flex-col gap-4">
+              <InstallAppButton hero />
+              <WelcomeCtas size="xl" stack />
+            </div>
           </motion.div>
           <motion.div
             className="min-w-0 w-full"
@@ -216,7 +220,10 @@ export function WelcomeLanding() {
               </CardContent>
             </Card>
           </div>
-          <WelcomeCtas size="xl" stack className="mt-8 justify-center" />
+          <div className="mt-8 flex w-full max-w-xl flex-col gap-4 sm:mx-auto">
+            <InstallAppButton hero />
+            <WelcomeCtas size="xl" stack className="justify-center" />
+          </div>
         </WelcomeSection>
       </main>
 
