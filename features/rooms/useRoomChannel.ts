@@ -8,6 +8,7 @@ import {
   touchRoomPresence,
 } from "@/features/rooms/api";
 import { pickNewerClockFields } from "@/features/rooms/live-member-clock";
+import { mergePresenceOnSync } from "@/features/rooms/presence-merge";
 import type { RoomPresenceMember } from "@/features/rooms/types";
 import type { MeltConfig } from "@/features/session/melt-catalog";
 import {
@@ -197,6 +198,8 @@ export function useRoomChannel(
   const roomNameRef = useRef(roomName);
   roomNameRef.current = roomName;
   const knownIdsRef = useRef<Set<string> | null>(null);
+  const tableMembersRef = useRef<RoomPresenceMember[]>([]);
+  tableMembersRef.current = tableMembers;
   const channelRef = useRef<ReturnType<
     ReturnType<typeof createClient>["channel"]
   > | null>(null);
@@ -355,27 +358,9 @@ export function useRoomChannel(
             incoming.set(m.userId, m);
           }
         }
-        // Keep newer optimistic/local stamps when Realtime echoes stale metadata.
-        setPresenceById((prev) => {
-          const next = new Map<string, RoomPresenceMember>();
-          for (const [id, remote] of incoming) {
-            const local = prev.get(id);
-            if (!local) {
-              next.set(id, remote);
-              continue;
-            }
-            const clocks = pickNewerClockFields(remote, local);
-            next.set(id, {
-              ...remote,
-              elapsedMs: clocks.elapsedMs,
-              clockSyncedAt: clocks.clockSyncedAt,
-              breakElapsedMs: clocks.breakElapsedMs,
-              breakRemainingMs: clocks.breakRemainingMs,
-              breakOpenEnded: clocks.breakOpenEnded,
-            });
-          }
-          return next;
-        });
+        setPresenceById((prev) =>
+          mergePresenceOnSync(incoming, prev, tableMembersRef.current),
+        );
       })
       .subscribe((status) => {
         if (cancelled.current) return;

@@ -28,6 +28,8 @@ export type ActiveSessionDraft = {
   personalRecordMs: number;
   didBreakPR: boolean;
   updatedAt: string;
+  /** ISO session start for wall-clock catch-up after sleep. */
+  startedAt?: string;
 };
 
 function canUseLocalStorage() {

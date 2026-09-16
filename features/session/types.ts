@@ -131,6 +131,7 @@ export type Action =
       personalRecordMs?: number;
       didBreakPR?: boolean;
       session?: SessionState;
+      startedAt?: string;
     }
   | {
       type: "HYDRATE_STATS";

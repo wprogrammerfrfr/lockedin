@@ -259,9 +259,11 @@ export function reducer(state: AppState, action: Action): AppState {
           action.personalRecordMs !== undefined
             ? action.personalRecordMs
             : state.personalRecordMs,
-        sessionStartedAt: new Date(
-          Date.now() - Math.max(0, action.elapsedMs),
-        ).toISOString(),
+        sessionStartedAt:
+          action.startedAt?.trim() ||
+          new Date(
+            Date.now() - Math.max(0, action.elapsedMs + breakMs),
+          ).toISOString(),
         remoteSessionId: null,
         ...(onBreak
           ? {

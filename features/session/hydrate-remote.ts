@@ -6,6 +6,7 @@ import {
 } from "@/features/session/melt-catalog";
 import type { Action, SessionState } from "@/features/session/types";
 import type { SessionRow } from "@/types/database";
+import { applyWallClockCatchUp } from "@/features/session/wall-clock";
 
 function asBreakTypesUsed(raw: unknown): BreakTypeStored[] {
   if (!Array.isArray(raw)) return [];
@@ -46,12 +47,28 @@ export function hydrateRemoteFromSessionRow(row: SessionRow): Extract<
   Action,
   { type: "HYDRATE_REMOTE" }
 > {
-  const elapsedMs = Number(row.active_ms) || 0;
-  const breakMs = Number(row.break_ms) || 0;
+  let elapsedMs = Number(row.active_ms) || 0;
+  let breakMs = Number(row.break_ms) || 0;
   const breakTypesUsed = asBreakTypesUsed(row.break_types_used);
   const breakHistory = asBreakHistory(row.break_history);
   const onBreak = row.status === "on_break";
   const session: SessionState = onBreak ? "ON_BREAK" : "LOCKED_IN";
+  const startedAt = row.started_at;
+  const lastBreak = lastBreakTypeId(breakTypesUsed);
+  const breakOpenEnded = onBreak ? true : undefined;
+  const caught = applyWallClockCatchUp(
+    elapsedMs,
+    breakMs,
+    startedAt,
+    {
+      onBreak,
+      breakOpenEnded,
+      breakElapsedMs: onBreak ? breakMs : undefined,
+      breakRemainingMs: onBreak ? 0 : undefined,
+    },
+  );
+  elapsedMs = caught.activeMs;
+  breakMs = caught.breakMs;
   const melt: MeltHydrateFields | null = meltFieldsFromDessertMetadata(
     row.dessert_metadata,
     elapsedMs,
@@ -68,10 +85,14 @@ export function hydrateRemoteFromSessionRow(row: SessionRow): Extract<
     breakTypesUsed,
     breakHistory,
     breakMs: onBreak || breakMs > 0 ? breakMs : undefined,
-    breakTypeId: onBreak ? lastBreakTypeId(breakTypesUsed) : undefined,
-    breakOpenEnded: onBreak ? true : undefined,
-    breakElapsedMs: onBreak ? breakMs : undefined,
-    breakRemainingMs: onBreak ? 0 : undefined,
+    breakTypeId: onBreak ? lastBreak : undefined,
+    breakOpenEnded: onBreak ? (breakOpenEnded ?? true) : undefined,
+    breakElapsedMs: onBreak
+      ? (caught.breakElapsedMs ?? breakMs)
+      : undefined,
+    breakRemainingMs: onBreak
+      ? (caught.breakRemainingMs ?? 0)
+      : undefined,
     breakDurationMs: onBreak ? 0 : undefined,
     ...(melt ?? {}),
   };

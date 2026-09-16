@@ -5,6 +5,7 @@ import {
   type SelfLiveClock,
 } from "@/features/rooms/live-member-clock";
 import { mergeMembers } from "@/features/rooms/useRoomChannel";
+import { mergePresenceOnSync } from "@/features/rooms/presence-merge";
 import type { RoomPresenceMember } from "@/features/rooms/types";
 
 function baseMember(
@@ -92,6 +93,58 @@ describe("memberDisplayClock", () => {
     const clock = memberDisplayClock(member, 1_060_000);
     expect(clock.elapsedMs).toBe(0);
     expect(clock.displayMs).toBe(0);
+  });
+});
+
+describe("mergePresenceOnSync", () => {
+  it("keeps ghost LOCKED_IN stamp when Realtime drops a sleeping peer", () => {
+    const table = [
+      baseMember({
+        userId: "u1",
+        seat: 1,
+        status: "LOCKED_IN",
+        elapsedMs: 10_000,
+      }),
+    ];
+    const prev = new Map<string, RoomPresenceMember>([
+      [
+        "u1",
+        baseMember({
+          userId: "u1",
+          elapsedMs: 10_000,
+          clockSyncedAt: 1_000_000,
+          status: "LOCKED_IN",
+        }),
+      ],
+    ]);
+    const merged = mergePresenceOnSync(new Map(), prev, table);
+    expect(merged.get("u1")?.clockSyncedAt).toBe(1_000_000);
+    const clock = memberDisplayClock(merged.get("u1")!, 1_005_000);
+    expect(clock.displayMs).toBe(15_000);
+  });
+
+  it("does not ghost WAITING members", () => {
+    const table = [
+      baseMember({
+        userId: "u1",
+        seat: 1,
+        status: "WAITING",
+        elapsedMs: 0,
+      }),
+    ];
+    const prev = new Map<string, RoomPresenceMember>([
+      [
+        "u1",
+        baseMember({
+          userId: "u1",
+          elapsedMs: 0,
+          clockSyncedAt: 1_000_000,
+          status: "WAITING",
+        }),
+      ],
+    ]);
+    const merged = mergePresenceOnSync(new Map(), prev, table);
+    expect(merged.has("u1")).toBe(false);
   });
 });
 

@@ -23,6 +23,7 @@ import {
   loadActiveSessionDraft,
   isActiveSessionDraftStale,
 } from "@/lib/auth/merge";
+import { applyWallClockCatchUp } from "@/features/session/wall-clock";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import { initialState, projectBreakHistory, reducer } from "@/features/session/reducer";
@@ -275,15 +276,32 @@ export default function LockInPage() {
     if (!draft) return;
 
     if (!isActiveSessionDraftStale(draft) && (draft.elapsedMs || 0) > 0) {
+      const onBreak = (draft.breakMs || 0) > 0;
+      const startedAt =
+        draft.startedAt ||
+        new Date(
+          Date.now() - Math.max(0, draft.elapsedMs + draft.breakMs),
+        ).toISOString();
+      const caught = applyWallClockCatchUp(
+        draft.elapsedMs,
+        draft.breakMs,
+        startedAt,
+        {
+          onBreak,
+          breakOpenEnded: true,
+          breakElapsedMs: onBreak ? draft.breakMs : undefined,
+        },
+      );
       dispatch({
         type: "HYDRATE_GUEST_DRAFT",
         sessionName: draft.sessionName,
-        elapsedMs: draft.elapsedMs,
-        breakMs: draft.breakMs,
+        elapsedMs: caught.activeMs,
+        breakMs: caught.breakMs,
         breakTypesUsed: draft.breakTypesUsed,
         personalRecordMs: draft.personalRecordMs,
         didBreakPR: draft.didBreakPR,
-        session: (draft.breakMs || 0) > 0 ? "ON_BREAK" : "LOCKED_IN",
+        session: onBreak ? "ON_BREAK" : "LOCKED_IN",
+        startedAt,
       });
       toast.message("Resumed your session");
       return;

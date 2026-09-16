@@ -62,14 +62,17 @@ export function useSessionClock(
       if (delta > 0) dispatch({ type: "TICK", delta });
     };
     const id = window.setInterval(tick, 50);
-    const onVisibility = () => {
+    const onVisible = () => {
       if (document.visibilityState === "visible") tick();
     };
-    document.addEventListener("visibilitychange", onVisibility);
+    const onPageShow = () => tick();
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", onPageShow);
 
     return () => {
       window.clearInterval(id);
-      document.removeEventListener("visibilitychange", onVisibility);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", onPageShow);
     };
   }, [dispatch, enabled, state.session]);
 
@@ -91,14 +94,17 @@ export function useSessionClock(
       if (delta > 0) dispatch({ type: "BREAK_TICK", delta });
     };
     const id = window.setInterval(tick, 50);
-    const onVisibility = () => {
+    const onVisible = () => {
       if (document.visibilityState === "visible") tick();
     };
-    document.addEventListener("visibilitychange", onVisibility);
+    const onPageShow = () => tick();
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", onPageShow);
 
     return () => {
       window.clearInterval(id);
-      document.removeEventListener("visibilitychange", onVisibility);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", onPageShow);
     };
   }, [dispatch, enabled, state.session]);
 
@@ -142,13 +148,17 @@ export function useSessionClock(
 
     const onVis = () => {
       if (document.visibilityState === "hidden") flushHeartbeat();
+      else flushHeartbeat();
     };
+    const onPageShow = () => flushHeartbeat();
 
     document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("pageshow", onPageShow);
 
     return () => {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("pageshow", onPageShow);
     };
   }, [enabled, state.remoteSessionId]);
 
@@ -169,6 +179,7 @@ export function useSessionClock(
         breakTypesUsed: s.breakTypesUsed,
         personalRecordMs: s.personalRecordMs,
         didBreakPR: s.didBreakPR,
+        startedAt: s.sessionStartedAt ?? undefined,
       });
     };
 
@@ -232,6 +243,7 @@ export function useSessionClock(
           breakTypesUsed: s.breakTypesUsed,
           personalRecordMs: s.personalRecordMs,
           didBreakPR: s.didBreakPR,
+          startedAt: s.sessionStartedAt ?? undefined,
         });
       }
     };

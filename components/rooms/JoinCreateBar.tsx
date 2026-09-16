@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { ScanLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { RoomQrScanDialog } from "@/components/rooms/RoomQrScanDialog";
 import { Input } from "@/components/ui/input";
 import { PomodoroCreateFields } from "@/components/rooms/PomodoroCreateFields";
 import {
@@ -35,6 +37,7 @@ export function JoinCreateBar({
   const [workMinutes, setWorkMinutes] = useState(50);
   const [breakMinutes, setBreakMinutes] = useState(10);
   const [busy, setBusy] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
 
   async function handleCreate() {
     if (!authed) {
@@ -70,19 +73,19 @@ export function JoinCreateBar({
     }
   }
 
-  async function handleJoin() {
+  async function joinWithCode(raw: string) {
     if (!authed) {
       onNeedAuth();
       return;
     }
-    if (!/^\d{6}$/.test(code)) {
+    if (!/^\d{6}$/.test(raw)) {
       toast.error(t("room.toast.invalidCode"));
       return;
     }
     setBusy(true);
     try {
       const supabase = createClient();
-      const room = await joinRoom(supabase, code);
+      const room = await joinRoom(supabase, raw);
       router.push(`/rooms/${room.code}`);
     } catch (err) {
       const msg = userFacingError(err, t("room.toast.joinFailed"));
@@ -94,6 +97,10 @@ export function JoinCreateBar({
     } finally {
       setBusy(false);
     }
+  }
+
+  async function handleJoin() {
+    await joinWithCode(code);
   }
 
   if (step === "name") {
@@ -142,28 +149,54 @@ export function JoinCreateBar({
   return (
     <div className="space-y-4 rounded-xl border border-border bg-card p-4">
       <div className="flex flex-col gap-2">
-        <Input
-          value={code}
-          onChange={(e) => setCode(digitsOnly(e.target.value))}
-          placeholder={t("room.codePlaceholder")}
-          inputMode="numeric"
-          pattern="[0-9]*"
-          maxLength={6}
-          autoComplete="off"
-          className="rounded-xl font-mono tabular-nums tracking-[0.2em]"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") void handleJoin();
-          }}
-        />
+        <div className="flex gap-2">
+          <Input
+            value={code}
+            onChange={(e) => setCode(digitsOnly(e.target.value))}
+            placeholder={t("room.codePlaceholder")}
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={6}
+            autoComplete="off"
+            className="min-w-0 flex-1 rounded-xl font-mono tabular-nums tracking-[0.2em]"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void handleJoin();
+            }}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            className="shrink-0 rounded-xl px-3"
+            disabled={busy}
+            aria-label={t("room.scanTitle")}
+            onClick={() => {
+              if (!authed) {
+                onNeedAuth();
+                return;
+              }
+              setScanOpen(true);
+            }}
+          >
+            <ScanLine className="h-4 w-4" />
+          </Button>
+        </div>
         <Button
           className="w-full rounded-xl"
           disabled={busy}
-          onClick={handleJoin}
+          onClick={() => void handleJoin()}
           variant="outline"
         >
           {t("room.joinShort")}
         </Button>
       </div>
+      <RoomQrScanDialog
+        open={scanOpen}
+        onOpenChange={setScanOpen}
+        onCode={(scanned) => {
+          setCode(scanned);
+          void joinWithCode(scanned);
+        }}
+      />
 
       <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
         <span className="h-px flex-1 bg-slate-200" />

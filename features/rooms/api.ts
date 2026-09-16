@@ -268,7 +268,7 @@ export async function fetchRoomMembers(
   const { data, error } = await supabase
     .from("room_members")
     .select(
-      "user_id, seat, focus_status, elapsed_ms, break_label, melt_config, melt_anim_offset_ms, melt_board_x, melt_board_z, profiles(username, avatar_path)",
+      "user_id, seat, focus_status, elapsed_ms, break_label, last_seen_at, melt_config, melt_anim_offset_ms, melt_board_x, melt_board_z, profiles(username, avatar_path)",
     )
     .eq("room_id", roomId)
     .order("seat", { ascending: true });
@@ -306,6 +306,10 @@ export async function fetchRoomMembers(
       typeof rawBoardZ === "number" && Number.isFinite(rawBoardZ)
         ? Math.min(1, Math.max(0, rawBoardZ))
         : null;
+    const lastSeenRaw = (row as { last_seen_at?: string | null }).last_seen_at;
+    const lastSeenMs = lastSeenRaw ? Date.parse(lastSeenRaw) : NaN;
+    const clockSyncedAt = Number.isFinite(lastSeenMs) ? lastSeenMs : undefined;
+
     return {
       userId: (row as { user_id: string }).user_id,
       username,
@@ -313,9 +317,8 @@ export async function fetchRoomMembers(
       avatarPath: publicAvatarUrl(profile?.avatar_path ?? null),
       status,
       elapsedMs: Number((row as { elapsed_ms?: number | null }).elapsed_ms) || 0,
-      // Do not invent clockSyncedAt — DB has no break ms fields. Leaving this
-      // unset lets Realtime presence stamps win in pickNewerClockFields /
-      // mergeMembers so BREAK countdowns keep ticking across polls.
+      clockSyncedAt,
+      // DB has no break ms fields; Realtime presence / ghost stamps win in merge.
       seat: (row as { seat?: number | null }).seat ?? null,
       breakLabel,
       // break_label stores the stable break type id for table-only fallback.

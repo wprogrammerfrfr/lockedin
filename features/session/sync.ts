@@ -5,8 +5,9 @@ import {
   isLikelyOffline,
 } from "@/features/session/offlineQueue";
 
-/** No heartbeat for this long → treat as abandoned (sleep / kill / crash). */
-export const STALE_SESSION_MS = 3 * 60 * 1000;
+import { STALE_SESSION_MS } from "@/features/session/wall-clock";
+
+export { STALE_SESSION_MS };
 
 export class ActiveSessionExistsError extends Error {
   readonly existing: SessionRow | null;

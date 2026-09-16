@@ -11,7 +11,8 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Copy, IceCreamCone } from "lucide-react";
+import { IceCreamCone, UserPlus } from "lucide-react";
+import { RoomInviteDialog } from "@/components/rooms/RoomInviteDialog";
 import { AppShell } from "@/components/layout/AppShell";
 import { LockedInLogo } from "@/components/brand/LockedInLogo";
 import { FocusTimer } from "@/components/session/FocusTimer";
@@ -99,42 +100,6 @@ function isFocusSession(session: (typeof initialState)["session"]) {
   );
 }
 
-async function shareOrCopyInvite(link: string) {
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(link);
-      return "copied" as const;
-    }
-  } catch {
-    // Fall through to the native share sheet or legacy copy.
-  }
-
-  if (navigator.share) {
-    try {
-      await navigator.share({
-        title: "LockedIn room",
-        text: "Join my LockedIn room",
-        url: link,
-      });
-      return "shared" as const;
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        return "cancelled" as const;
-      }
-    }
-  }
-
-  const textarea = document.createElement("textarea");
-  textarea.value = link;
-  textarea.style.position = "fixed";
-  textarea.style.opacity = "0";
-  document.body.appendChild(textarea);
-  textarea.select();
-  const copied = document.execCommand("copy");
-  textarea.remove();
-  return copied ? ("copied" as const) : ("failed" as const);
-}
-
 export default function RoomFocusPage({
   params,
 }: {
@@ -165,6 +130,7 @@ export default function RoomFocusPage({
     x: number | null;
     z: number | null;
   }>({ x: null, z: null });
+  const [inviteOpen, setInviteOpen] = useState(false);
   const stateRef = useRef(state);
   stateRef.current = state;
   const seenRoomRef = useRef(false);
@@ -1042,19 +1008,16 @@ export default function RoomFocusPage({
                   variant="outline"
                   size="sm"
                   className="h-8 rounded-lg px-2.5 text-xs sm:h-9 sm:rounded-xl sm:px-3 sm:text-sm"
-                  onClick={async () => {
-                    const link = `${window.location.origin}/rooms/${displayCode}`;
-                    const result = await shareOrCopyInvite(link);
-                    if (result === "copied") {
-                      toast.success(t("room.toast.inviteCopied"));
-                    } else if (result === "failed") {
-                      toast.error(t("room.toast.copyFailed"));
-                    }
-                  }}
+                  onClick={() => setInviteOpen(true)}
                 >
-                  <Copy className="mr-1 h-3.5 w-3.5 sm:mr-1.5" />
+                  <UserPlus className="mr-1 h-3.5 w-3.5 sm:mr-1.5" />
                   {t("room.invite")}
                 </Button>
+                <RoomInviteDialog
+                  open={inviteOpen}
+                  onOpenChange={setInviteOpen}
+                  code={displayCode}
+                />
                 {isVoteRoom ? (
                   <Button
                     variant="outline"

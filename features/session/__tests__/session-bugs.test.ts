@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { initialState, reducer } from "@/features/session/reducer";
 import { isSessionStale } from "@/features/session/sync";
 import { isActiveSessionDraftStale } from "@/lib/auth/merge";
@@ -218,8 +218,32 @@ describe("hydrateRemoteFromSessionRow", () => {
     const action = hydrateRemoteFromSessionRow(row);
     expect(action.type).toBe("HYDRATE_REMOTE");
     expect(action.session).toBe("ON_BREAK");
-    expect(action.breakMs).toBe(5_000);
     expect(action.breakTypeId).toBe("hydration");
     expect(action.elapsedMs).toBe(20_000);
+    expect(action.breakMs).toBeGreaterThanOrEqual(5_000);
+  });
+
+  it("catch-up adds focus elapsed after sleep gap", () => {
+    const row: SessionRow = {
+      id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+      user_id: "u1",
+      session_name: "Deep work",
+      started_at: "2026-01-01T12:00:00.000Z",
+      ended_at: null,
+      status: "active",
+      active_ms: 60_000,
+      break_ms: 0,
+      break_types_used: [],
+      is_shared: false,
+      outcome: null,
+      pr_broken: false,
+      client_id: "cccccccc-dddd-4eee-8fff-000000000000",
+    };
+    const now = Date.parse("2026-01-01T12:10:00.000Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    const action = hydrateRemoteFromSessionRow(row);
+    vi.useRealTimers();
+    expect(action.elapsedMs).toBe(10 * 60_000);
   });
 });
