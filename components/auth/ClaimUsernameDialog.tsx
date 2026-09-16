@@ -28,7 +28,7 @@ export function ClaimUsernameDialog() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const open = Boolean(needsUsernameClaim && user);
+  const open = Boolean(needsUsernameClaim && user && !user.is_anonymous);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

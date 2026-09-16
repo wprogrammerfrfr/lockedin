@@ -22,13 +22,14 @@ Fill in:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `NEXT_PUBLIC_SITE_URL` (production canonical origin, e.g. `https://your-domain.com`)
 
-2. Apply all SQL migrations in `supabase/migrations/` to your Supabase project (SQL editor or CLI), in order (`00001` … `00043`).
+2. Apply all SQL migrations in `supabase/migrations/` to your Supabase project (SQL editor or CLI), in order (`00001` … latest).
 
 3. Enable Auth providers in the Supabase dashboard:
 
 - Email (with confirmations **on** for production)
 - Google OAuth
 - GitHub OAuth
+- **Anonymous Sign-Ins** (required so guests can join rooms with a nickname without creating an account; only logged-in users can create rooms)
 
 Redirect URL allowlist must include:
 

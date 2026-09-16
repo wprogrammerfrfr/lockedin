@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ScanLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { GuestNicknameDialog } from "@/components/rooms/GuestNicknameDialog";
 import { RoomQrScanDialog } from "@/components/rooms/RoomQrScanDialog";
 import { Input } from "@/components/ui/input";
 import { PomodoroCreateFields } from "@/components/rooms/PomodoroCreateFields";
@@ -13,6 +14,7 @@ import {
   createRoom,
   joinRoom,
 } from "@/features/rooms/api";
+import { joinRoomAsGuest } from "@/features/rooms/guest-join";
 import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { userFacingError } from "@/lib/supabase/errors";
@@ -38,6 +40,8 @@ export function JoinCreateBar({
   const [breakMinutes, setBreakMinutes] = useState(10);
   const [busy, setBusy] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
+  const [nickOpen, setNickOpen] = useState(false);
+  const [pendingCode, setPendingCode] = useState<string | null>(null);
 
   async function handleCreate() {
     if (!authed) {
@@ -73,15 +77,7 @@ export function JoinCreateBar({
     }
   }
 
-  async function joinWithCode(raw: string) {
-    if (!authed) {
-      onNeedAuth();
-      return;
-    }
-    if (!/^\d{6}$/.test(raw)) {
-      toast.error(t("room.toast.invalidCode"));
-      return;
-    }
+  async function joinAuthed(raw: string) {
     setBusy(true);
     try {
       const supabase = createClient();
@@ -90,6 +86,44 @@ export function JoinCreateBar({
     } catch (err) {
       const msg = userFacingError(err, t("room.toast.joinFailed"));
       if (/room_full/i.test(err instanceof Error ? err.message : msg)) {
+        toast.error(t("room.toast.roomFull"));
+      } else {
+        toast.error(msg);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function joinWithCode(raw: string) {
+    if (!/^\d{6}$/.test(raw)) {
+      toast.error(t("room.toast.invalidCode"));
+      return;
+    }
+    if (!authed) {
+      setPendingCode(raw);
+      setNickOpen(true);
+      return;
+    }
+    await joinAuthed(raw);
+  }
+
+  async function handleGuestConfirm(nickname: string) {
+    if (!pendingCode) return;
+    setBusy(true);
+    try {
+      const supabase = createClient();
+      const room = await joinRoomAsGuest(supabase, pendingCode, nickname);
+      setNickOpen(false);
+      setPendingCode(null);
+      router.push(`/rooms/${room.code}`);
+    } catch (err) {
+      const msg = userFacingError(err, t("room.toast.joinFailed"));
+      if (/invalid_nickname/i.test(err instanceof Error ? err.message : "")) {
+        toast.error(t("room.toast.nicknameInvalid"));
+      } else if (/anonymous_sign_in|sign_in/i.test(msg)) {
+        toast.error(t("room.toast.guestJoinUnavailable"));
+      } else if (/room_full/i.test(err instanceof Error ? err.message : msg)) {
         toast.error(t("room.toast.roomFull"));
       } else {
         toast.error(msg);
@@ -169,13 +203,7 @@ export function JoinCreateBar({
             className="shrink-0 rounded-xl px-3"
             disabled={busy}
             aria-label={t("room.scanTitle")}
-            onClick={() => {
-              if (!authed) {
-                onNeedAuth();
-                return;
-              }
-              setScanOpen(true);
-            }}
+            onClick={() => setScanOpen(true)}
           >
             <ScanLine className="h-4 w-4" />
           </Button>
@@ -196,6 +224,15 @@ export function JoinCreateBar({
           setCode(scanned);
           void joinWithCode(scanned);
         }}
+      />
+      <GuestNicknameDialog
+        open={nickOpen}
+        onOpenChange={(open) => {
+          setNickOpen(open);
+          if (!open) setPendingCode(null);
+        }}
+        busy={busy}
+        onConfirm={handleGuestConfirm}
       />
 
       <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">

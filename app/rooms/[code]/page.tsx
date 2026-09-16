@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { IceCreamCone, UserPlus } from "lucide-react";
 import { RoomInviteDialog } from "@/components/rooms/RoomInviteDialog";
+import { GuestNicknameDialog } from "@/components/rooms/GuestNicknameDialog";
 import { AppShell } from "@/components/layout/AppShell";
 import { LockedInLogo } from "@/components/brand/LockedInLogo";
 import { FocusTimer } from "@/components/session/FocusTimer";
@@ -38,6 +39,7 @@ import {
   requestSharedBreak,
   resolveBreakVote,
 } from "@/features/rooms/api";
+import { joinRoomAsGuest } from "@/features/rooms/guest-join";
 import { useRoomCloseWatch } from "@/features/rooms/closeWatch";
 import {
   memberDisplayClock,
@@ -108,7 +110,7 @@ export default function RoomFocusPage({
   const { code } = use(params);
   const router = useRouter();
   const { t } = useTranslation();
-  const { status, user, profile, avatarUrl, isAuthenticated, profileLabel } =
+  const { status, user, profile, avatarUrl, isAuthenticated, isAnonymous, profileLabel } =
     useAuth();
   const [room, setRoom] = useState<RoomSummary | null>(null);
   const [missing, setMissing] = useState(false);
@@ -131,6 +133,8 @@ export default function RoomFocusPage({
     z: number | null;
   }>({ x: null, z: null });
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [guestNickOpen, setGuestNickOpen] = useState(false);
+  const [guestNickBusy, setGuestNickBusy] = useState(false);
   const stateRef = useRef(state);
   stateRef.current = state;
   const seenRoomRef = useRef(false);
@@ -147,14 +151,19 @@ export default function RoomFocusPage({
     try {
       const supabase = createClient();
       const normalized = code.replace(/\D/g, "").slice(0, 6);
+      const canAutoJoin =
+        (isAuthenticated || isAnonymous) &&
+        normalized.length === 6 &&
+        !joinedRef.current;
 
-      // Auto-join when authenticated so shared invite URLs seat the viewer.
-      if (isAuthenticated && normalized.length === 6 && !joinedRef.current) {
+      // Auto-join when seated identity exists (real or anon guest).
+      if (canAutoJoin) {
         try {
           const joined = await joinRoom(supabase, normalized);
           joinedRef.current = true;
           seenRoomRef.current = true;
           setMissing(false);
+          setGuestNickOpen(false);
           setRoom(joined);
           if (joined.activeBreakRoundId) {
             const votes = await fetchBreakVotes(
@@ -195,6 +204,15 @@ export default function RoomFocusPage({
       loadErrorToastRef.current = false;
       setMissing(false);
       setRoom(next);
+      if (
+        status !== "loading" &&
+        !isAuthenticated &&
+        !isAnonymous &&
+        normalized.length === 6 &&
+        !joinedRef.current
+      ) {
+        setGuestNickOpen(true);
+      }
       if (next.activeBreakRoundId) {
         const votes = await fetchBreakVotes(
           supabase,
@@ -213,7 +231,7 @@ export default function RoomFocusPage({
         toast.error(t("room.toast.loadFailed"));
       }
     }
-  }, [code, router, isAuthenticated]);
+  }, [code, router, isAuthenticated, isAnonymous, status, t]);
 
   useEffect(() => {
     void loadRoom();
@@ -438,12 +456,17 @@ export default function RoomFocusPage({
     setMeltBoardPos({ x, z });
   }, []);
 
-  useSessionClock(state, dispatch, { isAuthenticated });
-  useOfflineQueueReplay(status !== "loading" && isAuthenticated);
+  useSessionClock(state, dispatch, {
+    isAuthenticated: isAuthenticated || isAnonymous,
+  });
+  useOfflineQueueReplay(
+    status !== "loading" && (isAuthenticated || isAnonymous),
+  );
 
   // Auto-end stale orphans left by sleep / kill while in a room session
   useEffect(() => {
-    if (status === "loading" || !isAuthenticated || !userId) return;
+    if (status === "loading" || !(isAuthenticated || isAnonymous) || !userId)
+      return;
     if (isFocusSession(state.session)) return;
 
     let cancelled = false;
@@ -478,7 +501,51 @@ export default function RoomFocusPage({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- auth gate only
-  }, [status, isAuthenticated, userId]);
+  }, [status, isAuthenticated, isAnonymous, userId]);
+
+  async function onGuestNicknameConfirm(nickname: string) {
+    const normalized = code.replace(/\D/g, "").slice(0, 6);
+    if (normalized.length !== 6) return;
+    setGuestNickBusy(true);
+    try {
+      const joined = await joinRoomAsGuest(
+        createClient(),
+        normalized,
+        nickname,
+      );
+      joinedRef.current = true;
+      seenRoomRef.current = true;
+      setGuestNickOpen(false);
+      setMissing(false);
+      setRoom(joined);
+      if (joined.activeBreakRoundId) {
+        const votes = await fetchBreakVotes(
+          createClient(),
+          joined.id,
+          joined.activeBreakRoundId,
+        );
+        setTallies({ break: votes.break, stay: votes.stay });
+        setMyVote(votes.myVote);
+      }
+    } catch (err) {
+      const msg = userFacingError(err, t("room.toast.joinFailed"));
+      if (/invalid_nickname/i.test(err instanceof Error ? err.message : "")) {
+        toast.error(t("room.toast.nicknameInvalid"));
+      } else if (/anonymous_sign_in|sign_in/i.test(msg)) {
+        toast.error(t("room.toast.guestJoinUnavailable"));
+      } else if (/room_full/i.test(err instanceof Error ? err.message : msg)) {
+        toast.error(t("room.toast.roomFull"));
+      } else if (/room_not_found|room_closed/i.test(msg)) {
+        setMissing(true);
+        setRoom(null);
+        setGuestNickOpen(false);
+      } else {
+        toast.error(msg);
+      }
+    } finally {
+      setGuestNickBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (status === "loading" || !userId) return;
@@ -1191,6 +1258,13 @@ export default function RoomFocusPage({
           dispatch({ type: "MELT_POST_ACTION", action });
         }}
         onDismiss={() => setMeltDialogDismissed(true)}
+      />
+
+      <GuestNicknameDialog
+        open={guestNickOpen}
+        onOpenChange={setGuestNickOpen}
+        busy={guestNickBusy}
+        onConfirm={onGuestNicknameConfirm}
       />
 
       <BreakVoteDialog

@@ -33,6 +33,8 @@ type AuthContextValue = {
   user: User | null;
   session: Session | null;
   isAuthenticated: boolean;
+  /** True when the session is a Supabase anonymous guest (can join rooms, not create). */
+  isAnonymous: boolean;
   profile: AuthProfile | null;
   /** Indicator label: username → email local-part → "User". */
   profileLabel: string;
@@ -120,6 +122,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const applyUser = useCallback(
     (next: User | null, nextSession: Session | null) => {
+      if (next?.is_anonymous) {
+        setUser(next);
+        setSession(nextSession);
+        setStatus("guest");
+        return;
+      }
       const real = isRealUser(next) ? next : null;
       setUser(real);
       setSession(real ? nextSession : null);
@@ -256,7 +264,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [applyUser, router]);
 
   useEffect(() => {
-    if (status !== "authenticated" || !user?.id) {
+    if (!user?.id) {
       setProfile(null);
       profileUserIdRef.current = null;
       return;
@@ -264,9 +272,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void loadProfile(user.id);
   }, [status, user?.id, loadProfile]);
 
-  // Merge guest localStorage drafts once on sign-in (any route).
+  // Merge guest localStorage drafts once on real sign-in (any route).
   useEffect(() => {
-    if (status !== "authenticated" || !user?.id) return;
+    if (status !== "authenticated" || !user?.id || user.is_anonymous) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -300,6 +308,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       session,
       isAuthenticated: status === "authenticated",
+      isAnonymous: Boolean(user?.is_anonymous),
       profile,
       profileLabel: buildProfileLabel(profile, user),
       email: user?.email ?? null,
@@ -307,6 +316,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       connectedVia: connectedViaFromUser(user),
       needsUsernameClaim:
         status === "authenticated" &&
+        !user?.is_anonymous &&
         needsUsernameClaim(
           profile?.username,
           profile?.username_claimed_at,

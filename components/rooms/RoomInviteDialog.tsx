@@ -35,8 +35,8 @@ export function RoomInviteDialog({
       renderSVG(link, {
         pixelSize: 6,
         border: 2,
-        blackColor: "#fafafa",
-        whiteColor: "#09090b",
+        blackColor: "#09090b",
+        whiteColor: "#ffffff",
         ecc: "M",
       }),
     [link],
@@ -67,27 +67,24 @@ export function RoomInviteDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm border-border bg-zinc-950 text-foreground sm:rounded-2xl">
+      <DialogContent className="max-w-sm border-border bg-card text-foreground sm:rounded-2xl">
         <DialogHeader>
           <DialogTitle className="font-display text-lg">
             {t("room.inviteDialogTitle")}
           </DialogTitle>
         </DialogHeader>
-        <p className="text-center text-xs text-zinc-400">
-          {t("room.inviteDialogHint")}
-        </p>
-        <p className="text-center font-mono text-4xl font-bold tabular-nums tracking-[0.25em] text-white">
+        <p className="text-center font-mono text-4xl font-bold tabular-nums tracking-[0.25em] text-foreground">
           {code}
         </p>
         <div
-          className="mx-auto w-fit rounded-2xl border border-white/10 bg-zinc-950 p-3"
+          className="mx-auto size-52 rounded-2xl border border-border bg-white p-3 [&>svg]:h-full [&>svg]:w-full"
           dangerouslySetInnerHTML={{ __html: qrSvg }}
         />
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button
             type="button"
             variant="outline"
-            className="flex-1 rounded-xl border-white/10 bg-zinc-900"
+            className="flex-1 rounded-xl"
             onClick={() => void onCopy()}
           >
             <Copy className="mr-2 h-4 w-4" />

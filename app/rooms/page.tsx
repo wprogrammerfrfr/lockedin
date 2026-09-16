@@ -17,11 +17,7 @@ export default function RoomsPage() {
   const [tz, setTz] = useState("UTC");
 
   useEffect(() => {
-    if (status === "loading") return;
-    if (!isAuthenticated || !userId) {
-      setGateOpen(true);
-      return;
-    }
+    if (status === "loading" || !isAuthenticated || !userId) return;
 
     let cancelled = false;
     void (async () => {
@@ -53,16 +49,16 @@ export default function RoomsPage() {
 
         {status === "loading" ? (
           <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
-        ) : isAuthenticated ? (
+        ) : (
           <>
             <JoinCreateBar
               authed={isAuthenticated}
               onNeedAuth={() => setGateOpen(true)}
             />
-            <WeeklyLeaderboard timezone={tz} compact />
+            {isAuthenticated ? (
+              <WeeklyLeaderboard timezone={tz} compact />
+            ) : null}
           </>
-        ) : (
-          <p className="text-sm text-muted-foreground">{t("auth.loginRequired")}</p>
         )}
       </div>
 
