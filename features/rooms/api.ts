@@ -67,6 +67,49 @@ export async function leaveRoom(supabase: SupabaseClient, roomId: string) {
   if (error) throw new Error(error.message);
 }
 
+function supabaseRpcUrl(fn: string) {
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim().replace(/\/$/, "");
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  if (!base || !anonKey) return null;
+  return { url: `${base}/rest/v1/rpc/${fn}`, anonKey };
+}
+
+/**
+ * Best-effort leave_room on tab/app close (pagehide with persisted=false).
+ * Do not call on visibilitychange — app switch must keep the seat.
+ */
+export function leaveRoomKeepalive(
+  roomId: string,
+  accessToken: string | null | undefined,
+): void {
+  const rpc = supabaseRpcUrl("leave_room");
+  if (!rpc || !accessToken || !roomId) return;
+  try {
+    void fetch(rpc.url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: rpc.anonKey,
+        Authorization: `Bearer ${accessToken}`,
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({ p_room_id: roomId }),
+      keepalive: true,
+    });
+  } catch {
+    /* unload — ignore */
+  }
+}
+
+/** Prune stale seats and advance closing / recovery for the caller's room. */
+export async function sweepRoom(supabase: SupabaseClient, roomId: string) {
+  const { data, error } = await supabase.rpc("sweep_room", {
+    p_room_id: roomId,
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 /** Leave waiting/live/closing rooms so a new create/join is not blocked. */
 export async function leaveOpenRooms(
   supabase: SupabaseClient,
@@ -265,23 +308,53 @@ export async function fetchRoomMembers(
   supabase: SupabaseClient,
   roomId: string,
 ): Promise<RoomPresenceMember[]> {
-  const { data, error } = await supabase
-    .from("room_members")
-    .select(
-      "user_id, seat, focus_status, elapsed_ms, break_label, last_seen_at, melt_config, melt_anim_offset_ms, melt_board_x, melt_board_z, profiles(username, avatar_path)",
-    )
-    .eq("room_id", roomId)
-    .order("seat", { ascending: true });
+  const selectWithAnon =
+    "user_id, seat, focus_status, elapsed_ms, break_label, last_seen_at, melt_config, melt_anim_offset_ms, melt_board_x, melt_board_z, profiles(username, avatar_path, is_anonymous)";
+  const selectWithoutAnon =
+    "user_id, seat, focus_status, elapsed_ms, break_label, last_seen_at, melt_config, melt_anim_offset_ms, melt_board_x, melt_board_z, profiles(username, avatar_path)";
+
+  let data: unknown[] | null = null;
+  let error: { message: string } | null = null;
+
+  {
+    const first = await supabase
+      .from("room_members")
+      .select(selectWithAnon)
+      .eq("room_id", roomId)
+      .order("seat", { ascending: true });
+    if (first.error && /is_anonymous/i.test(first.error.message)) {
+      const second = await supabase
+        .from("room_members")
+        .select(selectWithoutAnon)
+        .eq("room_id", roomId)
+        .order("seat", { ascending: true });
+      data = second.data as unknown[] | null;
+      error = second.error;
+    } else {
+      data = first.data as unknown[] | null;
+      error = first.error;
+    }
+  }
   if (error) throw new Error(error.message);
 
   return (data ?? []).map((row) => {
     const profile = Array.isArray(
       (row as { profiles?: unknown }).profiles,
     )
-      ? (row as { profiles: { username?: string; avatar_path?: string | null }[] })
-          .profiles[0]
-      : (row as { profiles?: { username?: string; avatar_path?: string | null } })
-          .profiles;
+      ? (row as {
+          profiles: {
+            username?: string;
+            avatar_path?: string | null;
+            is_anonymous?: boolean | null;
+          }[];
+        }).profiles[0]
+      : (row as {
+          profiles?: {
+            username?: string;
+            avatar_path?: string | null;
+            is_anonymous?: boolean | null;
+          };
+        }).profiles;
     const username = profile?.username?.trim() || "member";
     const rawStatus = (row as { focus_status?: string | null }).focus_status;
     const status: RoomPresenceMember["status"] =
@@ -318,6 +391,7 @@ export async function fetchRoomMembers(
       status,
       elapsedMs: Number((row as { elapsed_ms?: number | null }).elapsed_ms) || 0,
       clockSyncedAt,
+      isAnonymous: Boolean(profile?.is_anonymous),
       // DB has no break ms fields; Realtime presence / ghost stamps win in merge.
       seat: (row as { seat?: number | null }).seat ?? null,
       breakLabel,

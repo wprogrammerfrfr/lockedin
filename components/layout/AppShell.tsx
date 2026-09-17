@@ -76,11 +76,7 @@ export function AppShell({
     <div
       className={cn(
         "flex flex-1 flex-col bg-background",
-          layoutMode === "solo-focus"
-            ? "h-svh overflow-hidden"
-            : layoutMode === "room-focus"
-              ? "h-dvh overflow-hidden overscroll-none"
-              : "min-h-full",
+        layoutMode === "solo-focus" ? "h-svh overflow-hidden" : "min-h-full",
       )}
     >
       {showSidebar && (
@@ -151,8 +147,7 @@ export function AppShell({
       <div
         className={cn(
           "flex min-h-0 flex-1",
-          (layoutMode === "solo-focus" || layoutMode === "room-focus") &&
-            "overflow-hidden",
+          layoutMode === "solo-focus" && "overflow-hidden",
         )}
       >
         <AnimatePresence initial={false}>
@@ -195,7 +190,7 @@ export function AppShell({
             layoutMode === "solo-focus"
               ? "flex min-h-0 items-start justify-center overflow-y-auto px-3 py-4 sm:items-center sm:px-6"
               : layoutMode === "room-focus"
-                ? "flex min-h-0 flex-col overflow-y-auto px-0 py-0"
+                ? "min-h-0 overflow-y-auto px-0 py-0"
                 : "overflow-y-auto px-4 py-6 sm:px-6 lg:px-8 lg:py-8",
           )}
           style={
@@ -223,7 +218,7 @@ export function AppShell({
               layoutMode === "solo-focus"
                 ? "max-w-6xl scale-100"
                 : layoutMode === "room-focus"
-                  ? "w-full max-w-6xl"
+                  ? "w-full max-w-6xl shrink-0"
                   : "max-w-6xl",
             )}
           >

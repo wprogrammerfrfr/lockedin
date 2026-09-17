@@ -385,7 +385,7 @@ export function RoomMeltTable({
   );
   /** Scoop hangs above the slab; wrapper includes caption room below contact. */
   const scoopOverhangPx = Math.round(dessertPx * 0.92);
-  const captionPadPx = 28;
+  const captionPadPx = 36;
   const boardHeightPx = chromeHeightPx + scoopOverhangPx + captionPadPx;
   /** Contact line as % from bottom of the board wrapper (chrome sits at bottom). */
   const tabletopFromBottomPct =
@@ -413,14 +413,14 @@ export function RoomMeltTable({
   return (
     <div
       className={cn(
-        "flex h-full min-h-0 w-full min-w-0 flex-col",
+        "flex w-full min-w-0 flex-col",
         className,
       )}
     >
-      {/* Stage fills leftover height; compact table+scoops are vertically centered. */}
+      {/* Compact table+scoops; intrinsic height so LOCK IN can scroll into view. */}
       <div
         ref={stageRef}
-        className="relative mx-auto flex min-h-[10rem] w-full min-w-0 flex-1 items-center justify-center overflow-visible sm:min-h-[12rem]"
+        className="relative mx-auto flex min-h-[10rem] w-full min-w-0 items-center justify-center overflow-visible sm:min-h-[12rem]"
       >
         <div
           className="relative"

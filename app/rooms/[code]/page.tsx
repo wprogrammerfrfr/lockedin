@@ -36,6 +36,7 @@ import {
   fetchRoomByCode,
   joinRoom,
   leaveRoom,
+  leaveRoomKeepalive,
   requestSharedBreak,
   resolveBreakVote,
 } from "@/features/rooms/api";
@@ -139,6 +140,8 @@ export default function RoomFocusPage({
   stateRef.current = state;
   const seenRoomRef = useRef(false);
   const joinedRef = useRef(false);
+  const leftIntentionallyRef = useRef(false);
+  const accessTokenRef = useRef<string | null>(null);
   const appliedVoteRoundRef = useRef<string | null>(null);
   const prevActiveBreakRoundRef = useRef<string | null>(null);
   const loadErrorToastRef = useRef(false);
@@ -350,6 +353,7 @@ export default function RoomFocusPage({
               : ("WAITING" as const),
         elapsedMs: state.elapsedMs,
         seat: null as number | null,
+        isAnonymous,
         breakLabel: onBreak ? breakLabel : null,
         breakType: onBreak ? breakType : null,
         breakElapsedMs: onBreak
@@ -388,6 +392,7 @@ export default function RoomFocusPage({
       userId,
       username,
       avatarPath,
+      isAnonymous,
       t,
     ],
   );
@@ -398,6 +403,53 @@ export default function RoomFocusPage({
     presenceSelf,
     room?.name,
   );
+
+  // Keep access token for unload leave beacon (pagehide cannot await).
+  useEffect(() => {
+    if (!userId) {
+      accessTokenRef.current = null;
+      return;
+    }
+    let cancelled = false;
+    void createClient()
+      .auth.getSession()
+      .then(({ data }) => {
+        if (!cancelled) {
+          accessTokenRef.current = data.session?.access_token ?? null;
+        }
+      })
+      .catch(() => {
+        if (!cancelled) accessTokenRef.current = null;
+      });
+    const {
+      data: { subscription },
+    } = createClient().auth.onAuthStateChange((_event, session) => {
+      accessTokenRef.current = session?.access_token ?? null;
+    });
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+  }, [userId]);
+
+  // Tab/app close → keepalive leave so the seat drops immediately.
+  // Skip visibilitychange (app switch / lock screen) and bfcache restores.
+  useEffect(() => {
+    const roomId = room?.id;
+    if (!roomId || !userId) return;
+
+    const onPageHide = (event: PageTransitionEvent) => {
+      if (event.persisted) return;
+      if (leftIntentionallyRef.current) return;
+      leftIntentionallyRef.current = true;
+      leaveRoomKeepalive(roomId, accessTokenRef.current);
+    };
+
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      window.removeEventListener("pagehide", onPageHide);
+    };
+  }, [room?.id, userId]);
 
   const selfLive = useMemo((): SelfLiveClock | null => {
     if (!userId) return null;
@@ -900,6 +952,7 @@ export default function RoomFocusPage({
 
   async function onLeave() {
     try {
+      leftIntentionallyRef.current = true;
       if (isFocusSession(stateRef.current.session) && stateRef.current.remoteSessionId) {
         await persistEnd("end");
         dispatch({ type: "END_SESSION" });
@@ -910,6 +963,7 @@ export default function RoomFocusPage({
         } catch (err) {
           const msg = err instanceof Error ? err.message : "";
           if (!msg.includes("not_in_room")) {
+            leftIntentionallyRef.current = false;
             toast.error(userFacingError(err, t("room.toast.leaveFailed")));
             return;
           }
@@ -917,6 +971,7 @@ export default function RoomFocusPage({
       }
       router.push("/rooms");
     } catch (err) {
+      leftIntentionallyRef.current = false;
       toast.error(userFacingError(err, t("room.toast.leaveFailed")));
     }
   }
@@ -1004,6 +1059,7 @@ export default function RoomFocusPage({
           members={members}
           selfUserId={userId}
           selfLive={selfLive}
+          selfIsAnonymous={isAnonymous}
         />
       }
       presenceStrip={

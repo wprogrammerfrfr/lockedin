@@ -22,6 +22,8 @@ export type RoomPresenceMember = {
    */
   clockSyncedAt?: number;
   seat?: number | null;
+  /** True when the member is a Supabase anonymous guest (not followable). */
+  isAnonymous?: boolean;
   /** Live break label, e.g. "15-minute Hydration Break" or "Quick Doomscroll". */
   breakLabel?: string | null;
   /** Choice id / coarse type for badges: hydration, doomscroll, pomodoro, etc. */

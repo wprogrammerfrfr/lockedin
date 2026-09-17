@@ -21,6 +21,7 @@ const ALLOWED_KEYS: Record<string, string> = {
   room_not_found: "That room code doesn't exist.",
   room_closed: "That room has closed.",
   not_in_room: "You're not in that room.",
+  anonymous_not_allowed: "Guests can't do that — sign in with a real account.",
   room_not_live: "Need at least two people in the room to vote on a break.",
   vote_in_progress: "A break vote is already running.",
   not_vote_room: "Pomodoro rooms use an automatic break cadence.",

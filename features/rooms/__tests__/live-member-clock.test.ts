@@ -276,4 +276,28 @@ describe("mergeMembers", () => {
     const clock = memberDisplayClock(merged[0]!, 1_005_000);
     expect(clock.displayMs).toBe(20_000);
   });
+
+  it("hides idle table members missing from presence after sync", () => {
+    const table = [
+      baseMember({
+        userId: "u1",
+        seat: 1,
+        status: "WAITING",
+      }),
+      baseMember({
+        userId: "u2",
+        seat: 2,
+        status: "LOCKED_IN",
+        elapsedMs: 5_000,
+      }),
+    ];
+    const presence = new Map<string, RoomPresenceMember>();
+    const beforeSync = mergeMembers(table, presence, { presenceSynced: false });
+    expect(beforeSync).toHaveLength(2);
+
+    const afterSync = mergeMembers(table, presence, { presenceSynced: true });
+    expect(afterSync).toHaveLength(1);
+    expect(afterSync[0]?.userId).toBe("u2");
+    expect(afterSync[0]?.status).toBe("LOCKED_IN");
+  });
 });

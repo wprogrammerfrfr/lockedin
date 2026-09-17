@@ -42,6 +42,9 @@ export function FollowButton({
 
   if (status === "self") return null;
 
+  // Guests / unauthenticated: never show Follow controls.
+  if (!isAuthenticated) return null;
+
   if (compact && (status === "accepted" || status === "blocked")) {
     return null;
   }

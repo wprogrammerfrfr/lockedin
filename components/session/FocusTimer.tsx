@@ -358,7 +358,7 @@ export function FocusTimer({
                   )}
                   <p
                     className={cn(
-                      "max-w-[11rem] text-center text-[10px] leading-snug tracking-[0.12em]",
+                      "max-w-[11rem] break-words px-1 text-center text-[10px] leading-snug tracking-[0.12em]",
                       muted ? "text-red-400/70" : "text-muted-foreground",
                       accent.text &&
                         (state === "ON_BREAK" || state === "CHOOSING_BREAK") &&
@@ -410,7 +410,14 @@ export function FocusTimer({
                     )}
                   </AnimatePresence>
                 </div>
-                <div className="min-h-0 min-w-0 flex-1 overflow-visible">
+                <div
+                  className={cn(
+                    "min-w-0 overflow-visible",
+                    roomLandscape
+                      ? "min-h-0 flex-1"
+                      : "w-full",
+                  )}
+                >
                   {heroExtra}
                 </div>
               </motion.div>

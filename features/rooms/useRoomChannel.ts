@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import {
   fetchRoomMembers,
+  sweepRoom,
   touchRoomPresence,
 } from "@/features/rooms/api";
 import { pickNewerClockFields } from "@/features/rooms/live-member-clock";
@@ -18,6 +19,8 @@ import {
 import { userFacingError } from "@/lib/supabase/errors";
 
 const TOUCH_MS = 10_000;
+/** Sweep stale seats every 3 touches (~30s) so disconnects advance closing. */
+const SWEEP_EVERY_TOUCHES = 3;
 
 /** Presence track payload: nested melt config is stringified on the wire. */
 type PresenceTrackPayload = Omit<RoomPresenceMember, "meltConfig"> & {
@@ -62,6 +65,7 @@ function normalizePresenceMember(
     meltConfig: parsePresenceMeltConfig(meta.meltConfig),
     meltBoardX: clamp01(meta.meltBoardX),
     meltBoardZ: clamp01(meta.meltBoardZ),
+    isAnonymous: Boolean(meta.isAnonymous),
   };
 }
 
@@ -69,12 +73,21 @@ function normalizePresenceMember(
 export function mergeMembers(
   table: RoomPresenceMember[],
   presence: Map<string, RoomPresenceMember>,
+  opts?: { presenceSynced?: boolean },
 ): RoomPresenceMember[] {
   const bySeat = new Map<number, RoomPresenceMember>();
   const extras: RoomPresenceMember[] = [];
+  const presenceSynced = opts?.presenceSynced ?? false;
 
   for (const m of table) {
     const live = presence.get(m.userId);
+    // After Realtime has synced once, drop idle seats that left presence
+    // (tab/app closed). Keep LOCKED_IN/BREAK ghosts for sleep/reconnect.
+    if (presenceSynced && !live) {
+      if (m.status !== "LOCKED_IN" && m.status !== "BREAK") {
+        continue;
+      }
+    }
     const next: RoomPresenceMember = live
       ? (() => {
           // Prefer DB status when it already left WAITING so a stale presence
@@ -99,6 +112,7 @@ export function mergeMembers(
             username: live.username || m.username,
             displayName: live.displayName || m.displayName,
             avatarPath: live.avatarPath || m.avatarPath,
+            isAnonymous: live.isAnonymous ?? m.isAnonymous ?? false,
             breakLabel: onBreak
               ? live.breakLabel || m.breakLabel || null
               : null,
@@ -150,10 +164,19 @@ async function toastMemberJoined(
   member: RoomPresenceMember,
   roomName: string | null | undefined,
   selfUserId: string | null,
+  selfIsAnonymous: boolean,
 ) {
   if (!selfUserId || member.userId === selfUserId) return;
 
   const message = joinToastMessage(member.username, roomName);
+  const targetIsAnonymous = Boolean(member.isAnonymous);
+
+  // Guests cannot follow; logged-in users cannot follow guests.
+  if (selfIsAnonymous || targetIsAnonymous) {
+    toast.message(message);
+    return;
+  }
+
   let relation: Awaited<ReturnType<typeof getFollowRelation>> = "none";
   try {
     relation = await getFollowRelation(createClient(), member.userId);
@@ -190,6 +213,7 @@ export function useRoomChannel(
   const [presenceById, setPresenceById] = useState<
     Map<string, RoomPresenceMember>
   >(() => new Map());
+  const [presenceSynced, setPresenceSynced] = useState(false);
   const [channelStatus, setChannelStatus] = useState<
     "idle" | "joined" | "error" | "closed"
   >("idle");
@@ -203,8 +227,11 @@ export function useRoomChannel(
   const channelRef = useRef<ReturnType<
     ReturnType<typeof createClient>["channel"]
   > | null>(null);
+  const touchCountRef = useRef(0);
 
-  const members = mergeMembers(tableMembers, presenceById);
+  const members = mergeMembers(tableMembers, presenceById, {
+    presenceSynced,
+  });
 
   const applyTableRows = useCallback(
     (rows: RoomPresenceMember[], cancelled: { current: boolean }) => {
@@ -215,9 +242,10 @@ export function useRoomChannel(
         knownIdsRef.current = new Set(rows.map((r) => r.userId));
       } else {
         const selfId = selfRef.current.userId;
+        const selfAnon = Boolean(selfRef.current.isAnonymous);
         for (const row of rows) {
           if (prev.has(row.userId)) continue;
-          void toastMemberJoined(row, roomNameRef.current, selfId);
+          void toastMemberJoined(row, roomNameRef.current, selfId, selfAnon);
         }
         knownIdsRef.current = new Set(rows.map((r) => r.userId));
       }
@@ -288,6 +316,7 @@ export function useRoomChannel(
       elapsedMs: s.elapsedMs,
       clockSyncedAt,
       seat: s.seat,
+      isAnonymous: Boolean(s.isAnonymous),
       breakLabel: s.status === "BREAK" ? s.breakLabel ?? null : null,
       breakType: s.status === "BREAK" ? s.breakType ?? null : null,
       breakElapsedMs: s.status === "BREAK" ? s.breakElapsedMs ?? 0 : 0,
@@ -342,6 +371,7 @@ export function useRoomChannel(
       config: { presence: { key: self.userId } },
     });
     channelRef.current = channel;
+    setPresenceSynced(false);
 
     channel
       .on("presence", { event: "sync" }, () => {
@@ -361,6 +391,7 @@ export function useRoomChannel(
         setPresenceById((prev) =>
           mergePresenceOnSync(incoming, prev, tableMembersRef.current),
         );
+        setPresenceSynced(true);
       })
       .subscribe((status) => {
         if (cancelled.current) return;
@@ -378,15 +409,23 @@ export function useRoomChannel(
     const touchId = window.setInterval(() => {
       touchSelf(roomId);
       trackSelf();
+      touchCountRef.current += 1;
+      if (touchCountRef.current % SWEEP_EVERY_TOUCHES === 0) {
+        void sweepRoom(createClient(), roomId)
+          .then(() => loadTable(roomId, cancelled))
+          .catch(() => undefined);
+      }
     }, TOUCH_MS);
 
     return () => {
       cancelled.current = true;
       window.clearInterval(touchId);
       channelRef.current = null;
+      touchCountRef.current = 0;
+      setPresenceSynced(false);
       void supabase.removeChannel(channel);
     };
-  }, [code, roomId, self.userId, trackSelf, touchSelf]);
+  }, [code, roomId, self.userId, trackSelf, touchSelf, loadTable]);
 
   const elapsedSec = Math.floor(self.elapsedMs / 1000);
   const breakClockSec = Math.floor(
@@ -399,6 +438,7 @@ export function useRoomChannel(
     self.avatarPath,
     self.username,
     self.status,
+    self.isAnonymous,
     elapsedSec,
     self.seat,
     self.breakLabel,

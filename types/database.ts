@@ -7,6 +7,7 @@ export type ProfileRow = {
   bio: string | null;
   timezone: string;
   username_changed_at: string | null;
+  is_anonymous?: boolean;
   created_at?: string | null;
 };
 

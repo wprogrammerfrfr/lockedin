@@ -64,9 +64,15 @@ function statusBadge(
         label: member.meltStatusLabel ?? t("melt.room.customizing"),
         className: "bg-pink-50 text-pink-700 border-pink-200",
       };
+    case "WAITING":
+    case "IDLE":
+      return {
+        label: t("timer.ready"),
+        className: "bg-background text-muted-foreground border-border",
+      };
     default:
       return {
-        label: member.status,
+        label: t("timer.ready"),
         className: "bg-background text-muted-foreground border-border",
       };
   }
@@ -77,12 +83,15 @@ export function RoomPresencePane({
   seats = 6,
   selfUserId = null,
   selfLive = null,
+  selfIsAnonymous = false,
 }: {
   members: RoomPresenceMember[];
   seats?: number;
   selfUserId?: string | null;
   /** Local session clock — bypasses presence lag for the current user. */
   selfLive?: SelfLiveClock | null;
+  /** Anonymous viewers cannot follow anyone. */
+  selfIsAnonymous?: boolean;
 }) {
   const { t } = useTranslation();
   const now = useNow(1_000);
@@ -90,13 +99,22 @@ export function RoomPresencePane({
     return members.find((m) => m.seat === i + 1) ?? null;
   });
 
+  const canFollowAnyone = Boolean(selfUserId) && !selfIsAnonymous;
+
   const otherIds = useMemo(
     () =>
-      members
-        .map((m) => m.userId)
-        .filter((id) => id && id !== selfUserId)
-        .slice(0, 5),
-    [members, selfUserId],
+      canFollowAnyone
+        ? members
+            .filter(
+              (m) =>
+                m.userId &&
+                m.userId !== selfUserId &&
+                !m.isAnonymous,
+            )
+            .map((m) => m.userId)
+            .slice(0, 5)
+        : [],
+    [members, selfUserId, canFollowAnyone],
   );
 
   const [relations, setRelations] = useState<
@@ -159,47 +177,54 @@ export function RoomPresencePane({
               )}
             >
               {m ? (
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-9 w-9 rounded-xl">
-                    {m.avatarPath ? (
-                      <AvatarImage src={m.avatarPath} alt="" />
-                    ) : null}
-                    <AvatarFallback className="rounded-xl bg-muted text-xs font-semibold text-muted-foreground">
-                      {(m.username || "?").slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  {!isSelf && relation != null && (
-                    <FollowButton
-                      targetUserId={m.userId}
-                      initialStatus={relation}
-                      compact
-                      onStatusChange={(next) =>
-                        setRelations((prev) => ({
-                          ...prev,
-                          [m.userId]: next,
-                        }))
-                      }
-                    />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-display text-sm font-semibold text-foreground">
-                      {m.username}
-                    </p>
-                    <p className="font-mono text-[11px] tabular-nums text-muted-foreground">
-                      {formatMs(clock?.displayMs ?? 0)}
-                    </p>
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-9 w-9 shrink-0 rounded-xl">
+                      {m.avatarPath ? (
+                        <AvatarImage src={m.avatarPath} alt="" />
+                      ) : null}
+                      <AvatarFallback className="rounded-xl bg-muted text-xs font-semibold text-muted-foreground">
+                        {(m.username || "?").slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-display text-sm font-semibold text-foreground">
+                        {m.username}
+                      </p>
+                      <p className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
+                        {formatMs(clock?.displayMs ?? 0)}
+                      </p>
+                    </div>
+                    {!isSelf &&
+                      canFollowAnyone &&
+                      !m.isAnonymous &&
+                      relation != null && (
+                        <FollowButton
+                          targetUserId={m.userId}
+                          initialStatus={relation}
+                          compact
+                          onStatusChange={(next) =>
+                            setRelations((prev) => ({
+                              ...prev,
+                              [m.userId]: next,
+                            }))
+                          }
+                        />
+                      )}
                   </div>
                   {badge && (
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "max-w-[9.5rem] shrink-0 truncate rounded-lg text-[10px]",
-                        badge.className,
-                      )}
-                      title={badge.label}
-                    >
-                      {badge.label}
-                    </Badge>
+                    <div className="min-w-0 pl-12">
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "max-w-full min-w-0 truncate rounded-lg text-[10px]",
+                          badge.className,
+                        )}
+                        title={badge.label}
+                      >
+                        {badge.label}
+                      </Badge>
+                    </div>
                   )}
                 </div>
               ) : (
