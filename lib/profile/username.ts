@@ -66,3 +66,19 @@ export function needsUsernameClaim(
   if (claimedAt) return false;
   return isProvisionalUsername(username) || !username;
 }
+
+/**
+ * Whether the claim dialog should open.
+ * Never true until the profile fetch for this user has finished (avoids PWA flash).
+ */
+export function shouldPromptUsernameClaim(opts: {
+  profileReady: boolean;
+  isAuthenticated: boolean;
+  isAnonymous: boolean;
+  username: string | null | undefined;
+  claimedAt: string | null | undefined;
+}): boolean {
+  if (!opts.profileReady) return false;
+  if (!opts.isAuthenticated || opts.isAnonymous) return false;
+  return needsUsernameClaim(opts.username, opts.claimedAt);
+}

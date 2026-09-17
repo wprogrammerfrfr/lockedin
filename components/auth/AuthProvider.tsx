@@ -13,7 +13,7 @@ import { useRouter } from "next/navigation";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { publicAvatarUrl } from "@/features/profile/api";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
-import { needsUsernameClaim } from "@/lib/profile/username";
+import { shouldPromptUsernameClaim } from "@/lib/profile/username";
 import { mergeLocalSessionsIntoUser } from "@/lib/auth/merge";
 import { toast } from "sonner";
 import { userFacingError } from "@/lib/supabase/errors";
@@ -41,6 +41,8 @@ type AuthContextValue = {
   email: string | null;
   avatarUrl: string | null;
   connectedVia: ConnectedVia;
+  /** True once the profile fetch for the current user has settled (success or failure). */
+  profileReady: boolean;
   needsUsernameClaim: boolean;
   refreshProfile: () => Promise<void>;
 };
@@ -118,6 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [profile, setProfile] = useState<AuthProfile | null>(null);
+  const [profileReady, setProfileReady] = useState(false);
   const profileUserIdRef = useRef<string | null>(null);
 
   const applyUser = useCallback(
@@ -126,6 +129,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(next);
         setSession(nextSession);
         setStatus("guest");
+        setProfile(null);
+        setProfileReady(true);
+        profileUserIdRef.current = null;
         return;
       }
       const real = isRealUser(next) ? next : null;
@@ -134,15 +140,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setStatus(real ? "authenticated" : "guest");
       if (!real) {
         setProfile(null);
+        setProfileReady(true);
         profileUserIdRef.current = null;
+        return;
+      }
+      // Only mark profile unready when the authenticated user changes.
+      // Focus/visibility re-applies the same user and must not flash the claim dialog.
+      if (profileUserIdRef.current !== real.id) {
+        setProfileReady(false);
       }
     },
     [],
   );
 
   const loadProfile = useCallback(async (userId: string) => {
-    if (!isSupabaseConfigured()) return;
+    if (!isSupabaseConfigured()) {
+      setProfileReady(true);
+      return;
+    }
     profileUserIdRef.current = userId;
+    setProfileReady(false);
     try {
       const supabase = createClient();
       let data: {
@@ -167,6 +184,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (profileUserIdRef.current !== userId) return;
         if (second.error || !second.data) {
           setProfile(null);
+          setProfileReady(true);
           return;
         }
         data = second.data;
@@ -174,6 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (profileUserIdRef.current !== userId) return;
         if (first.error || !first.data) {
           setProfile(null);
+          setProfileReady(true);
           return;
         }
         data = first.data;
@@ -201,15 +220,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ? "legacy"
           : null);
 
+      if (profileUserIdRef.current !== userId) return;
       setProfile({
         username: data.username ?? null,
         avatar_path: data.avatar_path ?? null,
         timezone: data.timezone ?? null,
         username_claimed_at: claimed,
       });
+      setProfileReady(true);
     } catch {
       if (profileUserIdRef.current !== userId) return;
       setProfile(null);
+      setProfileReady(true);
     }
   }, []);
 
@@ -266,11 +288,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user?.id) {
       setProfile(null);
+      setProfileReady(true);
+      profileUserIdRef.current = null;
+      return;
+    }
+    if (user.is_anonymous) {
+      setProfile(null);
+      setProfileReady(true);
       profileUserIdRef.current = null;
       return;
     }
     void loadProfile(user.id);
-  }, [status, user?.id, loadProfile]);
+  }, [status, user?.id, user?.is_anonymous, loadProfile]);
 
   // Merge guest localStorage drafts once on real sign-in (any route).
   useEffect(() => {
@@ -310,20 +339,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAuthenticated: status === "authenticated",
       isAnonymous: Boolean(user?.is_anonymous),
       profile,
+      profileReady,
       profileLabel: buildProfileLabel(profile, user),
       email: user?.email ?? null,
       avatarUrl: resolveAvatarUrl(profile, user),
       connectedVia: connectedViaFromUser(user),
-      needsUsernameClaim:
-        status === "authenticated" &&
-        !user?.is_anonymous &&
-        needsUsernameClaim(
-          profile?.username,
-          profile?.username_claimed_at,
-        ),
+      needsUsernameClaim: shouldPromptUsernameClaim({
+        profileReady,
+        isAuthenticated: status === "authenticated",
+        isAnonymous: Boolean(user?.is_anonymous),
+        username: profile?.username,
+        claimedAt: profile?.username_claimed_at,
+      }),
       refreshProfile,
     }),
-    [session, status, user, profile, refreshProfile],
+    [session, status, user, profile, profileReady, refreshProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

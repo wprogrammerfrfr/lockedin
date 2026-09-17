@@ -167,8 +167,8 @@ export function finalizeActiveSessionDraft(
 }
 
 /**
- * Guests stay localStorage-only (anonymous sign-ins disabled).
- * Does not call signInAnonymously.
+ * Solo timer guests stay localStorage-only.
+ * Does not call signInAnonymously — room guests use ensureGuestSession instead.
  */
 export async function ensureAnonymousSession(supabase: SupabaseClient) {
   const { data: existing } = await supabase.auth.getSession();
