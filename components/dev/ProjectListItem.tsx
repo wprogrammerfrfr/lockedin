@@ -18,6 +18,7 @@ import { buildCost, formatUsd } from "@/features/dev-mode/cost";
 import type { ProjectStats, RepoStatsError } from "@/features/dev-mode/DevModeProvider";
 import { createClient } from "@/lib/supabase/client";
 import { userFacingError } from "@/lib/supabase/errors";
+import { cn } from "@/lib/utils";
 import type { ProjectRow } from "@/types/database";
 
 const STATS_ERROR_TEXT: Record<Exclude<RepoStatsError, null>, string> = {
@@ -31,7 +32,7 @@ function Metric({ label, value, className }: { label: string; value: string; cla
       <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
         {label}
       </p>
-      <p className={`mt-0.5 truncate font-mono text-sm tabular-nums text-foreground ${className ?? ""}`}>
+      <p className={cn("mt-0.5 truncate font-mono text-sm tabular-nums text-foreground", className)}>
         {value}
       </p>
     </div>
@@ -85,7 +86,7 @@ export function ProjectListItem({
     <li className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-display text-base font-semibold text-foreground">
+          <p className="font-display text-base font-semibold text-lime-400">
             {project.display_name}
           </p>
           <p className="truncate font-mono text-xs text-muted-foreground">
@@ -130,7 +131,7 @@ export function ProjectListItem({
         <Metric
           label="Cost to date"
           value={cost ? `${formatUsd(cost.total)} · ${cost.months} mo` : "—"}
-          className={cost ? "text-amber-300" : undefined}
+          className={cost ? "text-lime-400" : undefined}
         />
         <Metric
           label="Recent LOC"

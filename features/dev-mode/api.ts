@@ -96,26 +96,6 @@ export async function deleteProject(
   if (error) throw new Error(error.message);
 }
 
-export async function projectLockedMs(
-  supabase: SupabaseClient,
-  projectId: string,
-): Promise<number> {
-  const { data, error } = await supabase
-    .from("session_projects")
-    .select("session_id, sessions(active_ms)")
-    .eq("project_id", projectId);
-  if (error) {
-    if (isSchemaUnavailable(error)) return 0;
-    throw new Error(error.message);
-  }
-
-  return (data ?? []).reduce((sum, row) => {
-    const s = row as { sessions?: { active_ms?: number } | { active_ms?: number }[] };
-    const sess = Array.isArray(s.sessions) ? s.sessions[0] : s.sessions;
-    return sum + (Number(sess?.active_ms) || 0);
-  }, 0);
-}
-
 const COMMITS_PAGE = 1000;
 
 export async function listProjectCommits(

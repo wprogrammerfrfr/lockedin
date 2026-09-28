@@ -2,8 +2,15 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Clock, GitCommitHorizontal, Hammer, Wallet } from "lucide-react";
+import { Clock, GitCommitHorizontal, Hammer, Info, Wallet } from "lucide-react";
 import { CountUp } from "@/components/ui/count-up";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { estimateCommitMs } from "@/features/dev-mode/commit-time";
 import { buildCost, formatUsd } from "@/features/dev-mode/cost";
 import { cn } from "@/lib/utils";
 import type { ProjectRow } from "@/types/database";
@@ -43,23 +50,26 @@ function StatTile({
   children,
   sub,
   accent,
+  corner,
 }: {
   icon: ReactNode;
   label: string;
   children: ReactNode;
   sub?: ReactNode;
   accent?: boolean;
+  corner?: ReactNode;
 }) {
   return (
     <div
       className={cn(
         "flex min-w-0 flex-col gap-2 rounded-2xl border bg-card p-4 sm:p-5",
-        accent ? "border-amber-400/30" : "border-border",
+        accent ? "border-lime-400" : "border-border",
       )}
     >
       <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
         {icon}
-        {label}
+        <span className="min-w-0 truncate">{label}</span>
+        {corner ? <span className="ml-auto shrink-0">{corner}</span> : null}
       </div>
       <div className="min-w-0 text-3xl font-bold leading-none text-foreground sm:text-4xl">
         {children}
@@ -71,18 +81,39 @@ function StatTile({
   );
 }
 
+function CodingTimeInfo() {
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className="rounded-md text-muted-foreground hover:text-foreground"
+            aria-label="How time coding is calculated"
+          >
+            <Info className="h-3.5 w-3.5" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top" align="end" className="max-w-56 normal-case tracking-normal">
+          Time between each commit and the next, counted only when the gap is 2
+          hours or less. Longer gaps, like overnight, are left out.
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 export function OverviewStats({
   project,
-  commitCount,
-  activeMs,
+  commits,
 }: {
   project: ProjectRow;
-  commitCount: number;
-  activeMs: number;
+  commits: { committed_at: string }[];
 }) {
   const today = useToday();
   const start = project.first_commit_at ?? null;
   const cost = buildCost(project.monthly_cost_usd, start, today);
+  const codingMs = estimateCommitMs(commits);
   const editHref = `/dev/projects?edit=${project.id}`;
 
   const startedLabel = start
@@ -111,7 +142,7 @@ export function OverviewStats({
       </StatTile>
 
       <StatTile
-        icon={<Wallet className="h-3.5 w-3.5 text-amber-400" />}
+        icon={<Wallet className="h-3.5 w-3.5 text-lime-400" />}
         label="Cost to build"
         accent={cost != null}
         sub={
@@ -132,7 +163,7 @@ export function OverviewStats({
           <CountUp
             value={cost.total}
             format={(n) => formatUsd(n)}
-            className="text-amber-300"
+            className="text-lime-400"
           />
         ) : (
           <span className="font-mono text-muted-foreground">—</span>
@@ -144,18 +175,22 @@ export function OverviewStats({
         label="Commits"
         sub="by you"
       >
-        <CountUp value={commitCount} />
+        <CountUp value={commits.length} />
       </StatTile>
 
       <StatTile
         icon={<Clock className="h-3.5 w-3.5" />}
-        label="Hours locked in"
-        sub="sessions tagged to this project"
+        label="Time coding"
+        corner={<CodingTimeInfo />}
       >
-        <CountUp
-          value={activeMs / 3_600_000}
-          format={(n) => `${n.toFixed(1)}h`}
-        />
+        {commits.length > 0 ? (
+          <CountUp
+            value={codingMs / 3_600_000}
+            format={(n) => `${n.toFixed(1)}h`}
+          />
+        ) : (
+          <span className="font-mono text-muted-foreground">—</span>
+        )}
       </StatTile>
     </div>
   );

@@ -4,9 +4,24 @@ import { Code2 } from "lucide-react";
 import { LockedInLogo } from "@/components/brand/LockedInLogo";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CountUp } from "@/components/ui/count-up";
-import { formatMs } from "@/features/session/format";
+import { estimateCommitMs } from "@/features/dev-mode/commit-time";
 
-const DEMO_HOURS_MS = 4 * 60 * 60 * 1000 + 12 * 60 * 1000;
+const DEMO_T0 = Date.UTC(2026, 2, 21, 14, 0, 0);
+
+function demoCommit(offsetMin: number) {
+  return { committed_at: new Date(DEMO_T0 + offsetMin * 60_000).toISOString() };
+}
+
+/** Two bursts a day apart: 50+60 and 40+60 minutes. The overnight gap is dropped. */
+const DEMO_COMMITS = [
+  demoCommit(0),
+  demoCommit(50),
+  demoCommit(110),
+  demoCommit(24 * 60),
+  demoCommit(24 * 60 + 40),
+  demoCommit(24 * 60 + 100),
+];
+
 const DEMO_DAYS = 73;
 const DEMO_MONTHS = 3;
 const DEMO_MONTHLY = 20;
@@ -40,7 +55,7 @@ export function WelcomeDevShowcase() {
       </CardHeader>
       <CardContent>
         <div className="rounded-2xl border border-border bg-card p-5 shadow-soft sm:p-6">
-          <p className="font-display text-base font-semibold text-foreground">
+          <p className="font-display text-base font-semibold text-lime-400">
             <LockedInLogo className="text-base" /> web
           </p>
           <p className="font-mono text-xs text-muted-foreground">acme/lockedin</p>
@@ -73,9 +88,9 @@ export function WelcomeDevShowcase() {
           </div>
 
           <p className="mt-4 text-xs text-muted-foreground">
-            Hours locked in:{" "}
+            Time coding:{" "}
             <span className="font-mono tabular-nums">
-              {formatMs(DEMO_HOURS_MS, true)}
+              {(estimateCommitMs(DEMO_COMMITS) / 3_600_000).toFixed(1)}h
             </span>
           </p>
 
@@ -93,14 +108,14 @@ export function WelcomeDevShowcase() {
                 from the first commit
               </p>
             </div>
-            <div className="rounded-xl border border-border bg-background p-3">
+            <div className="rounded-xl border border-lime-400 bg-background p-3">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Cost to build
               </p>
               <CountUp
                 value={DEMO_MONTHS * DEMO_MONTHLY}
                 format={(n) => money(Math.round(n))}
-                className="mt-1 block font-display text-xl font-bold text-amber-300"
+                className="mt-1 block font-display text-xl font-bold text-lime-400"
               />
               <p className="mt-1 font-mono text-[11px] tabular-nums text-muted-foreground">
                 {DEMO_MONTHS} mo × {money(DEMO_MONTHLY)}/mo

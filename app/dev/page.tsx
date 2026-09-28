@@ -25,7 +25,6 @@ export default function DevOverviewPage() {
     repoProjects,
     selectedProject,
     selectProject,
-    stats,
     connected,
     canReadPrivate,
     linkGithub,
@@ -73,14 +72,18 @@ export default function DevOverviewPage() {
             <Tabs value={project.id} onValueChange={selectProject}>
               <TabsList className="h-auto flex-wrap justify-start">
                 {repoProjects.map((p) => (
-                  <TabsTrigger key={p.id} value={p.id}>
+                  <TabsTrigger
+                    key={p.id}
+                    value={p.id}
+                    className="data-[state=active]:text-lime-400"
+                  >
                     {p.display_name}
                   </TabsTrigger>
                 ))}
               </TabsList>
             </Tabs>
           ) : (
-            <p className="font-display text-lg font-semibold text-foreground">
+            <p className="font-display text-lg font-semibold text-lime-400">
               {project.display_name}
             </p>
           )}
@@ -117,11 +120,7 @@ export default function DevOverviewPage() {
         />
       ) : null}
 
-      <OverviewStats
-        project={project}
-        commitCount={rows.length}
-        activeMs={stats[project.id]?.activeMs ?? 0}
-      />
+      <OverviewStats project={project} commits={rows} />
 
       <div className="rounded-2xl border border-border bg-card/40 p-4 sm:p-6">
         <CommitCalendar

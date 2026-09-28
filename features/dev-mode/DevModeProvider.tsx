@@ -14,7 +14,6 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import {
   listProjectCommits,
   listProjects,
-  projectLockedMs,
   syncProjectCommits,
 } from "@/features/dev-mode/api";
 import { createClient } from "@/lib/supabase/client";
@@ -25,7 +24,6 @@ export type RepoStatsError = "invalid_repo" | "repo_not_found" | null;
 export type ProjectStats = {
   additions: number;
   deletions: number;
-  activeMs: number;
   error: RepoStatsError;
 };
 
@@ -78,16 +76,9 @@ async function loadProjectStats(
   const stats: ProjectStats = {
     additions: 0,
     deletions: 0,
-    activeMs: 0,
     error: null,
   };
   let needsGithub = false;
-
-  try {
-    stats.activeMs = await projectLockedMs(createClient(), p.id);
-  } catch {
-    stats.activeMs = 0;
-  }
 
   if (!p.github_repo) return { stats, needsGithub };
 
