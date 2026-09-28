@@ -1,129 +1,129 @@
 "use client";
 
-import { Code2 } from "lucide-react";
-import { LockedInLogo } from "@/components/brand/LockedInLogo";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CountUp } from "@/components/ui/count-up";
-import { estimateCommitMs } from "@/features/dev-mode/commit-time";
+import { useEffect, useState } from "react";
+import { CommitCalendar } from "@/components/dev/CommitCalendar";
+import { OverviewStats } from "@/components/dev/OverviewStats";
+import type { ProjectCommitRow, ProjectRow } from "@/types/database";
 
-const DEMO_T0 = Date.UTC(2026, 2, 21, 14, 0, 0);
+const PROJECT_ID = "welcome-demo";
 
-function demoCommit(offsetMin: number) {
-  return { committed_at: new Date(DEMO_T0 + offsetMin * 60_000).toISOString() };
-}
+type ScriptRow = {
+  daysAgo: number;
+  hour: number;
+  minute: number;
+  message: string;
+};
 
-/** Two bursts a day apart: 50+60 and 40+60 minutes. The overnight gap is dropped. */
-const DEMO_COMMITS = [
-  demoCommit(0),
-  demoCommit(50),
-  demoCommit(110),
-  demoCommit(24 * 60),
-  demoCommit(24 * 60 + 40),
-  demoCommit(24 * 60 + 100),
+/** Oldest first. Same-day gaps stay under 2 hours so time coding counts them. */
+const SCRIPT: ScriptRow[] = [
+  { daysAgo: 80, hour: 9, minute: 14, message: "Initial commit" },
+  { daysAgo: 21, hour: 10, minute: 2, message: "Add the focus timer" },
+  { daysAgo: 21, hour: 10, minute: 48, message: "Lime glow while locked in" },
+  { daysAgo: 18, hour: 11, minute: 6, message: "Break pauses the clock" },
+  { daysAgo: 16, hour: 14, minute: 11, message: "Room seats and presence" },
+  { daysAgo: 16, hour: 14, minute: 52, message: "Bet / Nah break votes" },
+  { daysAgo: 12, hour: 9, minute: 40, message: "Melt scene" },
+  { daysAgo: 12, hour: 10, minute: 18, message: "Shared dessert table" },
+  { daysAgo: 12, hour: 11, minute: 5, message: "Topping picker" },
+  { daysAgo: 9, hour: 13, minute: 22, message: "Share card" },
+  { daysAgo: 9, hour: 14, minute: 1, message: "PR burst when the record falls" },
+  { daysAgo: 6, hour: 10, minute: 8, message: "Connect GitHub" },
+  { daysAgo: 6, hour: 10, minute: 44, message: "Import commits" },
+  { daysAgo: 6, hour: 11, minute: 27, message: "Month calendar" },
+  { daysAgo: 4, hour: 15, minute: 3, message: "Cost to build" },
+  { daysAgo: 4, hour: 15, minute: 41, message: "Time coding estimate" },
+  { daysAgo: 3, hour: 10, minute: 5, message: "Project switcher" },
+  { daysAgo: 3, hour: 10, minute: 33, message: "Sync status" },
+  { daysAgo: 3, hour: 11, minute: 12, message: "Started flag on day one" },
+  { daysAgo: 3, hour: 11, minute: 48, message: "Day dialog" },
+  { daysAgo: 3, hour: 13, minute: 6, message: "Jump to start" },
+  { daysAgo: 3, hour: 13, minute: 52, message: "Private repo access" },
+  { daysAgo: 1, hour: 9, minute: 16, message: "Stat tiles" },
+  { daysAgo: 1, hour: 9, minute: 58, message: "Midnight rollover for day count" },
+  { daysAgo: 0, hour: 8, minute: 24, message: "Polish developer mode" },
+  { daysAgo: 0, hour: 9, minute: 7, message: "Welcome demo" },
 ];
 
-const DEMO_DAYS = 73;
-const DEMO_MONTHS = 3;
-const DEMO_MONTHLY = 20;
+function atLocal(daysAgo: number, hour: number, minute: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - daysAgo);
+  d.setHours(hour, minute, 0, 0);
+  if (d.getTime() > Date.now()) d.setDate(d.getDate() - 1);
+  return d.toISOString();
+}
 
-function money(n: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(n);
+function shaFor(index: number): string {
+  return (0xa17c0de + index * 9973).toString(16).padStart(7, "0");
+}
+
+function buildDemo(): { project: ProjectRow; commits: ProjectCommitRow[] } {
+  const commits = SCRIPT.map((row, index) => {
+    const committed_at = atLocal(row.daysAgo, row.hour, row.minute);
+    return {
+      id: `welcome-commit-${index}`,
+      project_id: PROJECT_ID,
+      user_id: "welcome",
+      sha: shaFor(index),
+      message: row.message,
+      committed_at,
+      html_url: null,
+      created_at: committed_at,
+    };
+  }).sort((a, b) => a.committed_at.localeCompare(b.committed_at));
+
+  const first = commits[0];
+  return {
+    project: {
+      id: PROJECT_ID,
+      user_id: "welcome",
+      display_name: "LockedIn web",
+      github_repo: "acme/lockedin",
+      monthly_cost_usd: 20,
+      created_at: first.committed_at,
+      first_commit_at: first.committed_at,
+      first_commit_message: first.message,
+      first_commit_sha: first.sha,
+      commits_synced_at: new Date().toISOString(),
+    },
+    commits,
+  };
 }
 
 export function WelcomeDevShowcase() {
+  const [demo, setDemo] = useState<ReturnType<typeof buildDemo> | null>(null);
+
+  useEffect(() => {
+    setDemo(buildDemo());
+  }, []);
+
+  if (!demo) {
+    return (
+      <div
+        className="min-h-[28rem] rounded-2xl border border-border bg-card/40"
+        aria-hidden
+      />
+    );
+  }
+
   return (
-    <Card className="border-border">
-      <CardHeader className="space-y-3">
-        <CardTitle className="flex items-center gap-2 text-xl">
-          <Code2 className="h-5 w-5 text-emerald-600" />
-          Developer Mode
-        </CardTitle>
-        <div>
-          <p className="font-display text-lg font-bold tracking-tight text-foreground">
-            Track the cost and time of building software.
-          </p>
-          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-            Connect GitHub to see every commit on a calendar, how long
-            you&apos;ve been building since the first one, and the cost to
-            build (your monthly spend × months building).
-          </p>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-soft sm:p-6">
-          <p className="font-display text-base font-semibold text-lime-400">
-            <LockedInLogo className="text-base" /> web
-          </p>
-          <p className="font-mono text-xs text-muted-foreground">acme/lockedin</p>
+    <div className="flex flex-col gap-5">
+      <div className="min-w-0">
+        <p className="font-display text-lg font-semibold text-lime-600">
+          {demo.project.display_name}
+        </p>
+        <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
+          {demo.project.github_repo}
+        </p>
+      </div>
 
-          <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
-            <div className="rounded-xl bg-background p-3">
-              <p className="text-muted-foreground">Commits</p>
-              <CountUp
-                value={47}
-                className="mt-1 block font-mono text-sm tabular-nums text-foreground"
-              />
-            </div>
-            <div className="rounded-xl bg-background p-3">
-              <p className="text-muted-foreground">+LOC</p>
-              <CountUp
-                value={1284}
-                format={(n) =>
-                  Math.round(n).toLocaleString("en-US")
-                }
-                className="mt-1 block font-mono text-sm tabular-nums text-emerald-700"
-              />
-            </div>
-            <div className="rounded-xl bg-background p-3">
-              <p className="text-muted-foreground">−LOC</p>
-              <CountUp
-                value={312}
-                className="mt-1 block font-mono text-sm tabular-nums text-rose-600"
-              />
-            </div>
-          </div>
+      <OverviewStats project={demo.project} commits={demo.commits} />
 
-          <p className="mt-4 text-xs text-muted-foreground">
-            Time coding:{" "}
-            <span className="font-mono tabular-nums">
-              {(estimateCommitMs(DEMO_COMMITS) / 3_600_000).toFixed(1)}h
-            </span>
-          </p>
-
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="rounded-xl border border-border bg-background p-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Building since
-              </p>
-              <CountUp
-                value={DEMO_DAYS}
-                format={(n) => `${Math.round(n)} days`}
-                className="mt-1 block font-display text-xl font-bold text-foreground"
-              />
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                from the first commit
-              </p>
-            </div>
-            <div className="rounded-xl border border-lime-400 bg-background p-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Cost to build
-              </p>
-              <CountUp
-                value={DEMO_MONTHS * DEMO_MONTHLY}
-                format={(n) => money(Math.round(n))}
-                className="mt-1 block font-display text-xl font-bold text-lime-400"
-              />
-              <p className="mt-1 font-mono text-[11px] tabular-nums text-muted-foreground">
-                {DEMO_MONTHS} mo × {money(DEMO_MONTHLY)}/mo
-              </p>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+      <div className="rounded-2xl border border-border bg-card/40 p-4 sm:p-6">
+        <CommitCalendar
+          commits={demo.commits}
+          firstCommitAt={demo.project.first_commit_at}
+        />
+      </div>
+    </div>
   );
 }

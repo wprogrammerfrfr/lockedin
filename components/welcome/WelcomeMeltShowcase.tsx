@@ -526,16 +526,16 @@ export function WelcomeMeltShowcase() {
           </div>
 
           {/* Shared Melt Board */}
-          <div className="flex min-w-0 flex-col gap-3">
+          <div className="flex min-w-0 flex-col justify-center gap-3">
             <p className="text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
               Shared Melt Board
             </p>
-            <div className="flex min-h-[14rem] flex-1 flex-col justify-end overflow-visible rounded-2xl border border-border bg-background p-3 shadow-soft sm:min-h-[16rem] sm:p-4">
+            <div className="flex items-center justify-center overflow-visible rounded-2xl border border-border bg-background p-3 shadow-soft sm:p-4">
               <RoomMeltTable
                 members={tableMembers}
                 selfUserId={melting ? DEMO_YOU_ID : null}
                 onBoardPosChange={melting ? onBoardPosChange : undefined}
-                className="min-h-[12rem] sm:min-h-[14rem]"
+                className="w-full"
               />
             </div>
             <p className="text-center text-xs text-muted-foreground">

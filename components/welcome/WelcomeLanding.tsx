@@ -10,7 +10,6 @@ import { WelcomeCtas } from "@/components/welcome/WelcomeCtas";
 import { WelcomeDevShowcase } from "@/components/welcome/WelcomeDevShowcase";
 import { WelcomeFeatures } from "@/components/welcome/WelcomeFeatures";
 import { WelcomeHeroEquation } from "@/components/welcome/WelcomeHeroEquation";
-import { WelcomeHowTo } from "@/components/welcome/WelcomeHowTo";
 import { WelcomeMeltShowcase } from "@/components/welcome/WelcomeMeltShowcase";
 import { WelcomeRoomsShowcase } from "@/components/welcome/WelcomeRoomsShowcase";
 import { WelcomeTimerPreview } from "@/components/welcome/WelcomeTimerPreview";
@@ -91,22 +90,6 @@ export function WelcomeLanding() {
         </section>
 
         <WelcomeSection>
-          <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-muted-foreground">
-            How to use it
-          </p>
-          <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-foreground">
-            LOCK IN → LOCKED IN → BREAK → TAP OUT
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Hover or tap a step. Same buttons and state colors you’ll see in
-            the app.
-          </p>
-          <div className="mt-6">
-            <WelcomeHowTo />
-          </div>
-        </WelcomeSection>
-
-        <WelcomeSection>
           <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-emerald-600">
             Rooms
           </p>
@@ -119,6 +102,23 @@ export function WelcomeLanding() {
           </p>
           <div className="mt-6">
             <WelcomeRoomsShowcase />
+          </div>
+        </WelcomeSection>
+
+        <WelcomeSection>
+          <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-lime-600">
+            Developer Mode
+          </p>
+          <h2 className="mt-2 flex items-center gap-2 font-display text-3xl font-bold tracking-tight text-foreground">
+            <Code2 className="h-7 w-7 text-lime-600" />
+            Price the build.
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+            Connect GitHub. Every commit on a calendar, how long you&apos;ve
+            been building, and what it cost.
+          </p>
+          <div className="mt-6">
+            <WelcomeDevShowcase />
           </div>
         </WelcomeSection>
 
@@ -136,22 +136,6 @@ export function WelcomeLanding() {
           </p>
           <div className="mt-6">
             <WelcomeMeltShowcase />
-          </div>
-        </WelcomeSection>
-
-        <WelcomeSection>
-          <p className="font-display text-xs font-bold uppercase tracking-[0.22em] text-muted-foreground">
-            Developer Mode
-          </p>
-          <h2 className="mt-2 flex items-center gap-2 font-display text-3xl font-bold tracking-tight text-foreground">
-            <Code2 className="h-7 w-7 text-foreground" />
-            Price the build.
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Connect GitHub. Track hours, cost, commits, and lines of code.
-          </p>
-          <div className="mt-6">
-            <WelcomeDevShowcase />
           </div>
         </WelcomeSection>
 
