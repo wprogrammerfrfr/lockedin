@@ -1,187 +1,190 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ChromePage } from "@/components/layout/ChromePage";
-import { AuthGateModal } from "@/components/auth/AuthGateModal";
-import { useAuth } from "@/components/auth/AuthProvider";
-import { ProjectRateForm } from "@/components/dev/ProjectRateForm";
-import { RepoStatsCard } from "@/components/dev/RepoStatsCard";
+import Link from "next/link";
+import { AlertTriangle, FolderPlus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { listProjects, projectLockedMs } from "@/features/dev-mode/api";
-import type { ProjectRow } from "@/types/database";
-import { createClient } from "@/lib/supabase/client";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CommitCalendar } from "@/components/dev/CommitCalendar";
+import { OverviewStats } from "@/components/dev/OverviewStats";
+import { useDevMode } from "@/features/dev-mode/DevModeProvider";
+import { cn } from "@/lib/utils";
 
-type StatsMap = Record<
-  string,
-  { commits: number; additions: number; deletions: number; activeMs: number }
->;
+function syncedAgo(iso: string | null | undefined): string {
+  if (!iso) return "Never synced";
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
+  if (mins < 1) return "Synced just now";
+  if (mins < 60) return `Synced ${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `Synced ${hours}h ago`;
+  return `Synced ${Math.floor(hours / 24)}d ago`;
+}
 
-export default function DevPage() {
-  const { status, isAuthenticated, user, session, connectedVia } = useAuth();
-  const userId = user?.id ?? null;
-  const providerToken = Boolean(
-    (session as { provider_token?: string } | null)?.provider_token,
-  );
-  const [gateOpen, setGateOpen] = useState(false);
-  const [hasGithub, setHasGithub] = useState(false);
-  const [needsGithubReconnect, setNeedsGithubReconnect] = useState(false);
-  const [projects, setProjects] = useState<ProjectRow[]>([]);
-  const [stats, setStats] = useState<StatsMap>({});
+export default function DevOverviewPage() {
+  const {
+    projectsLoaded,
+    repoProjects,
+    selectedProject,
+    selectProject,
+    stats,
+    connected,
+    canReadPrivate,
+    linkGithub,
+    commitsFor,
+    syncErrorFor,
+    isSyncing,
+    syncProject,
+  } = useDevMode();
 
-  useEffect(() => {
-    if (status === "loading") return;
-    if (!isAuthenticated || !userId || !user) {
-      setGateOpen(true);
-      setProjects([]);
-      return;
-    }
+  if (!projectsLoaded) {
+    return <p className="text-sm text-muted-foreground">Loading projects…</p>;
+  }
 
-    setHasGithub(
-      Boolean(
-        providerToken ||
-          connectedVia === "GitHub" ||
-          user.app_metadata?.provider === "github" ||
-          (user.identities ?? []).some((i) => i.provider === "github"),
-      ),
+  if (!selectedProject) {
+    return (
+      <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-card/40 px-6 py-14 text-center">
+        <FolderPlus className="h-8 w-8 text-muted-foreground" />
+        <div>
+          <p className="font-display text-lg font-semibold text-foreground">
+            Add your first project to start tracking
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Link a GitHub repo and a monthly cost. LockedIn imports your commits
+            and works out how long you&apos;ve been building and what it cost.
+          </p>
+        </div>
+        <Button asChild className="rounded-xl">
+          <Link href="/dev/projects">Add a project</Link>
+        </Button>
+      </div>
     );
+  }
 
-    let cancelled = false;
-    void (async () => {
-      try {
-        const supabase = createClient();
-        const list = await listProjects(supabase);
-        if (cancelled) return;
-        setProjects(list);
-        const next: StatsMap = {};
-        let sawLinkGithub = false;
-        for (const p of list) {
-          let activeMs = 0;
-          try {
-            activeMs = await projectLockedMs(supabase, p.id);
-          } catch {
-            activeMs = 0;
-          }
-          let commits = 0;
-          let additions = 0;
-          let deletions = 0;
-          if (p.github_repo) {
-            try {
-              const res = await fetch(
-                `/api/github/stats?repo=${encodeURIComponent(p.github_repo)}`,
-              );
-              if (res.ok) {
-                const body = (await res.json()) as {
-                  commits?: number;
-                  additions?: number;
-                  deletions?: number;
-                };
-                commits = body.commits ?? 0;
-                additions = body.additions ?? 0;
-                deletions = body.deletions ?? 0;
-              } else if (res.status === 403) {
-                const body = (await res.json().catch(() => null)) as {
-                  error?: string;
-                } | null;
-                if (body?.error === "link_github") sawLinkGithub = true;
-              }
-            } catch {
-              /* ignore */
-            }
-          }
-          next[p.id] = { commits, additions, deletions, activeMs };
-        }
-        if (!cancelled) {
-          setStats(next);
-          setNeedsGithubReconnect(sawLinkGithub);
-        }
-      } catch {
-        if (!cancelled) setProjects([]);
-      }
-    })();
+  const project = selectedProject;
+  const rows = commitsFor(project) ?? [];
+  const syncing = isSyncing(project);
+  const error = syncErrorFor(project);
+  const editHref = `/dev/projects?edit=${project.id}`;
 
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    status,
-    isAuthenticated,
-    userId,
-    user,
-    providerToken,
-    connectedVia,
-  ]);
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          {repoProjects.length > 1 ? (
+            <Tabs value={project.id} onValueChange={selectProject}>
+              <TabsList className="h-auto flex-wrap justify-start">
+                {repoProjects.map((p) => (
+                  <TabsTrigger key={p.id} value={p.id}>
+                    {p.display_name}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          ) : (
+            <p className="font-display text-lg font-semibold text-foreground">
+              {project.display_name}
+            </p>
+          )}
+          <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
+            {project.github_repo}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">
+            {syncing ? "Syncing…" : syncedAgo(project.commits_synced_at)}
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 rounded-xl"
+            disabled={syncing || !connected}
+            onClick={() => void syncProject(project)}
+          >
+            <RefreshCw
+              className={cn("mr-1.5 h-3.5 w-3.5", syncing && "animate-spin")}
+            />
+            Sync
+          </Button>
+        </div>
+      </div>
 
-  async function linkGithub() {
-    const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
-      provider: "github",
-      options: {
-        scopes: "read:user repo",
-        redirectTo: `${window.location.origin}/auth/callback?next=/dev`,
-      },
-    });
+      {error ? (
+        <SyncErrorRow
+          error={error}
+          canReadPrivate={canReadPrivate}
+          editHref={editHref}
+          onConnect={() => void linkGithub()}
+        />
+      ) : null}
+
+      <OverviewStats
+        project={project}
+        commitCount={rows.length}
+        activeMs={stats[project.id]?.activeMs ?? 0}
+      />
+
+      <div className="rounded-2xl border border-border bg-card/40 p-4 sm:p-6">
+        <CommitCalendar
+          key={`${project.id}:${project.github_repo}`}
+          commits={rows}
+          firstCommitAt={project.first_commit_at}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SyncErrorRow({
+  error,
+  canReadPrivate,
+  editHref,
+  onConnect,
+}: {
+  error: string;
+  canReadPrivate: boolean;
+  editHref: string;
+  onConnect: () => void;
+}) {
+  let message = "GitHub sync failed. Try again in a moment.";
+  let action: { label: string; href?: string; onClick?: () => void } | null =
+    null;
+
+  if (error === "invalid_repo") {
+    message = "Repo must be owner/name, e.g. acme/lockedin.";
+    action = { label: "Edit project", href: editHref };
+  } else if (error === "repo_not_found") {
+    message = canReadPrivate
+      ? "Can't access this repo. Check the owner/name."
+      : "Can't access this repo. If it's private, grant LockedIn access.";
+    action = canReadPrivate
+      ? { label: "Edit project", href: editHref }
+      : { label: "Grant private repo access", onClick: onConnect };
+  } else if (error === "link_github") {
+    message = "GitHub isn't connected, so commits can't sync.";
+    action = { label: "Connect GitHub", onClick: onConnect };
   }
 
   return (
-    <ChromePage>
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-foreground">
-            Developer Mode
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Track project Cost (hours × rate) and Value side-by-side with GitHub
-            LOC.
-          </p>
-        </div>
-
-        {isAuthenticated && (!hasGithub || needsGithubReconnect) && (
-          <div className="rounded-xl border border-border bg-card p-4">
-            <p className="text-sm text-muted-foreground">
-              {needsGithubReconnect
-                ? "GitHub session expired. Reconnect to load commits and LOC."
-                : "Link GitHub to load commits and LOC for your projects."}
-            </p>
-            <Button className="mt-3 rounded-xl" onClick={linkGithub}>
-              {needsGithubReconnect ? "Reconnect GitHub" : "Link GitHub"}
-            </Button>
-          </div>
-        )}
-
-        {isAuthenticated && (
-          <>
-            <ProjectRateForm
-              onSaved={(p) =>
-                setProjects((prev) => [p, ...prev.filter((x) => x.id !== p.id)])
-              }
-            />
-            <div className="space-y-4">
-              {projects.map((p) => (
-                <RepoStatsCard
-                  key={p.id}
-                  project={p}
-                  activeMs={stats[p.id]?.activeMs ?? 0}
-                  commits={stats[p.id]?.commits ?? 0}
-                  additions={stats[p.id]?.additions ?? 0}
-                  deletions={stats[p.id]?.deletions ?? 0}
-                />
-              ))}
-              {projects.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  Add a project to see Cost vs Value.
-                </p>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-
-      <AuthGateModal
-        open={gateOpen}
-        onOpenChange={setGateOpen}
-        reason="save_sync"
-        onContinueAsGuest={() => setGateOpen(false)}
-      />
-    </ChromePage>
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3">
+      <p className="flex items-center gap-2 text-sm text-red-300">
+        <AlertTriangle className="h-4 w-4 shrink-0" />
+        {message}
+      </p>
+      {action?.href ? (
+        <Button asChild size="sm" variant="outline" className="rounded-xl">
+          <Link href={action.href}>{action.label}</Link>
+        </Button>
+      ) : action ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="rounded-xl"
+          onClick={action.onClick}
+        >
+          {action.label}
+        </Button>
+      ) : null}
+    </div>
   );
 }

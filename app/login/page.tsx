@@ -215,7 +215,7 @@ function LoginPageContent() {
     }
     setLoading(provider);
     try {
-      const redirectTo = `${window.location.origin}/auth/callback`;
+      const redirectTo = `${window.location.origin}/auth/callback${provider === "github" ? "?gh=1" : ""}`;
       const { error: oauthError } = await createClient().auth.signInWithOAuth({
         provider,
         options: { redirectTo },

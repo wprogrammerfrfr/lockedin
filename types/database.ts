@@ -109,8 +109,22 @@ export type ProjectRow = {
   user_id: string;
   display_name: string;
   github_repo: string | null;
-  hourly_rate_usd: number | null;
-  project_value_usd: number | null;
+  monthly_cost_usd: number | null;
+  created_at: string;
+  first_commit_at?: string | null;
+  first_commit_message?: string | null;
+  first_commit_sha?: string | null;
+  commits_synced_at?: string | null;
+};
+
+export type ProjectCommitRow = {
+  id: string;
+  project_id: string;
+  user_id: string;
+  sha: string;
+  message: string;
+  committed_at: string;
+  html_url: string | null;
   created_at: string;
 };
 

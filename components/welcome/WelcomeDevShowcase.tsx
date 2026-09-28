@@ -7,8 +7,9 @@ import { CountUp } from "@/components/ui/count-up";
 import { formatMs } from "@/features/session/format";
 
 const DEMO_HOURS_MS = 4 * 60 * 60 * 1000 + 12 * 60 * 1000;
-const DEMO_COST = 336;
-const DEMO_VALUE = 12_000;
+const DEMO_DAYS = 73;
+const DEMO_MONTHS = 3;
+const DEMO_MONTHLY = 20;
 
 function money(n: number) {
   return new Intl.NumberFormat("en-US", {
@@ -31,9 +32,9 @@ export function WelcomeDevShowcase() {
             Track the cost and time of building software.
           </p>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-            Connect GitHub, lock in hours, and see Project Cost (hours × hourly
-            rate) next to commits and lines of code — plus the value you set
-            for the project.
+            Connect GitHub to see every commit on a calendar, how long
+            you&apos;ve been building since the first one, and the cost to
+            build (your monthly spend × months building).
           </p>
         </div>
       </CardHeader>
@@ -81,28 +82,28 @@ export function WelcomeDevShowcase() {
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="rounded-xl border border-border bg-background p-3">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Project Cost
+                Building since
               </p>
               <CountUp
-                value={DEMO_COST}
-                format={(n) => money(Math.round(n))}
+                value={DEMO_DAYS}
+                format={(n) => `${Math.round(n)} days`}
                 className="mt-1 block font-display text-xl font-bold text-foreground"
               />
               <p className="mt-1 text-[11px] text-muted-foreground">
-                hours × hourly rate
+                from the first commit
               </p>
             </div>
             <div className="rounded-xl border border-border bg-background p-3">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Project Value
+                Cost to build
               </p>
               <CountUp
-                value={DEMO_VALUE}
+                value={DEMO_MONTHS * DEMO_MONTHLY}
                 format={(n) => money(Math.round(n))}
-                className="mt-1 block font-display text-xl font-bold text-foreground"
+                className="mt-1 block font-display text-xl font-bold text-amber-300"
               />
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                manual worth / revenue
+              <p className="mt-1 font-mono text-[11px] tabular-nums text-muted-foreground">
+                {DEMO_MONTHS} mo × {money(DEMO_MONTHLY)}/mo
               </p>
             </div>
           </div>

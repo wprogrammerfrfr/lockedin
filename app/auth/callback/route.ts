@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
+import { setGithubCookie } from "@/lib/github/token";
 
 const OTP_TYPES = new Set<EmailOtpType>([
   "signup",
@@ -74,8 +75,14 @@ export async function GET(request: NextRequest) {
   });
 
   if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) return redirectResponse;
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    if (!error) {
+      const token = data.session?.provider_token;
+      const uid = data.session?.user.id;
+      const viaGithub = searchParams.get("gh") === "1";
+      if (token && uid && viaGithub) setGithubCookie(redirectResponse, uid, token);
+      return redirectResponse;
+    }
     return failureRedirect(origin, next, typeParam);
   }
 

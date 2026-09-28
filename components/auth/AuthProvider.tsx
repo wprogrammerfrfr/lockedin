@@ -254,6 +254,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (cancelled) return;
       applyUser(nextSession?.user ?? null, nextSession);
+      if (event === "SIGNED_OUT") {
+        void fetch("/api/github/token", { method: "DELETE" }).catch(() => {});
+      }
       if (REFRESH_EVENTS.has(event)) {
         router.refresh();
       }

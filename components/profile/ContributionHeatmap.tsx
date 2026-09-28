@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { formatMs } from "@/features/session/format";
 import type { HeatmapDay } from "@/types/database";
 import { cn } from "@/lib/utils";
+import { WEEKDAYS, buildMonthGrid, monthLabel } from "@/lib/calendar";
 
 function levelFromMs(ms: number): 0 | 1 | 2 | 3 | 4 {
   if (ms <= 0) return 0;
@@ -23,22 +24,6 @@ const LEVEL_CLASS = [
   "bg-emerald-500 text-white dark:bg-emerald-500 dark:text-white",
   "bg-emerald-600 text-white dark:bg-emerald-400 dark:text-zinc-950",
 ] as const;
-
-const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"] as const;
-
-function toDayKey(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function monthLabel(year: number, month: number): string {
-  return new Intl.DateTimeFormat(undefined, {
-    month: "long",
-    year: "numeric",
-  }).format(new Date(year, month, 1));
-}
 
 type DayMeta = { ms: number; title: string | null };
 
@@ -59,32 +44,11 @@ function buildMonthCells(
   month: number,
   byDay: Map<string, DayMeta>,
 ): CalendarCell[] {
-  const first = new Date(year, month, 1);
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const startPad = first.getDay(); // 0 = Sunday
-  const todayKey = toDayKey(new Date());
-
-  const cells: CalendarCell[] = [];
-  for (let i = 0; i < startPad; i++) {
-    cells.push({ kind: "empty", key: `pad-start-${i}` });
-  }
-  for (let day = 1; day <= daysInMonth; day++) {
-    const date = toDayKey(new Date(year, month, day));
-    const meta = byDay.get(date);
-    cells.push({
-      kind: "day",
-      key: date,
-      date,
-      dayNum: day,
-      ms: meta?.ms ?? 0,
-      title: meta?.title ?? null,
-      isToday: date === todayKey,
-    });
-  }
-  while (cells.length % 7 !== 0) {
-    cells.push({ kind: "empty", key: `pad-end-${cells.length}` });
-  }
-  return cells;
+  return buildMonthGrid(year, month).map((cell) => {
+    if (cell.kind === "empty") return cell;
+    const meta = byDay.get(cell.date);
+    return { ...cell, ms: meta?.ms ?? 0, title: meta?.title ?? null };
+  });
 }
 
 export function ContributionHeatmap({
