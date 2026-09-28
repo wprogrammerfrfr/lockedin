@@ -1,5 +1,11 @@
 const SCHEMA_RE =
-  /schema cache|could not find the (table|function)|does not exist|PGRST202|PGRST205|42P01|42883/i;
+  /schema cache|could not find the (table|function)|could not find the '[^']+' column|does not exist|PGRST202|PGRST204|PGRST205|42P01|42703|42883/i;
+
+const MISSING_SCHEMA_RE =
+  /PGRST204|PGRST205|could not find the '[^']+' column|could not find the table|42703/i;
+
+const SCHEMA_OUTDATED_COPY =
+  "The database is missing a recent update. Run the latest migration (supabase db push), then try again.";
 
 const ALLOWED_KEYS: Record<string, string> = {
   invalid_username:
@@ -60,6 +66,8 @@ export function userFacingError(err: unknown, fallback: string): string {
   for (const [key, copy] of Object.entries(ALLOWED_KEYS)) {
     if (msg.includes(key)) return copy;
   }
+
+  if (MISSING_SCHEMA_RE.test(msg)) return SCHEMA_OUTDATED_COPY;
 
   return fallback;
 }
