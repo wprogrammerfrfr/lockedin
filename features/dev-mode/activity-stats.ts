@@ -1,4 +1,4 @@
-import { SESSION_GAP_MS } from "@/features/dev-mode/commit-time";
+import { DAY_START_CREDIT_MS, SESSION_GAP_MS } from "@/features/dev-mode/commit-time";
 import { billingMonths } from "@/features/dev-mode/cost";
 
 const DAY_MS = 86_400_000;
@@ -131,7 +131,8 @@ const EMPTY: ActivityStats = {
 
 /**
  * Averages, best days, and commit-habit counts for one project.
- * Coding time uses the same 2-hour gap rule as the overview total.
+ * Coding time uses the same rules as the overview total: gaps of 2 hours or
+ * less, plus 2 hours before the first commit of each local day.
  * A counted gap is assigned to the local day of the later commit.
  */
 export function buildActivityStats(
@@ -173,6 +174,10 @@ export function buildActivityStats(
   for (let i = 0; i < parsed.length; i++) {
     const current = parsed[i];
     const day = bucket(current.time);
+    if (day.commits === 0) {
+      codingMs += DAY_START_CREDIT_MS;
+      day.codingMs += DAY_START_CREDIT_MS;
+    }
     day.commits += 1;
 
     const hour = new Date(current.time).getHours();

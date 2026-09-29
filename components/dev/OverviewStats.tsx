@@ -96,7 +96,8 @@ function CodingTimeInfo() {
         </TooltipTrigger>
         <TooltipContent side="top" align="end" className="max-w-56 normal-case tracking-normal">
           Time between each commit and the next, counted only when the gap is 2
-          hours or less. Longer gaps, like overnight, are left out.
+          hours or less. Longer gaps, like overnight, are left out. Each day
+          also includes 2 hours before its first commit.
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

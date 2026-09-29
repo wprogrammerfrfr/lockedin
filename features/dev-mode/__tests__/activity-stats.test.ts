@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DAY_START_CREDIT_MS } from "@/features/dev-mode/commit-time";
 import {
   buildActivityStats,
   formatCodingDuration,
@@ -45,9 +46,9 @@ describe("buildActivityStats", () => {
     );
     expect(stats.months).toBe(1);
     expect(stats.days).toBe(1);
-    expect(stats.codingMs).toBe(30 * 60_000);
-    expect(stats.avgHoursPerMonth).toBeCloseTo(0.5);
-    expect(stats.avgHoursPerDay).toBeCloseTo(0.5);
+    expect(stats.codingMs).toBe(30 * 60_000 + DAY_START_CREDIT_MS);
+    expect(stats.avgHoursPerMonth).toBeCloseTo(2.5);
+    expect(stats.avgHoursPerDay).toBeCloseTo(2.5);
     expect(stats.avgCommitsPerMonth).toBe(2);
   });
 
@@ -65,7 +66,7 @@ describe("buildActivityStats", () => {
     expect(stats.bestCommitDay?.key).toBe(dayKey(2026, 2, 10));
     expect(stats.bestCommitDay?.commits).toBe(3);
     expect(stats.bestTimeDay?.key).toBe(dayKey(2026, 2, 11));
-    expect(stats.bestTimeDay?.codingMs).toBe(90 * 60_000);
+    expect(stats.bestTimeDay?.codingMs).toBe(90 * 60_000 + DAY_START_CREDIT_MS);
   });
 
   it("assigns a gap that crosses midnight to the later commit's day", () => {
@@ -74,8 +75,19 @@ describe("buildActivityStats", () => {
       { now },
     );
     expect(stats.bestTimeDay?.key).toBe(dayKey(2026, 2, 11));
-    expect(stats.bestTimeDay?.codingMs).toBe(50 * 60_000);
-    expect(stats.codingMs).toBe(50 * 60_000);
+    expect(stats.bestTimeDay?.codingMs).toBe(50 * 60_000 + DAY_START_CREDIT_MS);
+    expect(stats.codingMs).toBe(50 * 60_000 + 2 * DAY_START_CREDIT_MS);
+  });
+
+  it("credits the first commit of a day once and averages that total", () => {
+    const stats = buildActivityStats(
+      [at(2026, 2, 21, 10, 0), at(2026, 2, 21, 11, 0)],
+      { startIso: new Date(2026, 2, 21, 10, 0).toISOString(), now },
+    );
+    expect(stats.codingMs).toBe(60 * 60_000 + DAY_START_CREDIT_MS);
+    expect(stats.bestTimeDay?.codingMs).toBe(stats.codingMs);
+    expect(stats.avgHoursPerDay).toBeCloseTo(3);
+    expect(stats.avgHoursPerMonth).toBeCloseTo(3);
   });
 
   it("counts a 2am commit as night and late night", () => {
