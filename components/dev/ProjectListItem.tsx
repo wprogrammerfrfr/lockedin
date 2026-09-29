@@ -26,6 +26,14 @@ const STATS_ERROR_TEXT: Record<Exclude<RepoStatsError, null>, string> = {
   repo_not_found: "No access — repo not found or private",
 };
 
+function linesWrittenLabel(stats: ProjectStats | undefined): string {
+  if (!stats || stats.error) return "—";
+  if (stats.pending) return "Calculating…";
+  const added = stats.additions.toLocaleString("en-US");
+  const removed = stats.deletions.toLocaleString("en-US");
+  return `+${added} / −${removed}`;
+}
+
 function Metric({ label, value, className }: { label: string; value: string; className?: string }) {
   return (
     <div className="min-w-0">
@@ -134,8 +142,8 @@ export function ProjectListItem({
           className={cost ? "text-lime-400" : undefined}
         />
         <Metric
-          label="Recent LOC"
-          value={stats ? `+${stats.additions} / −${stats.deletions}` : "—"}
+          label="Lines written"
+          value={linesWrittenLabel(stats)}
         />
       </div>
 

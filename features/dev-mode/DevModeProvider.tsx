@@ -24,6 +24,8 @@ export type RepoStatsError = "invalid_repo" | "repo_not_found" | null;
 export type ProjectStats = {
   additions: number;
   deletions: number;
+  /** GitHub is still computing contributor stats. */
+  pending: boolean;
   error: RepoStatsError;
 };
 
@@ -70,39 +72,53 @@ function syncKey(p: ProjectRow, canSync: boolean): string {
   return `${dataKey(p)}:${canSync ? "sync" : "load"}`;
 }
 
+const STATS_ATTEMPTS = 4;
+const STATS_RETRY_MS = 1_500;
+
 async function loadProjectStats(
   p: ProjectRow,
+  onUpdate?: (stats: ProjectStats) => void,
 ): Promise<{ stats: ProjectStats; needsGithub: boolean }> {
   const stats: ProjectStats = {
     additions: 0,
     deletions: 0,
+    pending: false,
     error: null,
   };
   let needsGithub = false;
 
   if (!p.github_repo) return { stats, needsGithub };
 
-  try {
-    const res = await fetch(
-      `/api/github/stats?repo=${encodeURIComponent(p.github_repo)}`,
-    );
-    const body = (await res.json().catch(() => null)) as {
-      additions?: number;
-      deletions?: number;
-      error?: string;
-    } | null;
-    if (res.ok) {
-      stats.additions = body?.additions ?? 0;
-      stats.deletions = body?.deletions ?? 0;
-    } else if (body?.error === "invalid_repo") {
-      stats.error = "invalid_repo";
-    } else if (body?.error === "repo_not_found") {
-      stats.error = "repo_not_found";
-    } else if (body?.error === "link_github") {
-      needsGithub = true;
+  for (let attempt = 0; attempt < STATS_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(
+        `/api/github/stats?repo=${encodeURIComponent(p.github_repo)}`,
+      );
+      const body = (await res.json().catch(() => null)) as {
+        additions?: number;
+        deletions?: number;
+        pending?: boolean;
+        error?: string;
+      } | null;
+      if (res.ok) {
+        if (body?.pending && attempt < STATS_ATTEMPTS - 1) {
+          stats.pending = true;
+          onUpdate?.({ ...stats });
+          await new Promise((resolve) => setTimeout(resolve, STATS_RETRY_MS));
+          continue;
+        }
+        stats.additions = body?.additions ?? 0;
+        stats.deletions = body?.deletions ?? 0;
+        stats.pending = Boolean(body?.pending);
+        break;
+      }
+      if (body?.error === "invalid_repo") stats.error = "invalid_repo";
+      else if (body?.error === "repo_not_found") stats.error = "repo_not_found";
+      else if (body?.error === "link_github") needsGithub = true;
+      break;
+    } catch {
+      break;
     }
-  } catch {
-    /* network hiccup: show zeros */
   }
 
   return { stats, needsGithub };
@@ -136,7 +152,9 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
     repoProjects.find((p) => p.id === selectedId) ?? repoProjects[0] ?? null;
 
   const refreshStats = useCallback(async (p: ProjectRow) => {
-    const { stats: next, needsGithub } = await loadProjectStats(p);
+    const { stats: next, needsGithub } = await loadProjectStats(p, (partial) => {
+      setStats((prev) => ({ ...prev, [p.id]: partial }));
+    });
     setStats((prev) => ({ ...prev, [p.id]: next }));
     if (needsGithub) setNeedsGithubReconnect(true);
   }, []);

@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { buildActivityStats } from "@/features/dev-mode/activity-stats";
 import { WEEKDAYS, buildMonthGrid, monthLabel, toDayKey } from "@/lib/calendar";
 import { cn } from "@/lib/utils";
 import type { ProjectCommitRow } from "@/types/database";
@@ -46,6 +47,25 @@ function formatDayTitle(dayKey: string): string {
   }).format(new Date(y, m - 1, d));
 }
 
+function CellBadge({
+  children,
+  tone,
+}: {
+  children: string;
+  tone: "amber" | "ink";
+}) {
+  return (
+    <span
+      className={cn(
+        "rounded-md px-1 text-[8px] font-bold uppercase tracking-wider sm:text-[9px]",
+        tone === "amber" ? "bg-amber-400 text-zinc-950" : "bg-zinc-950 text-white",
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
 function formatTime(iso: string): string {
   return new Intl.DateTimeFormat(undefined, {
     hour: "numeric",
@@ -70,6 +90,13 @@ export function CommitCalendar({
     }
     return map;
   }, [commits]);
+
+  const activity = useMemo(() => buildActivityStats(commits), [commits]);
+  const lateNightDays = useMemo(
+    () => new Set(activity.lateNightDayKeys),
+    [activity],
+  );
+  const fixDays = useMemo(() => new Set(activity.fixDayKeys), [activity]);
 
   const startKey = firstCommitAt ? toDayKey(new Date(firstCommitAt)) : null;
   const latestAt = commits.length
@@ -108,7 +135,23 @@ export function CommitCalendar({
     );
   }
 
+  function marksFor(date: string | null): string[] {
+    if (!date) return [];
+    const marks: string[] = [];
+    if (activity.bestCommitDay?.key === date) marks.push("Best day");
+    if (
+      activity.bestTimeDay?.key === date &&
+      activity.bestTimeDay.key !== activity.bestCommitDay?.key
+    ) {
+      marks.push("Longest");
+    }
+    if (lateNightDays.has(date)) marks.push("Late night");
+    if (fixDays.has(date)) marks.push("Fix");
+    return marks;
+  }
+
   const openCommits = openDay ? (byDay.get(openDay) ?? []) : [];
+  const openMarks = marksFor(openDay);
 
   return (
     <div className="w-full">
@@ -164,9 +207,16 @@ export function CommitCalendar({
           const dayCommits = byDay.get(cell.date) ?? [];
           const count = dayCommits.length;
           const isStart = cell.date === startKey;
+          const isBest = activity.bestCommitDay?.key === cell.date;
+          const isLongest =
+            activity.bestTimeDay?.key === cell.date &&
+            activity.bestTimeDay.key !== activity.bestCommitDay?.key;
+          const isNight = lateNightDays.has(cell.date);
+          const isFix = fixDays.has(cell.date);
           const shown = dayCommits.slice(0, MAX_CELL_MESSAGES);
           const extra = count - shown.length;
-          const label = `${cell.date}: ${count} ${count === 1 ? "commit" : "commits"}${isStart ? " (project start)" : ""}`;
+          const marks = marksFor(cell.date);
+          const label = `${cell.date}: ${count} ${count === 1 ? "commit" : "commits"}${isStart ? " (project start)" : ""}${marks.length ? ` · ${marks.join(" · ")}` : ""}`;
 
           return (
             <button
@@ -187,15 +237,15 @@ export function CommitCalendar({
                   : "cursor-default",
               )}
             >
-              <span className="flex items-center justify-between gap-1">
+              <span className="flex flex-wrap items-center gap-0.5">
                 <span className="font-mono text-xs font-semibold tabular-nums sm:text-sm">
                   {cell.dayNum}
                 </span>
-                {isStart ? (
-                  <span className="rounded-md bg-amber-400 px-1 text-[8px] font-bold uppercase tracking-wider text-zinc-950 sm:text-[9px]">
-                    Started
-                  </span>
-                ) : null}
+                {isStart ? <CellBadge tone="amber">Started</CellBadge> : null}
+                {isBest ? <CellBadge tone="amber">Best</CellBadge> : null}
+                {isLongest ? <CellBadge tone="amber">Longest</CellBadge> : null}
+                {isNight ? <CellBadge tone="ink">Night</CellBadge> : null}
+                {isFix ? <CellBadge tone="ink">Fix</CellBadge> : null}
               </span>
               {shown.map((c) => (
                 <span
@@ -259,6 +309,7 @@ export function CommitCalendar({
               <span className="font-mono tabular-nums">{openCommits.length}</span>{" "}
               {openCommits.length === 1 ? "commit" : "commits"}
               {openDay && openDay === startKey ? " · project started" : ""}
+              {openMarks.length ? ` · ${openMarks.join(" · ")}` : ""}
             </DialogDescription>
           </DialogHeader>
           <ul className="space-y-2">

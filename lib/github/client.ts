@@ -1,9 +1,3 @@
-export type GithubRepoStats = {
-  commits: number;
-  additions: number;
-  deletions: number;
-};
-
 export class GithubApiError extends Error {
   constructor(
     message: string,
@@ -33,49 +27,60 @@ async function githubGet(token: string, path: string): Promise<Response> {
   return res;
 }
 
+export type AuthorCodeStats = {
+  additions: number;
+  deletions: number;
+  /** GitHub is still building contributor stats (HTTP 202). */
+  pending: boolean;
+};
+
+type ContributorWeek = { a?: number; d?: number };
+type ContributorStat = {
+  author?: { login?: string } | null;
+  weeks?: ContributorWeek[];
+};
+
 /**
- * Fetch commit stats for a repo using a GitHub OAuth access token.
- * No service role. Never log the token.
+ * All-time additions and deletions for one author on the default branch.
+ * GitHub answers 202 while it computes the weekly contributor stats.
  */
-export async function fetchRepoStats(
+export async function fetchAuthorCodeStats(
   token: string,
   owner: string,
   repo: string,
-  opts?: { since?: string; author?: string },
-): Promise<GithubRepoStats> {
-  const params = new URLSearchParams({ per_page: "100" });
-  if (opts?.since) params.set("since", opts.since);
-  if (opts?.author) params.set("author", opts.author);
-
-  const listRes = await githubGet(
-    token,
-    `/repos/${owner}/${repo}/commits?${params}`,
+  login: string,
+): Promise<AuthorCodeStats> {
+  const res = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/stats/contributors`,
+    { headers: githubHeaders(token), cache: "no-store" },
   );
-  if (listRes.status === 409) return { commits: 0, additions: 0, deletions: 0 };
-
-  const commits = (await listRes.json()) as { sha: string }[];
-  let additions = 0;
-  let deletions = 0;
-
-  const limited = commits.slice(0, 30);
-  for (const c of limited) {
-    const detail = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/commits/${c.sha}`,
-      { headers: githubHeaders(token), cache: "no-store" },
+  if (res.status === 202 || res.status === 204) {
+    return { additions: 0, deletions: 0, pending: res.status === 202 };
+  }
+  if (res.status === 409) {
+    return { additions: 0, deletions: 0, pending: false };
+  }
+  if (!res.ok) {
+    throw new GithubApiError(
+      `GitHub contributor stats failed (${res.status})`,
+      res.status,
     );
-    if (!detail.ok) continue;
-    const body = (await detail.json()) as {
-      stats?: { additions?: number; deletions?: number };
-    };
-    additions += body.stats?.additions ?? 0;
-    deletions += body.stats?.deletions ?? 0;
   }
 
-  return {
-    commits: commits.length,
-    additions,
-    deletions,
-  };
+  const body = (await res.json()) as ContributorStat[];
+  const mine = Array.isArray(body)
+    ? body.find(
+        (row) => row.author?.login?.toLowerCase() === login.toLowerCase(),
+      )
+    : undefined;
+
+  let additions = 0;
+  let deletions = 0;
+  for (const week of mine?.weeks ?? []) {
+    additions += week.a ?? 0;
+    deletions += week.d ?? 0;
+  }
+  return { additions, deletions, pending: false };
 }
 
 export type GithubCommit = {
