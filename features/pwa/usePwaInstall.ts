@@ -1,6 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import {
+  iosInstallSurface,
+  type IosInstallSurface,
+} from "@/features/pwa/ios-install";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -16,14 +20,14 @@ function isStandaloneDisplay() {
   return media || ios;
 }
 
-function isIosSafari() {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent;
-  const ios =
-    /iPad|iPhone|iPod/.test(ua) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-  const other = /CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
-  return ios && !other;
+function readIosSurface(): IosInstallSurface | null {
+  if (typeof navigator === "undefined") return null;
+  if (isStandaloneDisplay()) return null;
+  return iosInstallSurface(
+    navigator.userAgent,
+    navigator.platform,
+    navigator.maxTouchPoints,
+  );
 }
 
 function subscribeStandalone(onStoreChange: () => void) {
@@ -46,10 +50,10 @@ export function usePwaInstall() {
     isStandaloneDisplay,
     () => false,
   );
-  const ios = useSyncExternalStore(
+  const iosSurface = useSyncExternalStore(
     subscribeNoop,
-    () => isIosSafari() && !isStandaloneDisplay(),
-    () => false,
+    readIosSurface,
+    () => null,
   );
 
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(
@@ -81,7 +85,8 @@ export function usePwaInstall() {
   return {
     installed,
     canInstall: Boolean(deferred) && !installed,
-    isIos: ios && !installed,
+    isIos: iosSurface !== null && !installed,
+    iosSurface: installed ? null : iosSurface,
     promptInstall,
   };
 }

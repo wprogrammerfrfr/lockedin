@@ -48,6 +48,9 @@ export const metadata: Metadata = {
     title: "LockedIn",
     statusBarStyle: "black-translucent",
   },
+  other: {
+    "apple-mobile-web-app-capable": "yes",
+  },
 };
 
 export const viewport: Viewport = {

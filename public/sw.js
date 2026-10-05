@@ -1,5 +1,5 @@
 /* LockedIn service worker — app shell cache; never cache Supabase auth. */
-const CACHE = "lockedin-shell-v5";
+const CACHE = "lockedin-shell-v6";
 const SHELL = [
   "/",
   "/lockin",
@@ -11,7 +11,20 @@ const SHELL = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()),
+    caches
+      .open(CACHE)
+      .then(async (cache) => {
+        await Promise.all(
+          SHELL.map(async (url) => {
+            try {
+              await cache.add(url);
+            } catch {
+              // One missing shell file must not reject the whole install.
+            }
+          }),
+        );
+      })
+      .then(() => self.skipWaiting()),
   );
 });
 

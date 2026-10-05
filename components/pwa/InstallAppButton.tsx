@@ -30,7 +30,8 @@ export function InstallAppButton({
   /** Huge lime Download CTA for the welcome page. */
   hero?: boolean;
 }) {
-  const { installed, canInstall, isIos, promptInstall } = usePwaInstall();
+  const { installed, canInstall, isIos, iosSurface, promptInstall } =
+    usePwaInstall();
   const [howtoOpen, setHowtoOpen] = useState(false);
 
   if (installed) return null;
@@ -93,19 +94,36 @@ export function InstallAppButton({
             <DialogTitle>Install LockedIn</DialogTitle>
             <DialogDescription>
               {isIos
-                ? "Add LockedIn to your Home Screen to use it like an app."
+                ? "LockedIn shows up on your Home Screen like a downloaded app."
                 : "Install LockedIn from your browser for a full-screen timer on your phone."}
             </DialogDescription>
           </DialogHeader>
-          {isIos ? (
+          {iosSurface === "safari" ? (
             <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
               <li>
-                Tap Share
+                Tap the Share button
                 <Share className="mx-1 inline h-3.5 w-3.5 align-text-bottom text-muted-foreground" />
                 in Safari.
               </li>
-              <li>Choose Add to Home Screen.</li>
-              <li>Tap Add — LockedIn appears on your Home Screen.</li>
+              <li>Tap Add to Home Screen.</li>
+              <li>
+                Tap Add. Leave Open as Web App on. LockedIn shows up on your
+                Home Screen like a downloaded app.
+              </li>
+            </ol>
+          ) : iosSurface === "other" ? (
+            <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
+              <li>Open this page in Safari.</li>
+              <li>
+                Tap the Share button
+                <Share className="mx-1 inline h-3.5 w-3.5 align-text-bottom text-muted-foreground" />
+                in Safari.
+              </li>
+              <li>Tap Add to Home Screen.</li>
+              <li>
+                Tap Add. Leave Open as Web App on. LockedIn shows up on your
+                Home Screen like a downloaded app.
+              </li>
             </ol>
           ) : (
             <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
