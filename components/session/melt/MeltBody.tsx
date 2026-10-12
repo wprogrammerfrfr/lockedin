@@ -52,6 +52,7 @@ function PaintedScoop({
   seed,
   index,
   flavorId,
+  instanceId,
 }: {
   scoop: Scoop;
   color: string;
@@ -63,12 +64,14 @@ function PaintedScoop({
   seed: string;
   index: number;
   flavorId?: string;
+  /** Document-unique prefix so two desserts don't share paint servers. */
+  instanceId: string;
 }) {
   const r = scoop.r * seededRange(seed, 50 + index, 0.94, 1.05);
   const dome = isBottom
     ? scoopDomePathSoft(scoop.cx, scoop.seatY, r, shallow, seed, index)
     : scoopDomePath(scoop.cx, scoop.seatY, r, seed, index);
-  const gradId = `scoop-paint-${index}-${Math.round(scoop.cx)}`;
+  const gradId = `scoop-paint-${instanceId}-${index}-${Math.round(scoop.cx)}`;
   const flavorBoost =
     flavorId === "chocolate"
       ? 0.08
@@ -132,6 +135,7 @@ export function MeltScoopStack({
   seed,
   flavorId,
   mouthClipId,
+  instanceId,
   children,
 }: {
   scoops: Scoop[];
@@ -145,6 +149,8 @@ export function MeltScoopStack({
   flavorId?: string;
   /** Clip only the bottom scoop (belly in vessel); upper scoops stay unclipped so domes aren't sheared. */
   mouthClipId?: string;
+  /** Scopes scoop gradient and clip ids to this melt instance. */
+  instanceId: string;
   children?: ReactNode;
 }) {
   const topLayer = scoops[scoops.length - 1]?.layer;
@@ -174,6 +180,7 @@ export function MeltScoopStack({
               seed={seed}
               index={i}
               flavorId={flavorId}
+              instanceId={instanceId}
             />
             {isTop ? children : null}
           </g>
@@ -203,6 +210,7 @@ export function MeltInteriorFill({
   cx,
   progress,
   layerCount,
+  instanceId,
 }: {
   fillPath: string;
   color: string;
@@ -212,10 +220,12 @@ export function MeltInteriorFill({
   layerCount: number;
   /** @deprecated Gloss highlights removed — kept for call-site compat. */
   sheen?: number;
+  /** Scopes the interior gradient id to this melt instance. */
+  instanceId: string;
 }) {
   const pose = layerPose(0, layerCount, progress);
   if (pose.opacity <= 0) return null;
-  const gradId = `interior-paint-${Math.round(cx)}`;
+  const gradId = `interior-paint-${instanceId}-${Math.round(cx)}`;
   return (
     <g
       opacity={pose.opacity}

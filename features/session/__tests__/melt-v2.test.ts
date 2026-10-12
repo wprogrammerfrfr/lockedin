@@ -1,3 +1,5 @@
+import { createElement, type ReactElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
   createVisualSeed,
@@ -16,8 +18,9 @@ import {
   nearestBodyState,
 } from "@/components/session/melt/MeltInterpolation";
 import { quantizeProgress } from "@/components/session/melt/MeltLod";
-import { createMeltConfig } from "@/features/session/melt-catalog";
+import { createMeltConfig, type IceCreamFlavorId } from "@/features/session/melt-catalog";
 import { resolveArtVersion } from "@/features/session/melt-art-version";
+import { MeltComposer } from "@/components/session/melt/MeltComposer";
 
 describe("melt-seed", () => {
   it("derives a stable seed from config fields", () => {
@@ -208,5 +211,69 @@ describe("createMeltConfig art version", () => {
       displayName: "Legacy",
     };
     expect(resolveArtVersion(legacy)).toBe(1);
+  });
+});
+
+function flavorScene(flavorId: IceCreamFlavorId): ReactElement {
+  return createElement(MeltComposer, {
+    config: createMeltConfig({
+      kind: "iceCream",
+      containerId: "sundae_glass",
+      flavorId,
+      toppings: ["sprinkles", "cherry"],
+      artVersion: 2,
+      visualSeed: "room-shared-seed",
+    }),
+    progress: 0,
+    size: "md",
+    animated: false,
+  });
+}
+
+describe("melt flavor paint servers", () => {
+  it("keeps vanilla and strawberry gradients disjoint in one document", () => {
+    const markup = renderToStaticMarkup(
+      createElement("div", null, flavorScene("vanilla"), flavorScene("strawberry")),
+    );
+    const svgs = markup.match(/<svg\b[\s\S]*?<\/svg>/g) ?? [];
+    expect(svgs).toHaveLength(2);
+    const [vanilla, strawberry] = svgs as [string, string];
+
+    const gradientIds = (svg: string) =>
+      [...svg.matchAll(/<(?:radial|linear)Gradient\b[^>]*\bid="([^"]+)"/g)].map(
+        (match) => match[1]!,
+      );
+    const vanillaIds = gradientIds(vanilla);
+    const strawberryIds = gradientIds(strawberry);
+    expect(vanillaIds.length).toBeGreaterThan(0);
+    expect(strawberryIds.length).toBeGreaterThan(0);
+    expect(vanillaIds.some((id) => id.startsWith("scoop-paint-"))).toBe(true);
+    expect(strawberryIds.some((id) => id.startsWith("scoop-paint-"))).toBe(true);
+    expect(vanillaIds.some((id) => id.startsWith("interior-paint-"))).toBe(true);
+    expect(strawberryIds.some((id) => id.startsWith("interior-paint-"))).toBe(true);
+    expect(new Set([...vanillaIds, ...strawberryIds]).size).toBe(
+      vanillaIds.length + strawberryIds.length,
+    );
+
+    const definedIds = (svg: string) =>
+      new Set([...svg.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]!));
+    const fillIds = (svg: string) =>
+      [...svg.matchAll(/\bfill="url\(#([^"]+)\)"/g)].map((match) => match[1]!);
+    const vanillaDefined = definedIds(vanilla);
+    const strawberryDefined = definedIds(strawberry);
+
+    for (const id of fillIds(vanilla)) {
+      expect(vanillaDefined.has(id)).toBe(true);
+      expect(strawberryDefined.has(id)).toBe(false);
+    }
+    for (const id of fillIds(strawberry)) {
+      expect(strawberryDefined.has(id)).toBe(true);
+      expect(vanillaDefined.has(id)).toBe(false);
+    }
+
+    expect(vanilla).toContain("#FFE7A3");
+    expect(strawberry).toContain("#F06B8A");
+    expect(vanilla).not.toContain("#F06B8A");
+    expect(strawberry).not.toContain("#FFE7A3");
   });
 });

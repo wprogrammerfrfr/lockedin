@@ -111,6 +111,7 @@ export function MeltComposer({
       mouthScale={mouthScale}
       innerClipId={innerClipId}
       mouthClipId={mouthClipId}
+      paintId={clipSuffix}
       className={className}
       size={size}
     />
@@ -128,6 +129,7 @@ function IceCreamComposer({
   mouthScale,
   innerClipId,
   mouthClipId,
+  paintId,
   className,
   size,
 }: {
@@ -141,6 +143,7 @@ function IceCreamComposer({
   mouthScale: number;
   innerClipId: string;
   mouthClipId: string;
+  paintId: string;
   className?: string;
   size: MeltSceneSize;
 }) {
@@ -220,6 +223,7 @@ function IceCreamComposer({
             progress={progress}
             layerCount={profile.layerCount}
             sheen={pose.sheen}
+            instanceId={paintId}
           />
         ) : null}
         {showInteriorLiquid ? (
@@ -244,6 +248,7 @@ function IceCreamComposer({
         seed={seed}
         flavorId={config.flavorId}
         mouthClipId={mouthClipId}
+        instanceId={paintId}
       />
       {config.containerId === "sundae_glass" && topScoop && topLocal < 1 ? (
         <g clipPath={`url(#${mouthClipId})`}>

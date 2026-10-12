@@ -51,6 +51,29 @@ describe("memberDisplayClock", () => {
     expect(clock.displayMs).toBe(8_500);
   });
 
+  it("keeps a remote LOCKED_IN clock increasing from the last stamp", () => {
+    const member = baseMember({
+      userId: "them",
+      elapsedMs: 10_000,
+      clockSyncedAt: 1_000_000,
+      status: "LOCKED_IN",
+    });
+    const first = memberDisplayClock(member, 1_002_000);
+    const later = memberDisplayClock(member, 1_005_000);
+    expect(later.displayMs - first.displayMs).toBe(3_000);
+  });
+
+  it("treats a future clockSyncedAt as now", () => {
+    const now = 1_000_000;
+    const member = baseMember({
+      userId: "them",
+      elapsedMs: 4_000,
+      clockSyncedAt: now + 30_000,
+      status: "LOCKED_IN",
+    });
+    expect(memberDisplayClock(member, now).displayMs).toBe(4_000);
+  });
+
   it("freezes focus elapsed on BREAK and ticks open-ended break", () => {
     const member = baseMember({
       userId: "them",
@@ -149,13 +172,25 @@ describe("mergePresenceOnSync", () => {
 });
 
 describe("pickNewerClockFields", () => {
-  it("keeps elapsedMs of 0 (does not treat as missing)", () => {
+  it("keeps elapsedMs of 0 when the projections tie", () => {
     const picked = pickNewerClockFields(
-      { elapsedMs: 0, clockSyncedAt: 200 },
-      { elapsedMs: 5_000, clockSyncedAt: 100 },
+      { elapsedMs: 0, clockSyncedAt: 1_000 },
+      { elapsedMs: 0, clockSyncedAt: 1_000 },
+      1_000,
     );
     expect(picked.elapsedMs).toBe(0);
-    expect(picked.clockSyncedAt).toBe(200);
+    expect(picked.clockSyncedAt).toBe(1_000);
+  });
+
+  it("prefers a further-along elapsed over a future presence stamp", () => {
+    const now = 1_000_000;
+    const picked = pickNewerClockFields(
+      { elapsedMs: 0, clockSyncedAt: now + 60_000 },
+      { elapsedMs: 20_000, clockSyncedAt: now - 10_000 },
+      now,
+    );
+    expect(picked.elapsedMs).toBe(20_000);
+    expect(picked.clockSyncedAt).toBe(now - 10_000);
   });
 
   it("prefers newer clockSyncedAt", () => {
@@ -214,13 +249,14 @@ describe("mergeMembers", () => {
     expect(merged[0]?.clockSyncedAt).toBe(2_000);
   });
 
-  it("does not drop elapsedMs of 0 from presence", () => {
+  it("lets a higher database elapsed replace a future presence stamp", () => {
+    const now = Date.now();
     const table = [
       baseMember({
         userId: "u1",
         seat: 1,
-        elapsedMs: 9_000,
-        clockSyncedAt: 100,
+        elapsedMs: 20_000,
+        clockSyncedAt: now - 10_000,
         status: "LOCKED_IN",
       }),
     ];
@@ -231,13 +267,14 @@ describe("mergeMembers", () => {
           userId: "u1",
           seat: 1,
           elapsedMs: 0,
-          clockSyncedAt: 500,
+          clockSyncedAt: now + 60_000,
           status: "LOCKED_IN",
         }),
       ],
     ]);
     const merged = mergeMembers(table, presence);
-    expect(merged[0]?.elapsedMs).toBe(0);
+    expect(merged[0]?.elapsedMs).toBe(20_000);
+    expect(merged[0]?.clockSyncedAt).toBe(now - 10_000);
   });
 
   it("keeps live BREAK countdown when DB poll has no break ms and no stamp", () => {

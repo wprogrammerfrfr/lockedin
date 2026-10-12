@@ -37,6 +37,7 @@ import {
   joinRoom,
   leaveRoom,
   leaveRoomKeepalive,
+  touchRoomPresence,
   requestSharedBreak,
   resolveBreakVote,
 } from "@/features/rooms/api";
@@ -47,6 +48,7 @@ import {
   type SelfLiveClock,
 } from "@/features/rooms/live-member-clock";
 import { usePomodoroCadence } from "@/features/rooms/usePomodoroCadence";
+import { backgroundKeepsRoomSeat } from "@/features/rooms/background-seat";
 import { useRoomChannel } from "@/features/rooms/useRoomChannel";
 import type { BreakVoteChoice, RoomSummary } from "@/features/rooms/types";
 import {
@@ -441,6 +443,19 @@ export default function RoomFocusPage({
     const onPageHide = (event: PageTransitionEvent) => {
       if (event.persisted) return;
       if (leftIntentionallyRef.current) return;
+      const standalone =
+        window.matchMedia("(display-mode: standalone)").matches ||
+        (navigator as Navigator & { standalone?: boolean }).standalone === true;
+      if (
+        backgroundKeepsRoomSeat({
+          userAgent: navigator.userAgent,
+          platform: navigator.platform,
+          maxTouchPoints: navigator.maxTouchPoints,
+          standalone,
+        })
+      ) {
+        return;
+      }
       leftIntentionallyRef.current = true;
       leaveRoomKeepalive(roomId, accessTokenRef.current);
     };
@@ -450,6 +465,58 @@ export default function RoomFocusPage({
       window.removeEventListener("pagehide", onPageHide);
     };
   }, [room?.id, userId]);
+
+  const presenceSelfRef = useRef(presenceSelf);
+  presenceSelfRef.current = presenceSelf;
+
+  useEffect(() => {
+    const roomId = room?.id;
+    if (!roomId || !userId) return;
+
+    let cancelled = false;
+    const resumeSeat = () => {
+      if (leftIntentionallyRef.current) return;
+      const s = presenceSelfRef.current;
+      const meltActive =
+        (s.status === "LOCKED_IN" || s.status === "BREAK") &&
+        Boolean(s.meltConfig);
+      void touchRoomPresence(
+        createClient(),
+        roomId,
+        s.status,
+        s.elapsedMs,
+        s.status === "BREAK" ? s.breakType ?? null : null,
+        meltActive ? (s.meltConfig ?? null) : null,
+        meltActive ? (s.meltAnimOffsetMs ?? 0) : 0,
+        meltActive ? (s.meltBoardX ?? null) : null,
+        meltActive ? (s.meltBoardZ ?? null) : null,
+      ).catch((err: unknown) => {
+        if (cancelled || leftIntentionallyRef.current) return;
+        const msg = err instanceof Error ? err.message : "";
+        if (!msg.includes("not_in_room")) return;
+        const normalized = code.replace(/\D/g, "").slice(0, 6);
+        if (normalized.length !== 6) return;
+        void joinRoom(createClient(), normalized)
+          .then((joined) => {
+            if (cancelled || leftIntentionallyRef.current) return;
+            joinedRef.current = true;
+            seenRoomRef.current = true;
+            setRoom(joined);
+          })
+          .catch(() => undefined);
+      });
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") resumeSeat();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", resumeSeat);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", resumeSeat);
+    };
+  }, [room?.id, userId, code]);
 
   const selfLive = useMemo((): SelfLiveClock | null => {
     if (!userId) return null;

@@ -63,8 +63,10 @@ export function memberDisplayClock(
     Number.isFinite(member.clockSyncedAt)
       ? member.clockSyncedAt
       : null;
-  const delta =
-    syncedAt != null ? Math.max(0, now - syncedAt) : 0;
+  // A phone clock ahead of this device must not freeze the timer at delta 0
+  // forever, and must not produce a negative gap. Cap the stamp at `now`.
+  const stamp = syncedAt == null ? null : Math.min(syncedAt, now);
+  const delta = stamp != null ? Math.max(0, now - stamp) : 0;
 
   const baseElapsed = clampNonNeg(member.elapsedMs);
   const breakOpenEnded = member.breakOpenEnded ?? false;
@@ -118,9 +120,23 @@ export function useNow(intervalMs: number): number {
   return now;
 }
 
+function focusProjection(
+  sample: { elapsedMs?: number; clockSyncedAt?: number },
+  now: number,
+): number {
+  const elapsed = clampNonNeg(sample.elapsedMs ?? 0);
+  const at = sample.clockSyncedAt;
+  if (typeof at !== "number" || !Number.isFinite(at)) return elapsed;
+  const stamp = Math.min(at, now);
+  return elapsed + Math.max(0, now - stamp);
+}
+
 /**
- * Pick the newer of two clocked snapshots. Prefer `a` when stamps are equal
- * or missing on `b`. Uses nullish coalescing so `elapsedMs: 0` is kept.
+ * Pick the clock that should drive a remote seat.
+ * LOCKED_IN samples (no break fields) keep whichever extrapolated focus time
+ * is further along, so a future `clockSyncedAt` cannot freeze a higher elapsed.
+ * Prefer `a` when those projections tie. Uses nullish coalescing so
+ * `elapsedMs: 0` is kept on that tie.
  *
  * When either side carries real BREAK clock fields and the other does not
  * (typical DB row vs Realtime presence), prefer the side with break fields
@@ -143,6 +159,7 @@ export function pickNewerClockFields(
     | "breakRemainingMs"
     | "breakOpenEnded"
   >,
+  now = Date.now(),
 ): Pick<
   RoomPresenceMember,
   | "elapsedMs"
@@ -153,6 +170,21 @@ export function pickNewerClockFields(
 > {
   const aHasBreak = hasBreakClockFields(a);
   const bHasBreak = hasBreakClockFields(b);
+  if (!aHasBreak && !bHasBreak) {
+    const aProj = focusProjection(a, now);
+    const bProj = focusProjection(b, now);
+    if (aProj !== bProj) {
+      const src = aProj > bProj ? a : b;
+      const other = aProj > bProj ? b : a;
+      return {
+        elapsedMs: src.elapsedMs ?? other.elapsedMs ?? 0,
+        clockSyncedAt: src.clockSyncedAt ?? other.clockSyncedAt,
+        breakElapsedMs: src.breakElapsedMs ?? other.breakElapsedMs ?? 0,
+        breakRemainingMs: src.breakRemainingMs ?? other.breakRemainingMs ?? 0,
+        breakOpenEnded: src.breakOpenEnded ?? other.breakOpenEnded ?? false,
+      };
+    }
+  }
   if (aHasBreak !== bHasBreak) {
     const src = aHasBreak ? a : b;
     const other = aHasBreak ? b : a;

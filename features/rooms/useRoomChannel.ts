@@ -10,7 +10,10 @@ import {
 } from "@/features/rooms/api";
 import { pickNewerClockFields } from "@/features/rooms/live-member-clock";
 import { mergePresenceOnSync } from "@/features/rooms/presence-merge";
-import type { RoomPresenceMember } from "@/features/rooms/types";
+import type {
+  RoomPresenceMember,
+  RoomPresenceStatus,
+} from "@/features/rooms/types";
 import type { MeltConfig } from "@/features/session/melt-catalog";
 import {
   getFollowRelation,
@@ -21,6 +24,37 @@ import { userFacingError } from "@/lib/supabase/errors";
 const TOUCH_MS = 10_000;
 /** Sweep stale seats every 3 touches (~30s) so disconnects advance closing. */
 const SWEEP_EVERY_TOUCHES = 3;
+
+const CLOCK_STATUSES = new Set<RoomPresenceStatus>([
+  "LOCKED_IN",
+  "BREAK",
+  "LACKING",
+  "IDLE",
+  "WAITING",
+  "CUSTOMIZING",
+]);
+
+type ClockBroadcast = {
+  userId: string;
+  status: RoomPresenceStatus;
+  elapsedMs: number;
+  clockSyncedAt: number;
+  breakElapsedMs: number;
+  breakRemainingMs: number;
+  breakOpenEnded: boolean;
+};
+
+function isClockBroadcast(value: unknown): value is ClockBroadcast {
+  if (!value || typeof value !== "object") return false;
+  const row = value as Partial<ClockBroadcast>;
+  return (
+    typeof row.userId === "string" &&
+    typeof row.status === "string" &&
+    CLOCK_STATUSES.has(row.status as RoomPresenceStatus) &&
+    typeof row.elapsedMs === "number" &&
+    typeof row.clockSyncedAt === "number"
+  );
+}
 
 /** Presence track payload: nested melt config is stringified on the wire. */
 type PresenceTrackPayload = Omit<RoomPresenceMember, "meltConfig"> & {
@@ -343,6 +377,18 @@ export function useRoomChannel(
       return next;
     });
     void channel.track(payload).catch(() => undefined);
+    const clock: ClockBroadcast = {
+      userId: s.userId,
+      status: s.status,
+      elapsedMs: s.elapsedMs,
+      clockSyncedAt,
+      breakElapsedMs: payload.breakElapsedMs ?? 0,
+      breakRemainingMs: payload.breakRemainingMs ?? 0,
+      breakOpenEnded: payload.breakOpenEnded ?? false,
+    };
+    void channel
+      .send({ type: "broadcast", event: "clock", payload: clock })
+      .catch(() => undefined);
   }, []);
 
   const touchSelf = useCallback((roomIdArg: string) => {
@@ -373,7 +419,34 @@ export function useRoomChannel(
     channelRef.current = channel;
     setPresenceSynced(false);
 
+    const applyClock = (raw: unknown) => {
+      if (cancelled.current || !isClockBroadcast(raw)) return;
+      setPresenceById((prev) => {
+        const next = new Map(prev);
+        const existing = next.get(raw.userId);
+        const clocks = pickNewerClockFields(raw, existing ?? raw);
+        next.set(raw.userId, {
+          username: "",
+          displayName: null,
+          avatarPath: null,
+          seat: null,
+          ...existing,
+          userId: raw.userId,
+          status: raw.status,
+          elapsedMs: clocks.elapsedMs,
+          clockSyncedAt: clocks.clockSyncedAt,
+          breakElapsedMs: clocks.breakElapsedMs,
+          breakRemainingMs: clocks.breakRemainingMs,
+          breakOpenEnded: clocks.breakOpenEnded,
+        });
+        return next;
+      });
+    };
+
     channel
+      .on("broadcast", { event: "clock" }, ({ payload }) => {
+        applyClock(payload);
+      })
       .on("presence", { event: "sync" }, () => {
         if (cancelled.current) return;
         const state = channel.presenceState() as Record<string, unknown[]>;
@@ -409,6 +482,7 @@ export function useRoomChannel(
     const touchId = window.setInterval(() => {
       touchSelf(roomId);
       trackSelf();
+      void loadTable(roomId, cancelled);
       touchCountRef.current += 1;
       if (touchCountRef.current % SWEEP_EVERY_TOUCHES === 0) {
         void sweepRoom(createClient(), roomId)
@@ -417,9 +491,21 @@ export function useRoomChannel(
       }
     }, TOUCH_MS);
 
+    const republish = () => {
+      trackSelf();
+      touchSelf(roomId);
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") republish();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", republish);
+
     return () => {
       cancelled.current = true;
       window.clearInterval(touchId);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", republish);
       channelRef.current = null;
       touchCountRef.current = 0;
       setPresenceSynced(false);
